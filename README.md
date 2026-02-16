@@ -22,11 +22,20 @@ Detects people, tracks them across frames, counts how many stand inside a config
 
 ## 🚀 Installation
 
-### 1. Create a conda environment
+### 1. Create a Python virtual environment (venv)
+
+Windows (PowerShell):
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+macOS / Linux:
 
 ```bash
-conda create -n queue_estimation python=3.10 -y
-conda activate queue_estimation
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
 ### 2. Install dependencies
@@ -36,10 +45,15 @@ pip install -r requirements.txt
 ```
 
 > **GPU support (optional):**  
-> If you have an NVIDIA GPU, install the CUDA version of PyTorch *before* the above:
+> If you have an NVIDIA GPU, install the CUDA-enabled PyTorch wheel *before* the other dependencies. Recommended build for this project: **CUDA 12.4**.
 > ```bash
-> pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+> pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
 > ```
+> Verify GPU availability:
+> ```bash
+> python -c "import torch; print('GPU available:', torch.cuda.is_available())"
+> ```
+> **Recommended Python:** 3.10 (best-tested). Python 3.13 may require manual wheel selection for some libraries.
 
 ---
 
@@ -69,6 +83,18 @@ python -m src.main --source rtsp://192.168.1.10:554/stream
 python -m src.main --source videos/test.mp4 \
     --zone-points '[[100,200],[400,200],[400,600],[100,600]]'
 ```
+
+### GUI (Graphical interface)
+
+```bash
+# Activate the project's virtual environment (Windows PowerShell)
+.\.venv\Scripts\Activate.ps1
+# Start the GUI launcher
+python gui.py
+```
+
+- Quick flow: `Select Video` → `Select Zone from Video` (draw polygon) → `Run Analysis`.
+- The GUI spawns the processing backend in a separate console window so the interface remains responsive.
 
 ### All options
 
@@ -134,7 +160,7 @@ Stage_PFE/
 
 ## 📝 License
 
-Academic project – Université / École d'ingénieurs, Tunisia.
+Academic project – Université Sesame, Tunisia.
 
 ---
 
