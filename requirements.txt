@@ -1,0 +1,19 @@
+# ============================================================
+# Queue Wait-Time Estimation System – Dependencies
+# ============================================================
+
+# Computer-vision backbone
+ultralytics>=8.4.0          # YOLO26 support
+opencv-python>=4.9.0
+supervision>=0.24.0         # polygon zones, tracking helpers
+
+# Scientific / data
+numpy>=1.26.0
+pandas>=2.1.0
+
+# Future – n8n webhook integration
+requests>=2.31.0
+
+# Notebooks / dev
+jupyter>=1.0.0
+matplotlib>=3.8.0

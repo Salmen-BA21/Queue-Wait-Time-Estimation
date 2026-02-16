@@ -1,0 +1,39 @@
+# ────────────────── Python ──────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ────────────────── Virtual Envs ──────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ────────────────── IDEs ──────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ────────────────── OS ──────────────────
+.DS_Store
+Thumbs.db
+
+# ────────────────── Project-specific ──────────────────
+videos/
+data/
+*.mp4
+*.avi
+*.mkv
+*.mov
+
+# YOLO weights (downloaded automatically)
+*.pt
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
