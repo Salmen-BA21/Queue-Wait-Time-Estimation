@@ -1,12 +1,13 @@
 """
 Queue analyser – count people in zone, estimate arrival/service rates
-and expected waiting time.
+and expected waiting time with uncertainty quantification.
 
 Uses a simple sliding-window approach:
 * **λ (arrival rate)**: persons entering the zone per second.
 * **μ (service rate)**: persons leaving the zone per second.
 * **W (expected wait)**: estimated via M/M/1 queueing formula ``1 / (μ − λ)``
   when the queue is stable (λ < μ).  Falls back to ``queue_size / μ`` otherwise.
+* **Uncertainty**: Bayesian rate estimates + variance-based wait time intervals.
 """
 
 from __future__ import annotations
@@ -19,13 +20,19 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from src.config import ARRIVAL_WINDOW_SEC, MIN_EVENTS_FOR_RATE, SERVICE_WINDOW_SEC
+from src.uncertainty import (
+    classify_uncertainty_level,
+    estimate_rate_uncertainty,
+    estimate_uncertainty_from_detection_confidence,
+    estimate_wait_time_uncertainty_from_variance,
+)
 
 logger = logging.getLogger("queue_system.queue_analyzer")
 
 
 @dataclass
 class QueueMetrics:
-    """Snapshot of current queue metrics."""
+    """Snapshot of current queue metrics with uncertainty quantification."""
 
     timestamp: float = 0.0
     people_in_zone: int = 0
@@ -33,6 +40,15 @@ class QueueMetrics:
     service_rate: float = 0.0   # μ – persons / sec
     estimated_wait_sec: float = 0.0
     queue_stable: bool = True
+    
+    # Uncertainty quantification fields
+    arrival_rate_lower: float = 0.0  # 95% credible interval lower bound
+    arrival_rate_upper: float = 0.0  # 95% credible interval upper bound
+    service_rate_lower: float = 0.0
+    service_rate_upper: float = 0.0
+    wait_time_lower: float = 0.0
+    wait_time_upper: float = 0.0
+    uncertainty_level: str = "Low"  # "Low", "Medium", or "High"
 
 
 class QueueAnalyzer:
@@ -62,6 +78,10 @@ class QueueAnalyzer:
         self._ids_in_zone: set[int] = set()
 
         self._metrics = QueueMetrics()
+        
+        # Uncertainty history tracking (for variance-based uncertainty calculation)
+        self._wait_times_history: deque[float] = deque(maxlen=30)  # Keep last 30 measurements
+        self._confidence_scores_history: deque[list[float]] = deque(maxlen=30)
 
     # ── Main update ───────────────────────────────────────────
 
@@ -122,6 +142,35 @@ class QueueAnalyzer:
         else:
             wait = 0.0
 
+        # Store wait time for variance-based uncertainty
+        self._wait_times_history.append(max(wait, 0.0))
+
+        # ── Uncertainty Quantification ────────────────────────
+        
+        # 1. Rate uncertainties (Bayesian Gamma)
+        arrival_unc = estimate_rate_uncertainty(len(self._arrivals), self._arrival_window)
+        service_unc = estimate_rate_uncertainty(len(self._departures), self._service_window)
+        
+        # 2. Wait time uncertainty (from variance if enough history)
+        if len(self._wait_times_history) >= 5:
+            wait_unc = estimate_wait_time_uncertainty_from_variance(
+                list(self._wait_times_history), confidence=0.95
+            )
+        else:
+            # Fallback: use ±20% if insufficient history
+            wait_unc_margin = wait * 0.2
+            from src.uncertainty import UncertaintyEstimate
+            wait_unc = UncertaintyEstimate(
+                mean=wait,
+                lower=max(0.0, wait - wait_unc_margin),
+                upper=wait + wait_unc_margin,
+                confidence_level=0.95,
+                method="fallback",
+            )
+        
+        # 3. Overall uncertainty classification
+        uncertainty_level = classify_uncertainty_level(wait_unc, point_estimate=wait)
+
         self._metrics = QueueMetrics(
             timestamp=now,
             people_in_zone=people,
@@ -129,6 +178,14 @@ class QueueAnalyzer:
             service_rate=round(mu, 4),
             estimated_wait_sec=round(max(wait, 0.0), 1),
             queue_stable=stable,
+            # Uncertainty fields
+            arrival_rate_lower=round(arrival_unc.lower, 4),
+            arrival_rate_upper=round(arrival_unc.upper, 4),
+            service_rate_lower=round(service_unc.lower, 4),
+            service_rate_upper=round(service_unc.upper, 4),
+            wait_time_lower=round(wait_unc.lower, 1),
+            wait_time_upper=round(wait_unc.upper, 1),
+            uncertainty_level=uncertainty_level,
         )
         return self._metrics
 

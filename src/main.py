@@ -202,25 +202,36 @@ def _build_labels(detections, in_zone: np.ndarray) -> list[str]:
 
 
 def _metrics_dict(m: QueueMetrics) -> dict[str, str]:
-    """Convert ``QueueMetrics`` to a display-friendly dict."""
+    """Convert ``QueueMetrics`` to a display-friendly dict with uncertainty.
+    
+    Formats metrics with credible intervals for compact display.
+    """
     return {
-        "In zone": str(m.people_in_zone),
-        "Arrival (lam)": f"{m.arrival_rate:.3f} /s",
-        "Service (mu)": f"{m.service_rate:.3f} /s",
-        "Est. wait": f"{m.estimated_wait_sec:.1f} s",
-        "Stable": "yes" if m.queue_stable else "NO",
+        "People": str(m.people_in_zone),
+        "λ (arr)": f"{m.arrival_rate:.3f}±{(m.arrival_rate_upper - m.arrival_rate_lower)/2:.3f}",
+        "μ (svc)": f"{m.service_rate:.3f}±{(m.service_rate_upper - m.service_rate_lower)/2:.3f}",
+        "Wait": f"{m.estimated_wait_sec:.1f}s",
+        "Unc.": m.uncertainty_level,
+        "Stable": "✓" if m.queue_stable else "✗",
     }
 
 
 def _log_metrics(m: QueueMetrics, frame_count: int) -> None:
-    """Write metrics to the logger."""
+    """Write metrics to the logger with uncertainty."""
     logger.info(
-        "[frame %d] zone=%d | λ=%.4f | μ=%.4f | W=%.1fs | stable=%s",
+        "[frame %d] zone=%d | λ=%.4f [%.4f,%.4f] | μ=%.4f [%.4f,%.4f] | W=%.1fs [%.1f,%.1f] | unc=%s | stable=%s",
         frame_count,
         m.people_in_zone,
         m.arrival_rate,
+        m.arrival_rate_lower,
+        m.arrival_rate_upper,
         m.service_rate,
+        m.service_rate_lower,
+        m.service_rate_upper,
         m.estimated_wait_sec,
+        m.wait_time_lower,
+        m.wait_time_upper,
+        m.uncertainty_level,
         m.queue_stable,
     )
 
