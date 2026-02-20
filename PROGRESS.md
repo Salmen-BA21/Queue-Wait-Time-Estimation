@@ -1,7 +1,7 @@
 # Project Progress Report - Queue Wait-Time Estimation System
 
-**Current Date:** February 18, 2026  
-**Last Updated:** February 18, 2026  
+**Current Date:** February 20, 2026  
+**Last Updated:** February 20, 2026  
 
 This report assesses the completion status of each phase based on the project structure, documentation, and daily logs.
 
@@ -34,6 +34,9 @@ This report assesses the completion status of each phase based on the project st
 - ✅ Video processing pipeline  
 - ✅ Stability fixes for GUI image rendering  
 - ✅ 3-step workflow (video selection → configuration → analysis)  
+- ✅ **Multi-video support added (Feb 20):** spinbox to set camera count, listbox-based picker (Add/Remove one at a time), per-video zone polygons, scrollable Step 3 summary, each video launched in its own console (`get_analysis_commands()`)  
+- ✅ Unit tests for `get_analysis_commands()` – 4 tests passing (`test_gui_app.py`)  
+- ✅ README updated with multi-video GUI workflow documentation  
 
 ### Phase 3 – Add Rate Estimation & Basic Wait Time
 **Status: COMPLETED**  
@@ -67,17 +70,23 @@ This report assesses the completion status of each phase based on the project st
 - ✅ Basic testing scripts created  
 - ✅ STATUS_REPORT.md documenting fixes and architecture  
 - ✅ Some scenario testing done  
+- ✅ Unit tests for GUI command builder (`test_gui_app.py`, 4 tests, 100% pass)  
 - ⚠️ Comprehensive testing with various scenarios not complete  
 - ⚠️ Ground truth comparison not documented  
 
 ## ❌ Remaining Phases
 
 ### Phase 5 – Send Data to n8n
-**Status: NOT STARTED**  
-- ❌ n8n workflow not created  
-- ❌ Webhook integration not implemented  
-- ❌ Data sending from Python not implemented  
-- ❌ Google Sheets/local CSV storage not set up  
+**Status: IN PROGRESS**  
+- ✅ n8n webhook setup and deployment complete
+- ✅ JSON payload structure designed (17 fields)
+- ✅ Python webhook client created with retry logic
+- ✅ Main.py integration complete (webhook sends every 5 seconds)
+- ✅ End-to-end testing successful (HTTP 200 responses)
+- ✅ CSV backup logging implemented (`src/csv_logger.py`)
+- ✅ Queue threshold detection logic implemented (`src/threshold_detector.py`)
+- ⏳ Telegram bot setup and integration pending
+- ⏳ Persistence checking with n8n state pending  
 
 ### Phase 6 – Alerts & Recommendations Logic (in n8n)
 **Status: NOT STARTED**  
@@ -97,15 +106,15 @@ This report assesses the completion status of each phase based on the project st
 
 - **Completed Phases:** 0, 1, 2, 3, 4 (5 phases)  
 - **Total Phases:** 10 (0-9)  
-- **Completion Rate:** ~50%  
-- **Current Focus:** Move to Phase 5 n8n integration for external data transmission  
+- **Completion Rate:** ~55%  
+- **Current Focus:** Multi-video GUI (completed Feb 20); next is Phase 5 Telegram/n8n alerts  
 
 ## 🎯 Next Immediate Tasks
 
-1. **Start Phase 5:** Set up n8n webhook for data transmission  
-2. **Create data payload structure** for JSON serialization  
-3. **Test webhook connectivity** with sample data  
-4. **Enhance Testing:** Run comprehensive tests across different scenarios  
+1. **Complete Phase 5:** Telegram bot setup and integration with n8n  
+2. **Phase 6:** Define alert persistence rules and implement inline Telegram buttons  
+3. **Write daily log** for Feb 20 – multi-video GUI feature  
+4. **Enhance Testing:** Run comprehensive end-to-end tests with multiple simultaneous video feeds  
 
 ## 📝 Notes
 

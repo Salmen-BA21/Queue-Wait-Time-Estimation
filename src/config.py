@@ -51,12 +51,19 @@ MIN_EVENTS_FOR_RATE: int = 2       # min events to compute a rate
 
 
 # ─── Display / Logging ───────────────────────────────────────
-DEFAULT_OUTPUT_FPS: int = 30
+DEFAULT_OUTPUT_FPS: int = 0
 DEFAULT_LOG_INTERVAL_SEC: float = 5.0
 WINDOW_NAME: str = "Queue Estimation"
 
 
-# ─── Convenience dataclass ────────────────────────────────────
+# ─── Webhook / n8n Integration ────────────────────────────────
+# Local n8n webhook URL – change if n8n is on different host/port
+N8N_WEBHOOK_URL: str = "http://localhost:5678/webhook/queue-metrics"
+WEBHOOK_ENABLED: bool = True  # Set to False to disable webhook sending
+WEBHOOK_TIMEOUT_SEC: float = 5.0
+WEBHOOK_RETRY_COUNT: int = 3
+WEBHOOK_SEND_INTERVAL_SEC: float = 5.0  # Send every N seconds (not every frame)
+
 @dataclass
 class AppConfig:
     """Runtime configuration assembled from CLI args + defaults."""

@@ -93,8 +93,9 @@ python -m src.main --source videos/test.mp4 \
 python gui.py
 ```
 
-- Quick flow: `Select Video` → `Select Zone from Video` (draw polygon) → `Run Analysis`.
-- The GUI spawns the processing backend in a separate console window so the interface remains responsive.
+- **Multi-video support**: choose how many camera feeds to analyse, pick that many files, and define a separate cashier zone for each.
+- Quick flow: `Set video count` → `Browse files` → `Configure model & zones (per video)` → `Run Analysis`.
+- Each video launches in its **own console window**, so all feeds are processed simultaneously without interference.
 
 ### All options
 

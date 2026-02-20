@@ -23,6 +23,9 @@ from src.config import (
     DEFAULT_LOG_INTERVAL_SEC,
     DEFAULT_OUTPUT_FPS,
     WINDOW_NAME,
+    N8N_WEBHOOK_URL,
+    WEBHOOK_ENABLED,
+    WEBHOOK_SEND_INTERVAL_SEC,
 )
 from src.detector import PersonDetector
 from src.queue_analyzer import QueueAnalyzer, QueueMetrics
@@ -30,6 +33,7 @@ from src.tracker import ObjectTracker
 from src.utils.drawing import create_annotators, draw_detections, draw_metrics_overlay
 from src.utils.logging_setup import setup_logging
 from src.video_capture import VideoStream
+from src.webhook_client import WebhookClient
 from src.zone_manager import ZoneManager
 
 logger: logging.Logger  # assigned in main()
@@ -135,9 +139,11 @@ def run(cfg: AppConfig) -> None:
         )
         analyzer = QueueAnalyzer()
         annotators = create_annotators()
+        webhook_client = WebhookClient(N8N_WEBHOOK_URL) if WEBHOOK_ENABLED else None
 
         frame_delay = int(1000 / cfg.output_fps) if cfg.output_fps > 0 else 1
         last_log_time = time.monotonic()
+        last_webhook_time = time.monotonic()
         frame_count = 0
 
         logger.info("Entering main loop. Press 'q' to quit.")
@@ -173,11 +179,23 @@ def run(cfg: AppConfig) -> None:
                 logger.info("Quit requested by user.")
                 break
 
-            # 7. Periodic logging
+            # 7. Periodic logging & webhook sending
             now = time.monotonic()
             if (now - last_log_time) >= cfg.log_interval_sec:
                 _log_metrics(metrics, frame_count)
                 last_log_time = now
+            
+            # 8. Periodic webhook sending to n8n
+            if webhook_client and (now - last_webhook_time) >= WEBHOOK_SEND_INTERVAL_SEC:
+                try:
+                    webhook_client.send_metrics(
+                        metrics=metrics,
+                        frame_id=frame_count,
+                        source=str(cfg.source),
+                    )
+                except Exception as exc:
+                    logger.debug(f"Webhook send failed: {exc}")
+                last_webhook_time = now
 
     cv2.destroyAllWindows()
     logger.info("Pipeline finished. Processed %d frames.", frame_count)

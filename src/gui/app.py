@@ -1,8 +1,8 @@
 """
 GUI interface for queue estimation system.
 
-Allows users to select video source, define zones, and run analysis
-without using the terminal.
+Allows users to select one or more video sources, define per-video zones,
+and run analysis – each video launches in its own terminal process.
 """
 
 from __future__ import annotations
@@ -22,9 +22,13 @@ from PIL import Image, ImageTk
 logger = logging.getLogger("queue_system.gui")
 
 
+# ═══════════════════════════════════════════════════════════════
+# Zone Selector
+# ═══════════════════════════════════════════════════════════════
+
 class ZoneSelectorWindow:
     """Interactive zone selection window."""
-    
+
     def __init__(self, video_path: str, parent: tk.Tk | tk.Toplevel | None = None):
         self.video_path = video_path
         # Explicit Tk/Toplevel typing avoids wm_transient type errors in Pylance
@@ -36,12 +40,12 @@ class ZoneSelectorWindow:
         self.scale = 1.0
         self.offset_x = 0
         self.offset_y = 0
-        
-        # Store image references as instance variables to prevent garbage collection
+
+        # Store image references to prevent garbage collection
         self.pil_image = None
         self.photo = None
-        self.photo_list = []  # Keep all images alive
-        
+        self.photo_list: list = []
+
         # Setup window (Toplevel when embedded in main GUI, standalone Tk otherwise)
         if parent is not None:
             self.root = tk.Toplevel(parent)
@@ -49,416 +53,603 @@ class ZoneSelectorWindow:
             self.root.grab_set()  # modal behavior
         else:
             self.root = tk.Tk()
-        
+
         self.root.title("Queue System - Zone Selector")
         self.root.geometry("1000x700")
-        
+
         # Video canvas
         self.canvas = tk.Canvas(self.root, bg="black", highlightthickness=0)
         self.canvas.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         self.canvas.bind("<Button-1>", self.on_canvas_click)
-        
+
         # Controls frame
         controls = ttk.Frame(self.root)
         controls.pack(fill=tk.X, padx=5, pady=5)
-        
-        ttk.Label(controls, text="Click to define cashier zone (min 3 points)", 
-                 font=("Arial", 10)).pack(side=tk.LEFT, padx=5)
-        
+
+        ttk.Label(controls, text="Click to define cashier zone (min 3 points)",
+                  font=("Arial", 10)).pack(side=tk.LEFT, padx=5)
+
         ttk.Button(controls, text="Reset", command=self.reset).pack(side=tk.LEFT, padx=2)
         ttk.Button(controls, text="Confirm", command=self.confirm).pack(side=tk.LEFT, padx=2)
         ttk.Button(controls, text="Cancel", command=self.cancel).pack(side=tk.LEFT, padx=2)
-        
+
         # Info label
         self.info_label = ttk.Label(controls, text="", font=("Arial", 9), foreground="blue")
         self.info_label.pack(side=tk.RIGHT, padx=5)
-        
+
         self.result = None
         self.load_and_display_frame()
-        
+
+    # ── frame helpers ─────────────────────────────────────────
+
     def load_and_display_frame(self):
         """Load first frame of video and display it."""
         print(f"Loading video: {self.video_path}")
         cap = cv2.VideoCapture(self.video_path)
         ret, frame = cap.read()
         cap.release()
-        
+
         if not ret:
             messagebox.showerror("Error", f"Could not open video: {self.video_path}")
             self.root.destroy()
             return
-        
+
         print(f"Frame loaded: {frame.shape}")
         self.frame_original = frame
         self.frame_h, self.frame_w = frame.shape[:2]
         print(f"Frame dimensions: {self.frame_w}x{self.frame_h}")
-        
+
         # Show window first
         self.root.deiconify()
         self.root.update()
         self.root.update_idletasks()
-        
+
         # Schedule display after window is fully initialized
         self.root.after(300, self.display_frame)
-        
+
     def display_frame(self):
         """Display frame with points and polygon."""
         if self.frame_original is None:
             self.root.after(100, self.display_frame)
             return
-        
+
         try:
             frame = self.frame_original.copy()
-            
+
             # Draw points
             for i, pt in enumerate(self.points):
                 cv2.circle(frame, tuple(pt), 8, (0, 255, 0), -1)
-                cv2.putText(frame, str(i+1), (pt[0]+15, pt[1]+5),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-            
+                cv2.putText(frame, str(i + 1), (pt[0] + 15, pt[1] + 5),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
             # Draw lines
             if len(self.points) > 1:
                 for i in range(len(self.points) - 1):
-                    cv2.line(frame, tuple(self.points[i]), tuple(self.points[i+1]),
-                            (255, 255, 0), 2)
+                    cv2.line(frame, tuple(self.points[i]), tuple(self.points[i + 1]),
+                             (255, 255, 0), 2)
                 if len(self.points) > 2:
                     cv2.line(frame, tuple(self.points[-1]), tuple(self.points[0]),
-                            (255, 255, 0), 2)
-            
+                             (255, 255, 0), 2)
+
             # Get canvas dimensions
             self.canvas.update_idletasks()
             canvas_w = self.canvas.winfo_width()
             canvas_h = self.canvas.winfo_height()
-            
+
             if canvas_w < 100 or canvas_h < 100:
                 self.root.after(150, self.display_frame)
                 return
-            
+
             # Resize frame to fit canvas
             self.scale = min(canvas_w / self.frame_w, canvas_h / self.frame_h)
             new_w = int(self.frame_w * self.scale)
             new_h = int(self.frame_h * self.scale)
-            
+
             frame_resized = cv2.resize(frame, (new_w, new_h))
-            
+
             # Center the image
             self.offset_x = (canvas_w - new_w) / 2
             self.offset_y = (canvas_h - new_h) / 2
-            
+
             # Convert BGR to RGB
             frame_rgb = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB)
-            
-            # Create PhotoImage and STORE as instance variables to prevent garbage collection
+
+            # Create PhotoImage and STORE as instance variables
             self.pil_image = Image.fromarray(frame_rgb)
             self.photo = ImageTk.PhotoImage(image=self.pil_image)
-            
-            # Also keep in list for redundancy
             self.photo_list = [self.photo, self.pil_image]
-            
+
             # Display on canvas
             self.canvas.delete("all")
-            self.canvas.create_image(canvas_w//2, canvas_h//2, image=self.photo)
-            
+            self.canvas.create_image(canvas_w // 2, canvas_h // 2, image=self.photo)
+
             self.update_info()
             print("[OK] Frame displayed successfully")
-        
+
         except Exception as e:
             print(f"Error: {e}")
             import traceback
             traceback.print_exc()
-        
+
+    # ── interaction ───────────────────────────────────────────
+
     def on_canvas_click(self, event):
         """Handle canvas click."""
-        # Convert canvas coordinates to frame coordinates
         x = int((event.x - self.offset_x) / self.scale)
         y = int((event.y - self.offset_y) / self.scale)
-        
-        # Validate bounds
+
         if 0 <= x < self.frame_w and 0 <= y < self.frame_h:
             self.points.append([x, y])
             self.display_frame()
         else:
-            messagebox.showwarning("Out of bounds", f"Click within the video frame!")
-    
+            messagebox.showwarning("Out of bounds", "Click within the video frame!")
+
     def reset(self):
         """Reset polygon."""
         self.points = []
         self.display_frame()
-    
+
     def update_info(self):
         """Update info label."""
-        self.info_label.config(text=f"Points: {len(self.points)}/4 | Video: {self.frame_w}x{self.frame_h}")
-    
+        self.info_label.config(
+            text=f"Points: {len(self.points)}/4 | Video: {self.frame_w}x{self.frame_h}")
+
     def confirm(self):
         """Confirm zone selection."""
         if len(self.points) < 3:
             messagebox.showwarning("Invalid", "Need at least 3 points!")
             return
-        
-        normalized = [[x/self.frame_w, y/self.frame_h] for x, y in self.points]
+
+        normalized = [[x / self.frame_w, y / self.frame_h] for x, y in self.points]
         self.result = {
             "pixel": self.points,
             "normalized": normalized,
         }
         self.root.destroy()
-    
+
     def cancel(self):
         """Cancel selection."""
         self.result = None
         self.root.destroy()
-    
+
     def run(self):
         """Show window and return result."""
         if self.parent is not None:
-            # Parent mainloop already running; wait for this window
             self.root.wait_window()
         else:
             self.root.mainloop()
         return self.result
 
 
+# ═══════════════════════════════════════════════════════════════
+# Main Window – multi-video workflow
+# ═══════════════════════════════════════════════════════════════
+
 class MainWindow:
-    """Main GUI application window with step-by-step workflow."""
-    
+    """Main GUI application window with step-by-step workflow.
+
+    Supports selecting *multiple* video files, configuring a zone for each,
+    and launching one analysis process per video.
+    """
+
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Queue Wait-Time Estimation System")
-        self.root.geometry("700x600")
-        self.root.resizable(True, False)
-        
-        self.video_path = tk.StringVar()
+        self.root.geometry("700x650")
+        self.root.resizable(True, True)
+
+        # ── multi-video state ─────────────────────────────────
+        self.video_count = tk.IntVar(value=1)
+        self.video_count.trace_add("write", self._on_video_count_change)
+        self.video_paths: list[str] = []
+        self.current_video_index: int = 0
+        self.zone_points_map: dict[str, list[list[int]]] = {}
+
+        # tk helpers
+        self.video_path = tk.StringVar()           # kept for compatibility
+        self.video_selector_var = tk.StringVar()   # combobox in step 2
+        self.video_listbox: tk.Listbox | None = None
+        self.count_status_label: ttk.Label | None = None
+        self.zone_status_label: ttk.Label | None = None
+
+        # config state
         self.model_size = tk.StringVar(value="n")
-        self.zone_points = tk.StringVar(value="None")
         self.log_level = tk.StringVar(value="INFO")
-        
-        self.setup_ui()
+
+        self._setup_ui()
         self.show_step1()
-        
-    def clear_window(self):
-        """Clear all widgets from window."""
-        for widget in self.root.winfo_children():
-            widget.destroy()
-    
-    def setup_ui(self):
-        """Create UI elements (but hidden initially)."""
+
+    # ── helpers ───────────────────────────────────────────────
+
+    def _clear_window(self):
+        """Remove all widgets so a new step can be drawn."""
+        for w in self.root.winfo_children():
+            w.destroy()
+
+    def _setup_ui(self):
+        """Reserved for future global UI setup."""
         pass
-    
+
+    # ══════════════════════════════════════════════════════════
+    # Step 1 – Select Videos
+    # ══════════════════════════════════════════════════════════
+
     def show_step1(self):
-        """Step 1: Select Video File."""
-        self.clear_window()
-        
+        """Step 1: choose how many videos, then pick that many files."""
+        self._clear_window()
+
         # Title
-        title = ttk.Label(self.root, text="Queue Wait-Time Estimation System",
-                         font=("Arial", 16, "bold"))
-        title.pack(pady=20)
-        
+        ttk.Label(self.root, text="Queue Wait-Time Estimation System",
+                  font=("Arial", 16, "bold")).pack(pady=20)
+
         # Step indicator
-        step = ttk.Label(self.root, text="Step 1 of 3: Select Video",
-                        font=("Arial", 12, "italic"), foreground="blue")
-        step.pack(pady=10)
-        
-        # Video frame
-        video_frame = ttk.LabelFrame(self.root, text="Video Source", padding=15)
-        video_frame.pack(fill=tk.X, padx=20, pady=15)
-        
-        ttk.Label(video_frame, text="Video File:", font=("Arial", 10)).pack(anchor=tk.W, pady=5)
-        
-        file_frame = ttk.Frame(video_frame)
-        file_frame.pack(fill=tk.X, pady=10)
-        
-        ttk.Entry(file_frame, textvariable=self.video_path, width=50, font=("Arial", 10)).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
-        ttk.Button(file_frame, text="Browse", command=self.browse_video).pack(side=tk.LEFT, padx=2)
-        
-        # Info
-        info = ttk.Label(video_frame, text="Select a video file (MP4, AVI, MOV)",
-                        font=("Arial", 9), foreground="gray")
-        info.pack(anchor=tk.W)
-        
-        # Buttons
-        button_frame = ttk.Frame(self.root)
-        button_frame.pack(fill=tk.X, padx=20, pady=20)
-        
-        ttk.Button(button_frame, text="Next →", command=self.validate_and_go_step2).pack(side=tk.RIGHT, padx=5)
-        ttk.Button(button_frame, text="Exit", command=self.root.quit).pack(side=tk.LEFT, padx=5)
-    
+        ttk.Label(self.root, text="Step 1 of 3: Select Videos",
+                  font=("Arial", 12, "italic"), foreground="blue").pack(pady=10)
+
+        # ── Number of videos ──────────────────────────────────
+        count_frame = ttk.LabelFrame(self.root, text="Number of Videos", padding=10)
+        count_frame.pack(fill=tk.X, padx=20, pady=(10, 5))
+
+        ttk.Label(count_frame, text="How many video feeds to analyse?",
+                  font=("Arial", 10)).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Spinbox(count_frame, from_=1, to=10, textvariable=self.video_count,
+                    width=5, font=("Arial", 10), justify=tk.CENTER).pack(side=tk.LEFT)
+
+        # ── Video file picker ─────────────────────────────────
+        video_frame = ttk.LabelFrame(self.root, text="Video Source(s)", padding=15)
+        video_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+
+        # Count status
+        self.count_status_label = ttk.Label(video_frame, text="",
+                                            font=("Arial", 10, "bold"))
+        self.count_status_label.pack(anchor=tk.W, pady=(0, 5))
+
+        # Listbox showing selected files
+        lb_frame = ttk.Frame(video_frame)
+        lb_frame.pack(fill=tk.BOTH, expand=True, pady=5)
+
+        self.video_listbox = tk.Listbox(lb_frame, font=("Arial", 10),
+                                        selectmode=tk.SINGLE, height=6)
+        lb_scroll = ttk.Scrollbar(lb_frame, orient=tk.VERTICAL,
+                                  command=self.video_listbox.yview)
+        self.video_listbox.configure(yscrollcommand=lb_scroll.set)
+        self.video_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        lb_scroll.pack(side=tk.LEFT, fill=tk.Y)
+
+        # Add / Remove buttons
+        action_frame = ttk.Frame(video_frame)
+        action_frame.pack(fill=tk.X, pady=(5, 0))
+        ttk.Button(action_frame, text="+ Add Video",
+                   command=self._add_video).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(action_frame, text="- Remove Selected",
+                   command=self._remove_video).pack(side=tk.LEFT, padx=5)
+
+        ttk.Label(video_frame, text="Supported formats: MP4, AVI, MOV",
+                  font=("Arial", 9), foreground="gray").pack(anchor=tk.W, pady=(8, 0))
+
+        # Populate from existing selection (e.g. after Back navigation)
+        self._refresh_listbox()
+
+        # ── Nav buttons ───────────────────────────────────────
+        btn = ttk.Frame(self.root)
+        btn.pack(fill=tk.X, padx=20, pady=20)
+        ttk.Button(btn, text="Next ->", command=self._validate_and_go_step2).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(btn, text="Exit", command=self.root.quit).pack(side=tk.LEFT, padx=5)
+
+    # ── step-1 helpers ────────────────────────────────────────
+
+    def _add_video(self):
+        """Open a single-file dialog and append the result to the list."""
+        expected = self.video_count.get()
+        if len(self.video_paths) >= expected:
+            messagebox.showwarning(
+                "Limit reached",
+                f"You already have {expected} video(s) selected.\n"
+                "Remove one first or increase the count.",
+            )
+            return
+        filename = filedialog.askopenfilename(
+            title="Add Video File",
+            filetypes=[("Video Files", "*.mp4 *.avi *.mov"), ("All Files", "*.*")],
+            initialdir="videos",
+        )
+        if filename and filename not in self.video_paths:
+            self.video_paths.append(filename)
+            self._refresh_listbox()
+
+    def _remove_video(self):
+        """Remove the currently-selected item from the list."""
+        if self.video_listbox is None:
+            return
+        sel = self.video_listbox.curselection()
+        if not sel:
+            messagebox.showinfo("Remove", "Select a video in the list first.")
+            return
+        idx = sel[0]
+        path = self.video_paths.pop(idx)
+        self.zone_points_map.pop(path, None)
+        self._refresh_listbox()
+
+    def _refresh_listbox(self):
+        """Sync the Listbox, count label and video_path var with video_paths."""
+        if self.video_listbox is None:
+            return
+        self.video_listbox.delete(0, tk.END)
+        for i, p in enumerate(self.video_paths):
+            self.video_listbox.insert(tk.END, f"{i+1}.  {Path(p).name}")
+        # update count status label
+        expected = self.video_count.get()
+        n = len(self.video_paths)
+        color = "green" if n == expected else ("orange" if n > 0 else "red")
+        if self.count_status_label is not None:
+            self.count_status_label.config(
+                text=f"{n} of {expected} video(s) selected", foreground=color)
+        # keep backward-compatible single-path var
+        self.video_path.set(self.video_paths[0] if self.video_paths else "")
+
+    def _on_video_count_change(self, *_args):
+        """Clear previous selections when the count spinbox changes."""
+        self.video_paths.clear()
+        self.zone_points_map.clear()
+        self.video_path.set("")
+        self._refresh_listbox()
+
+    def _validate_and_go_step2(self):
+        """Validate the video selection and advance to step 2."""
+        expected = self.video_count.get()
+        if not self.video_paths:
+            messagebox.showerror("Error", "Please select your video file(s)!")
+            return
+        if len(self.video_paths) != expected:
+            messagebox.showerror(
+                "Error",
+                f"You need to select exactly {expected} video(s) "
+                f"but {len(self.video_paths)} were chosen.",
+            )
+            return
+        for p in self.video_paths:
+            if not Path(p).exists():
+                messagebox.showerror("Error", f"File not found:\n{p}")
+                return
+        self.current_video_index = 0
+        self.show_step2()
+
+    # ══════════════════════════════════════════════════════════
+    # Step 2 – Configure Model & Zone (per video)
+    # ══════════════════════════════════════════════════════════
+
     def show_step2(self):
-        """Step 2: Model Configuration & Zone Selection."""
-        self.clear_window()
-        
-        # Title
-        title = ttk.Label(self.root, text="Queue Wait-Time Estimation System",
-                         font=("Arial", 16, "bold"))
-        title.pack(pady=15)
-        
-        # Step indicator
-        step = ttk.Label(self.root, text="Step 2 of 3: Configure Model & Zone",
-                        font=("Arial", 12, "italic"), foreground="blue")
-        step.pack(pady=10)
-        
-        # Model section
+        """Step 2: model settings + zone for each video."""
+        self._clear_window()
+
+        ttk.Label(self.root, text="Queue Wait-Time Estimation System",
+                  font=("Arial", 16, "bold")).pack(pady=15)
+
+        ttk.Label(self.root, text="Step 2 of 3: Configure Model & Zone",
+                  font=("Arial", 12, "italic"), foreground="blue").pack(pady=10)
+
+        # ── Model configuration ───────────────────────────────
         model_frame = ttk.LabelFrame(self.root, text="Model Configuration", padding=10)
         model_frame.pack(fill=tk.X, padx=15, pady=10)
-        
-        ttk.Label(model_frame, text="Model Size:", font=("Arial", 10)).grid(row=0, column=0, sticky=tk.W, padx=5, pady=8)
+
+        ttk.Label(model_frame, text="Model Size:", font=("Arial", 10)).grid(
+            row=0, column=0, sticky=tk.W, padx=5, pady=8)
         ttk.Combobox(model_frame, textvariable=self.model_size,
-                    values=["n (nano - fastest)", "s (small)", "m (medium)", "l (large)", "x (x-large)"],
-                    state="readonly", width=30, font=("Arial", 10)).grid(row=0, column=1, sticky=tk.W, padx=5, pady=8)
-        
-        ttk.Label(model_frame, text="Log Level:", font=("Arial", 10)).grid(row=1, column=0, sticky=tk.W, padx=5, pady=8)
+                     values=["n (nano - fastest)", "s (small)", "m (medium)",
+                             "l (large)", "x (x-large)"],
+                     state="readonly", width=30, font=("Arial", 10)).grid(
+            row=0, column=1, sticky=tk.W, padx=5, pady=8)
+
+        ttk.Label(model_frame, text="Log Level:", font=("Arial", 10)).grid(
+            row=1, column=0, sticky=tk.W, padx=5, pady=8)
         ttk.Combobox(model_frame, textvariable=self.log_level,
-                    values=["DEBUG", "INFO", "WARNING", "ERROR"], state="readonly", width=30, font=("Arial", 10)).grid(row=1, column=1, sticky=tk.W, padx=5, pady=8)
-        
-        # Zone section
-        zone_frame = ttk.LabelFrame(self.root, text="Zone Selection", padding=10)
+                     values=["DEBUG", "INFO", "WARNING", "ERROR"],
+                     state="readonly", width=30, font=("Arial", 10)).grid(
+            row=1, column=1, sticky=tk.W, padx=5, pady=8)
+
+        # ── Zone selection (per video) ────────────────────────
+        zone_frame = ttk.LabelFrame(self.root, text="Zone Selection (per video)", padding=10)
         zone_frame.pack(fill=tk.X, padx=15, pady=10)
-        
-        zone_info = ttk.Label(zone_frame, text="Define the cashier area polygon:",
-                             font=("Arial", 9), foreground="gray")
-        zone_info.pack(anchor=tk.W, padx=5, pady=5)
-        
-        zone_status = ttk.Label(zone_frame, text="Status: Not selected",
-                               font=("Arial", 10), foreground="red")
-        zone_status.pack(anchor=tk.W, padx=5, pady=5)
-        self.zone_status_label = zone_status
-        self.update_zone_status()
-        
-        ttk.Button(zone_frame, text="Select Zone from Video", 
-                  command=lambda: self.select_zone()).pack(anchor=tk.W, padx=5, pady=10)
-        
-        # Buttons
-        button_frame = ttk.Frame(self.root)
-        button_frame.pack(fill=tk.X, padx=15, pady=20)
-        
-        ttk.Button(button_frame, text="Next →", command=self.show_step3).pack(side=tk.RIGHT, padx=5)
-        ttk.Button(button_frame, text="← Back", command=self.show_step1).pack(side=tk.RIGHT, padx=5)
-    
-    def show_step3(self):
-        """Step 3: Review & Run Analysis."""
-        self.clear_window()
-        
-        # Title
-        title = ttk.Label(self.root, text="Queue Wait-Time Estimation System",
-                         font=("Arial", 16, "bold"))
-        title.pack(pady=15)
-        
-        # Step indicator
-        step = ttk.Label(self.root, text="Step 3 of 3: Review & Run",
-                        font=("Arial", 12, "italic"), foreground="blue")
-        step.pack(pady=10)
-        
-        # Summary frame
-        summary_frame = ttk.LabelFrame(self.root, text="Configuration Summary", padding=15)
-        summary_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
-        
-        # Video info
-        ttk.Label(summary_frame, text="Video File:", font=("Arial", 10, "bold")).pack(anchor=tk.W, pady=(10, 2))
-        ttk.Label(summary_frame, text=self.video_path.get(), 
-                 font=("Arial", 9), foreground="darkgreen").pack(anchor=tk.W, padx=20, pady=(0, 10))
-        
-        # Model info
-        ttk.Label(summary_frame, text="Model Size:", font=("Arial", 10, "bold")).pack(anchor=tk.W, pady=(10, 2))
-        ttk.Label(summary_frame, text=self.model_size.get(), 
-                 font=("Arial", 9), foreground="darkgreen").pack(anchor=tk.W, padx=20, pady=(0, 10))
-        
-        # Log level info
-        ttk.Label(summary_frame, text="Log Level:", font=("Arial", 10, "bold")).pack(anchor=tk.W, pady=(10, 2))
-        ttk.Label(summary_frame, text=self.log_level.get(), 
-                 font=("Arial", 9), foreground="darkgreen").pack(anchor=tk.W, padx=20, pady=(0, 10))
-        
-        # Zone info
-        ttk.Label(summary_frame, text="Zone Status:", font=("Arial", 10, "bold")).pack(anchor=tk.W, pady=(10, 2))
-        zone_text = self.zone_points.get()
-        if zone_text and zone_text != "None":
-            zone_display = zone_text[:80] + "..." if len(zone_text) > 80 else zone_text
-            ttk.Label(summary_frame, text=zone_display, 
-                     font=("Arial", 8), foreground="darkgreen").pack(anchor=tk.W, padx=20, pady=(0, 10))
-        else:
-            ttk.Label(summary_frame, text="Full frame (no zone defined)", 
-                     font=("Arial", 9), foreground="orange").pack(anchor=tk.W, padx=20, pady=(0, 10))
-        
-        # Buttons
-        button_frame = ttk.Frame(self.root)
-        button_frame.pack(fill=tk.X, padx=15, pady=15)
-        
-        ttk.Button(button_frame, text="Run Analysis", command=self.run_analysis).pack(side=tk.RIGHT, padx=5, ipady=5)
-        ttk.Button(button_frame, text="← Back", command=self.show_step2).pack(side=tk.RIGHT, padx=5)
-        ttk.Button(button_frame, text="Exit", command=self.root.quit).pack(side=tk.LEFT, padx=5)
-    
-    def validate_and_go_step2(self):
-        """Validate video selection and go to step 2."""
-        if not self.video_path.get():
-            messagebox.showerror("Error", "Please select a video file!")
-            return
-        
-        # Check if file exists
-        if not Path(self.video_path.get()).exists():
-            messagebox.showerror("Error", f"File not found: {self.video_path.get()}")
-            return
-        
-        self.show_step2()
-    
-    def browse_video(self):
-        """Browse and select video file."""
-        filename = filedialog.askopenfilename(
-            title="Select Video File",
-            filetypes=[("Video Files", "*.mp4 *.avi *.mov"), ("All Files", "*.*")],
-            initialdir="videos"
-        )
-        if filename:
-            self.video_path.set(filename)
-    
-    def select_zone(self):
-        """Open zone selector window."""
-        if not self.video_path.get():
-            messagebox.showwarning("Warning", "Please go back and select a video first!")
-            return
-        
-        selector = ZoneSelectorWindow(self.video_path.get(), parent=self.root)
-        result = selector.run()
-        
-        if result:
-            self.zone_points.set(json.dumps(result["pixel"]))
-            self.update_zone_status()
-    
-    def update_zone_status(self):
-        """Update zone status label."""
-        if hasattr(self, 'zone_status_label'):
-            zone_str = self.zone_points.get().strip()
-            if zone_str and zone_str != "None":
-                self.zone_status_label.config(text="Status: Zone defined ✓", foreground="green")
-            else:
-                self.zone_status_label.config(text="Status: Not selected (optional)", foreground="orange")
-    
-    def run_analysis(self):
-        """Run the main analysis script."""
+
+        # Video selector when multiple files
+        if len(self.video_paths) > 1:
+            sel_frame = ttk.Frame(zone_frame)
+            sel_frame.pack(fill=tk.X, padx=5, pady=5)
+
+            ttk.Label(sel_frame, text="Current video:", font=("Arial", 10)).pack(side=tk.LEFT)
+            combo_values = [f"{i+1}. {Path(p).name}" for i, p in enumerate(self.video_paths)]
+            comb = ttk.Combobox(sel_frame, textvariable=self.video_selector_var,
+                                values=combo_values, state="readonly",
+                                width=45, font=("Arial", 10))
+            comb.pack(side=tk.LEFT, padx=5)
+            comb.bind("<<ComboboxSelected>>", lambda _: self._on_video_select())
+            # default to first
+            self.video_selector_var.set(combo_values[0])
+
+        ttk.Label(zone_frame, text="Define the cashier area polygon:",
+                  font=("Arial", 9), foreground="gray").pack(anchor=tk.W, padx=5, pady=5)
+
+        self.zone_status_label = ttk.Label(zone_frame, text="", font=("Arial", 10))
+        self.zone_status_label.pack(anchor=tk.W, padx=5, pady=5)
+        self._update_zone_status()
+
+        ttk.Button(zone_frame, text="Select Zone from Video",
+                   command=self._select_zone).pack(anchor=tk.W, padx=5, pady=10)
+
+        # ── Nav buttons ───────────────────────────────────────
+        btn = ttk.Frame(self.root)
+        btn.pack(fill=tk.X, padx=15, pady=20)
+        ttk.Button(btn, text="Next ->", command=self.show_step3).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(btn, text="<- Back", command=self.show_step1).pack(side=tk.RIGHT, padx=5)
+
+    # ── step-2 helpers ────────────────────────────────────────
+
+    def _on_video_select(self):
+        """User picked a different video in the combobox."""
+        label = self.video_selector_var.get()
+        # label is "1. filename.mp4" -> extract index
         try:
-            # Build command
-            model_size = self.model_size.get().split()[0]  # Extract just the letter
+            idx = int(label.split(".")[0]) - 1
+        except (ValueError, IndexError):
+            idx = 0
+        self.current_video_index = max(0, min(idx, len(self.video_paths) - 1))
+        self._update_zone_status()
+
+    def _select_zone(self):
+        """Open zone selector for the currently-selected video."""
+        if not self.video_paths:
+            messagebox.showwarning("Warning", "Go back and select a video first!")
+            return
+        path = self.video_paths[self.current_video_index]
+        selector = ZoneSelectorWindow(path, parent=self.root)
+        result = selector.run()
+        if result:
+            self.zone_points_map[path] = result["pixel"]
+            self._update_zone_status()
+
+    def _update_zone_status(self):
+        """Refresh the zone status label for the current video."""
+        if self.zone_status_label is None:
+            return
+        if not self.video_paths:
+            self.zone_status_label.config(text="Status: No video selected", foreground="red")
+            return
+        path = self.video_paths[self.current_video_index]
+        name = Path(path).name
+        if self.zone_points_map.get(path):
+            n_pts = len(self.zone_points_map[path])
+            self.zone_status_label.config(
+                text=f"Zone defined for {name} ({n_pts} points)", foreground="green")
+        else:
+            self.zone_status_label.config(
+                text=f"Not selected (optional) - {name}", foreground="orange")
+
+    # ══════════════════════════════════════════════════════════
+    # Step 3 – Review & Run
+    # ══════════════════════════════════════════════════════════
+
+    def show_step3(self):
+        """Step 3: summary of all videos + zones, then launch."""
+        self._clear_window()
+
+        ttk.Label(self.root, text="Queue Wait-Time Estimation System",
+                  font=("Arial", 16, "bold")).pack(pady=15)
+        ttk.Label(self.root, text="Step 3 of 3: Review & Run",
+                  font=("Arial", 12, "italic"), foreground="blue").pack(pady=10)
+
+        # ── scrollable summary ────────────────────────────────
+        outer = ttk.LabelFrame(self.root, text="Configuration Summary", padding=10)
+        outer.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
+
+        canvas = tk.Canvas(outer, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(outer, orient=tk.VERTICAL, command=canvas.yview)
+        summary_frame = ttk.Frame(canvas)
+
+        summary_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
+        )
+        canvas.create_window((0, 0), window=summary_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Per-video info
+        for idx, path in enumerate(self.video_paths, start=1):
+            ttk.Label(summary_frame, text=f"Video {idx}:",
+                      font=("Arial", 10, "bold")).pack(anchor=tk.W, pady=(10, 2))
+            ttk.Label(summary_frame, text=path,
+                      font=("Arial", 9), foreground="darkgreen").pack(
+                anchor=tk.W, padx=20, pady=(0, 2))
+
+            points = self.zone_points_map.get(path)
+            if points:
+                txt = json.dumps(points)
+                if len(txt) > 80:
+                    txt = txt[:80] + "..."
+                ttk.Label(summary_frame, text=f"Zone: {txt}",
+                          font=("Arial", 8), foreground="darkgreen").pack(
+                    anchor=tk.W, padx=40, pady=(0, 5))
+            else:
+                ttk.Label(summary_frame, text="Zone: full frame (none defined)",
+                          font=("Arial", 9), foreground="orange").pack(
+                    anchor=tk.W, padx=40, pady=(0, 5))
+
+        ttk.Separator(summary_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=10)
+
+        # Model / log level
+        ttk.Label(summary_frame, text="Model Size:", font=("Arial", 10, "bold")).pack(
+            anchor=tk.W, pady=(5, 2))
+        ttk.Label(summary_frame, text=self.model_size.get(),
+                  font=("Arial", 9), foreground="darkgreen").pack(
+            anchor=tk.W, padx=20, pady=(0, 10))
+
+        ttk.Label(summary_frame, text="Log Level:", font=("Arial", 10, "bold")).pack(
+            anchor=tk.W, pady=(5, 2))
+        ttk.Label(summary_frame, text=self.log_level.get(),
+                  font=("Arial", 9), foreground="darkgreen").pack(
+            anchor=tk.W, padx=20, pady=(0, 10))
+
+        # ── Nav buttons ───────────────────────────────────────
+        btn = ttk.Frame(self.root)
+        btn.pack(fill=tk.X, padx=15, pady=15)
+        ttk.Button(btn, text="Run Analysis", command=self._run_analysis).pack(
+            side=tk.RIGHT, padx=5, ipady=5)
+        ttk.Button(btn, text="<- Back", command=self.show_step2).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(btn, text="Exit", command=self.root.quit).pack(side=tk.LEFT, padx=5)
+
+    # ══════════════════════════════════════════════════════════
+    # Command construction & execution
+    # ══════════════════════════════════════════════════════════
+
+    def get_analysis_commands(self) -> list[list[str]]:
+        """Build one subprocess arg-list per selected video.
+
+        Each command invokes ``python -m src.main`` with the appropriate
+        ``--source``, ``--model-size``, ``--log-level``, and (optionally)
+        ``--zone-points`` flags.
+        """
+        model_size = self.model_size.get().split()[0]  # "n (nano ...)" -> "n"
+        commands: list[list[str]] = []
+        for path in self.video_paths:
             cmd = [
                 sys.executable, "-m", "src.main",
-                "--source", self.video_path.get(),
+                "--source", path,
                 "--model-size", model_size,
                 "--log-level", self.log_level.get(),
             ]
-            
-            # Add zone points if specified
-            zone_str = self.zone_points.get().strip()
-            if zone_str and zone_str != "None":
-                cmd.extend(["--zone-points", zone_str])
-            
-            messagebox.showinfo("Starting Analysis", "Analysis starting... Check the video window.")
-            
-            # Run in new window
-            if sys.platform == "win32":
-                subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE)
-            else:
-                subprocess.Popen(cmd)
-        
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to start analysis:\n{str(e)}")
-    
+            pts = self.zone_points_map.get(path)
+            if pts:
+                cmd.extend(["--zone-points", json.dumps(pts)])
+            commands.append(cmd)
+        return commands
+
+    def _run_analysis(self):
+        """Spawn one analysis process per video in its own console."""
+        try:
+            cmds = self.get_analysis_commands()
+            if not cmds:
+                messagebox.showerror("Error", "No videos to analyse.")
+                return
+            started = 0
+            for cmd in cmds:
+                if sys.platform == "win32":
+                    subprocess.Popen(cmd, creationflags=subprocess.CREATE_NEW_CONSOLE)
+                else:
+                    subprocess.Popen(cmd)
+                started += 1
+            messagebox.showinfo(
+                "Analysis Started",
+                f"Launched {started} analysis process(es).\n"
+                "Each video opens in its own console window.",
+            )
+        except Exception as exc:
+            messagebox.showerror("Error", f"Failed to start analysis:\n{exc}")
+
+    # ── lifecycle ─────────────────────────────────────────────
+
     def run(self):
-        """Start the application."""
+        """Start the Tk main loop."""
         self.root.mainloop()
 
 
