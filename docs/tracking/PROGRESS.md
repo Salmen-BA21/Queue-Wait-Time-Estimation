@@ -1,7 +1,7 @@
 # Project Progress Report - Queue Wait-Time Estimation System
 
-**Current Date:** February 20, 2026  
-**Last Updated:** February 20, 2026  
+**Current Date:** February 23, 2026  
+**Last Updated:** February 23, 2026  
 
 This report assesses the completion status of each phase based on the project structure, documentation, and daily logs.
 
@@ -12,9 +12,11 @@ This report assesses the completion status of each phase based on the project st
 - ✅ Dedicated project folder created (`Stage_PFE`)  
 - ✅ Git repository initialized (on branch `main`, up to date with `origin/main`)  
 - ✅ README.md created with project description and tech stack  
-- ✅ Sub-folders established: `src/`, `videos/`, `notebooks/`, `docs/`, `data/`  
+- ✅ Sub-folders established: `src/`, `docs/`, `data/`  
+- ✅ `videos/` and `notebooks/` folders exist on primary dev machine (in .gitignore)  
 - ✅ Initial documentation structure in place  
 - ✅ Daily logs folder created in `docs/daily-logs/`  
+- ✅ Documentation reorganized (Feb 23): phases/ and tracking/ subdirectories created  
 
 ### Phase 1 – Environment & First Tests
 **Status: COMPLETED**  
@@ -113,17 +115,23 @@ This report assesses the completion status of each phase based on the project st
 
 1. **Complete Phase 5:** Telegram bot setup and integration with n8n  
 2. **Phase 6:** Define alert persistence rules and implement inline Telegram buttons  
-3. **Write daily log** for Feb 20 – multi-video GUI feature  
-4. **Enhance Testing:** Run comprehensive end-to-end tests with multiple simultaneous video feeds  
+3. **Enhance Testing:** Run comprehensive end-to-end tests with multiple simultaneous video feeds  
+4. **Phase 8 Testing:** Evaluate system under various scenarios (normal, crowd, slow service)  
 
 ## 📝 Notes
 
 - The core computer vision and queuing logic is solid and working  
-- GUI is functional but may need polish for production use  
-- Documentation is well-maintained with daily logs  
+- GUI is functional with multi-video support (completed Feb 20)  
+- Documentation is well-maintained with daily logs through Feb 18  
 - Project is ahead of schedule for core functionality  
 - Integration with external systems (n8n) is the main remaining work  
+- **Note:** `videos/` and `notebooks/` folders are on primary development machine and excluded from git via .gitignore  
+- Documentation structure reorganized (Feb 23): created `docs/phases/` and `docs/tracking/` subdirectories; removed redundant PHASE_TRACKING.md  
 
 ---
 
-*This report was generated based on project files, daily logs, and STATUS_REPORT.md as of February 18, 2026.*
+**Recent Activity (Feb 21-23):**
+- Feb 21: Queue metrics data generated (queue_metrics_2026-02-21.csv)  
+- Feb 23: Documentation reorganization and cleanup completed  
+
+*This report was updated as of February 23, 2026.*

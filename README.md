@@ -2,8 +2,14 @@
 
 > **PFE – Conception et développement d'un système multi-agents pour l'estimation du temps d'attente aux caisses à partir de flux vidéo, avec quantification d'incertitude**
 
+> ⚠️ **New to this project?** 
+> 1. Start with [docs/agent-guide/INDEX.md](docs/agent-guide/INDEX.md) for the reading roadmap
+> 2. Then read [docs/agent-guide/PROJECT_CONCEPT.md](docs/agent-guide/PROJECT_CONCEPT.md) to understand the **complete idea**
+> 3. Then read [docs/agent-guide/AGENT_CONTEXT.md](docs/agent-guide/AGENT_CONTEXT.md) for **current status**
+> 4. Finally, see [docs/tracking/PROGRESS.md](docs/tracking/PROGRESS.md) for **full details**
+
 Real-time queue monitoring for supermarket / bank checkouts using a video feed.  
-Detects people, tracks them across frames, counts how many stand inside a configurable queue zone, and estimates **arrival rate (λ)**, **service rate (μ)** and **expected waiting time (W)** – with uncertainty quantification coming soon.
+Detects people, tracks them across frames, counts how many stand inside a configurable queue zone, and estimates **arrival rate (λ)**, **service rate (μ)** and **expected waiting time (W)** – with **Bayesian uncertainty quantification** providing confidence intervals for all metrics.
 
 ---
 
@@ -16,7 +22,10 @@ Detects people, tracks them across frames, counts how many stand inside a config
 | Video I/O | OpenCV |
 | Zone logic | supervision PolygonZone |
 | Queueing math | numpy / pandas |
-| Alerting (future) | n8n webhook via `requests` |
+| Uncertainty quantification | scipy.stats (Bayesian Gamma) |
+| GUI | tkinter / customtkinter |
+| Alerting | n8n webhook via `requests` |
+| Logging | CSV files, JSON webhooks |
 
 ---
 
@@ -96,6 +105,7 @@ python gui.py
 - **Multi-video support**: choose how many camera feeds to analyse, pick that many files, and define a separate cashier zone for each.
 - Quick flow: `Set video count` → `Browse files` → `Configure model & zones (per video)` → `Run Analysis`.
 - Each video launches in its **own console window**, so all feeds are processed simultaneously without interference.
+- Real-time dashboard showing queue length, wait time, uncertainty levels, and confidence intervals.
 
 ### All options
 
@@ -114,12 +124,14 @@ python -m src.main --help
 
 Press **`q`** in the OpenCV window to quit.
 
+**Display includes:** bounding boxes, track IDs, zone polygon, queue count, arrival/service rates, wait time with confidence intervals, uncertainty level (Low/Medium/High), and stability indicator.
+
 ---
 
 ## 🏗️ Project Structure
 
 ```
-Stage_PFE/
+Queue-Wait-Time-Estimation/
 ├── src/
 │   ├── __init__.py
 │   ├── main.py               # entry point + argparse
@@ -128,17 +140,33 @@ Stage_PFE/
 │   ├── detector.py            # YOLO26 person detector
 │   ├── tracker.py             # ByteTrack wrapper
 │   ├── zone_manager.py        # PolygonZone management
-│   ├── queue_analyzer.py      # λ, μ, W estimation
-│   ├── uncertainty.py         # (placeholder) uncertainty quantification
+│   ├── queue_analyzer.py      # λ, μ, W estimation + uncertainty
+│   ├── uncertainty.py         # Bayesian uncertainty quantification
+│   ├── webhook_client.py      # n8n webhook sender
+│   ├── csv_logger.py          # CSV backup logging
+│   ├── threshold_detector.py  # Queue threshold detection
 │   └── utils/
 │       ├── drawing.py         # annotators & overlay helpers
-│       └── logging_setup.py   # logging configuration
-├── videos/                    # test videos (git-ignored)
-├── data/                      # CSV logs (git-ignored)
-├── notebooks/                 # Jupyter experiments
+│       ├── logging_setup.py   # logging configuration
+│       └── zone_selector.py   # GUI zone selection tool
+│   └── gui/
+│       └── app.py             # GUI dashboard & multi-video launcher
+├── docs/
+│   └── daily-logs/            # development logs
+├── scripts/
+│   ├── test_n8n_webhook.py    # webhook testing
+│   └── ...
+├── n8n_workflow_template.json # sample n8n workflow
 ├── requirements.txt
 ├── README.md
-├── .gitignore
+├── PHASE_TRACKING.md
+├── PROGRESS.md
+├── STATUS_REPORT.md
+├── gui.py                     # GUI launcher script
+├── test_gui_app.py            # GUI unit tests
+├── test_uncertainty.py        # uncertainty unit tests
+├── yolo26l.pt                 # YOLO model weights
+├── yolo26x.pt
 └── run_dev.sh
 ```
 
@@ -149,13 +177,15 @@ Stage_PFE/
 - [x] YOLO26 person detection + ByteTrack tracking
 - [x] Configurable polygon queue zone
 - [x] Real-time λ / μ / W estimation (M/M/1 model)
-- [ ] **Uncertainty quantification** – Bayesian rate estimation, bootstrap CI
+- [x] **Uncertainty quantification** – Bayesian rate estimation, confidence intervals
+- [x] **GUI dashboard** – Multi-video support, zone configuration
+- [x] **CSV logging** – Persist metrics to local files
+- [x] **n8n webhook integration** – Send JSON data every 5 seconds
 - [ ] **Multi-zone** support (several queues at once)
-- [ ] **n8n webhook integration** – send JSON alerts in real time
-- [ ] **Dashboard** – Streamlit / Grafana visualisation
-- [ ] **CSV logging** – persist metrics to `data/`
-- [ ] **Multi-camera** support
+- [ ] **Telegram alerts** – n8n integration for notifications
+- [ ] **Streamlit dashboard** – Advanced visualization with time series
 - [ ] **Edge deployment** – ONNX / TensorRT export
+- [ ] **Comprehensive testing** – Various scenarios and evaluation
 
 ---
 
