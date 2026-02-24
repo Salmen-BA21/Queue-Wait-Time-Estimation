@@ -25,10 +25,11 @@
 \usepackage{xcolor}
 \usepackage{csquotes}
 
-\usepackage[hidelinks, colorlinks=false, pdfborder={0 0 0}]{hyperref}
+\usepackage[hidelinks, colorlinks=false, pdfborder={0 0 0}, linktoc=all]{hyperref}
 \usepackage[nameinlink]{cleveref}
 
 \usepackage{tocloft}
+\usepackage{etoc}
 \renewcommand{\cftchapfont}{\bfseries}
 \renewcommand{\cftsecfont}{\normalfont}
 \renewcommand{\cftsubsecfont}{\normalfont}
@@ -38,6 +39,24 @@
 \setlength{\cftbeforesecskip}{2pt}
 \setcounter{secnumdepth}{4}
 \setcounter{tocdepth}{4}
+
+\newcommand{\chaptertoc}{%
+	\begingroup
+	\etocsetnexttocdepth{subsection}
+	\etocsettocstyle{%
+		\vspace{0.8cm}%
+		{\Large Contents\par}%
+		\vspace{0.2cm}%
+		\hrule
+		\vspace{0.35cm}%
+		\small
+	}{%
+		\par\vspace{0.3cm}\hrule
+	}
+	\localtableofcontents
+	\endgroup
+	\clearpage
+}
 
 \usepackage[explicit]{titlesec}
 \titleformat{\chapter}[block]

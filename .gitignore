@@ -39,21 +39,24 @@ data/
 .ipynb_checkpoints/
 
 # ────────────────── LaTeX build artifacts ──────────────────
-report-latex/%OUTDIR%/
-report-latex/*.aux
-report-latex/*.bbl
-report-latex/*.bcf
-report-latex/*.blg
-report-latex/*.fdb_latexmk
-report-latex/*.fls
-report-latex/*.lof
-report-latex/*.log
-report-latex/*.lot
-report-latex/*.out
-report-latex/*.run.xml
-report-latex/*.synctex.gz
-report-latex/*.toc
-report-latex/*.xdv
+report-latex/**/%OUTDIR%/
+report-latex/**/*.aux
+report-latex/**/*.bbl
+report-latex/**/*.bcf
+report-latex/**/*.blg
+report-latex/**/*.fdb_latexmk
+report-latex/**/*.fls
+report-latex/**/*.lof
+report-latex/**/*.log
+report-latex/**/*.lot
+report-latex/**/*.out
+report-latex/**/*.run.xml
+report-latex/**/*.synctex.gz
+report-latex/**/*.toc
+report-latex/**/*.xdv
+report-latex/**/*.maf
+report-latex/**/*.mtc*
+report-latex/**/*-SAVE-ERROR
 
 # Ignore generated PDFs by default, but keep main report PDF versioned
 report-latex/*.pdf
