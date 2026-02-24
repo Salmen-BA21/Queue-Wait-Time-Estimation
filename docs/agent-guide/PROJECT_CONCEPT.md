@@ -355,9 +355,9 @@ Decision-makers need to know:
 ## 📚 Further Reading
 
 For deeper technical details:
-- **Phase 4 Summary:** [../phases/PHASE4_SUMMARY.md](../phases/PHASE4_SUMMARY.md) – Uncertainty implementation
-- **Phase 5 Setup:** [../phases/PHASE5_SETUP.md](../phases/PHASE5_SETUP.md) – n8n integration details
-- **Daily Logs:** [../daily-logs/](../daily-logs/) – Development decisions logged per phase
+- **Sprint 4 Summary:** [../sprints/SPRINT4_SUMMARY.md](../sprints/SPRINT4_SUMMARY.md) – Uncertainty implementation
+- **Sprint 5 Setup:** [../sprints/SPRINT5_SETUP.md](../sprints/SPRINT5_SETUP.md) – n8n integration details
+- **Daily Logs:** [../daily-logs/](../daily-logs/) – Development decisions logged per sprint activity
 - **Code:** Start with [../../src/main.py](../../src/main.py) to see the full pipeline
 
 ---

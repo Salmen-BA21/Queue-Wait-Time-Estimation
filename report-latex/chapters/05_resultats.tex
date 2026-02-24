@@ -1,0 +1,36 @@
+\chapter{Results and Evaluation}
+
+\section{Experimental Protocol}
+Experiments were conducted on queue-scene videos with different traffic dynamics.
+The monitored indicators include counting accuracy, estimation stability, and alert responsiveness.
+
+\section{Observed Metrics}
+\begin{itemize}
+    \item number of people inside the zone,
+    \item arrival rate $\lambda$,
+    \item service rate $\mu$,
+    \item estimated waiting time $W$,
+    \item credible intervals and uncertainty level.
+\end{itemize}
+
+\section{Qualitative Analysis}
+The system correctly tracks queue-load evolution and flags critical phases.
+The addition of credible intervals improves the operational interpretation of results.
+
+\section{Example Results Table}
+\begin{table}[H]
+    \centering
+    \caption{Example experimental summary (to be completed)}
+    \begin{tabularx}{\textwidth}{lcccX}
+        \toprule
+        Scenario & $\lambda$ (pers/s) & $\mu$ (pers/s) & $W$ (s) & Uncertainty Level \\
+        \midrule
+        Low load & 0.04 & 0.08 & 1.00 & Low \\
+        Medium load & 0.08 & 0.11 & 2.67 & Medium \\
+        High load & 0.10 & 0.11 & 10.00 & High \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\section{Evaluation Limitations}
+Comprehensive multi-scenario evaluation still needs to be extended (camera-angle variations, strong occlusions, lighting changes, multi-zone setups).

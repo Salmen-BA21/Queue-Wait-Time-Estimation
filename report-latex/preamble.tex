@@ -1,0 +1,64 @@
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{mathpazo}
+\usepackage{microtype}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+\usepackage{setspace}
+\onehalfspacing
+
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{siunitx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{csquotes}
+
+\usepackage[hidelinks, colorlinks=false, pdfborder={0 0 0}]{hyperref}
+\usepackage[nameinlink]{cleveref}
+
+\usepackage{tocloft}
+\renewcommand{\cftchapfont}{\bfseries}
+\renewcommand{\cftsecfont}{\normalfont}
+\renewcommand{\cftsubsecfont}{\normalfont}
+\renewcommand{\cftsubsubsecfont}{\normalfont}
+\renewcommand{\cftparafont}{\normalfont}
+\setlength{\cftbeforechapskip}{6pt}
+\setlength{\cftbeforesecskip}{2pt}
+\setcounter{secnumdepth}{4}
+\setcounter{tocdepth}{4}
+
+\usepackage[explicit]{titlesec}
+\titleformat{\chapter}[block]
+	{\normalfont}
+	{}
+	{0pt}
+	{%
+		\noindent
+		\begin{minipage}{0.06\textwidth}
+			\vspace{0.1cm}
+			{\color{black}\rule{\linewidth}{1.4cm}}
+		\end{minipage}%
+		\hfill
+		\begin{minipage}{0.88\textwidth}
+			{\raggedright\LARGE\bfseries #1\\[6pt]}
+			\noindent\rule{0.95\linewidth}{0.5pt}
+		\end{minipage}
+	}
+\titlespacing*{\chapter}{0pt}{0pt}{1.8cm}
+
+\usepackage[backend=biber,style=ieee]{biblatex}
+
+\setlist[itemize]{topsep=4pt,itemsep=2pt}
+\setlist[enumerate]{topsep=4pt,itemsep=2pt}

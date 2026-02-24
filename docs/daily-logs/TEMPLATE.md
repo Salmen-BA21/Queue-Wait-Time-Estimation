@@ -1,5 +1,5 @@
 # Daily Progress Log – YYYY-MM-DD  
-**Phase:** [e.g. 1 – Analysis / 2 – Implementation]  
+**Sprint:** [e.g. 1 – Core Pipeline / 2 – GUI & Multi-Video]  
 **Task completed:** [Brief title of the task]  
 
 ## Summary (1–2 sentences)

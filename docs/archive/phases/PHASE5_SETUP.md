@@ -1,4 +1,4 @@
-# Phase 5 Setup Guide: n8n Integration
+# Legacy Phase 5 Setup Guide: n8n Integration (Sprint 5 Equivalent)
 
 ## Quick Start
 

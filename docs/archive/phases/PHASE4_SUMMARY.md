@@ -1,4 +1,4 @@
-# Phase 4 Completion Summary
+# Legacy Phase 4 Completion Summary (Sprint 4 Equivalent)
 
 **Date:** February 18, 2026  
 **Phase:** 4 – Uncertainty Quantification  

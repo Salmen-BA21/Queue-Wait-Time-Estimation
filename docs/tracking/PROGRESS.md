@@ -1,13 +1,13 @@
 # Project Progress Report - Queue Wait-Time Estimation System
 
-**Current Date:** February 23, 2026  
-**Last Updated:** February 23, 2026  
+**Current Date:** February 24, 2026  
+**Last Updated:** February 24, 2026  
 
-This report assesses the completion status of each phase based on the project structure, documentation, and daily logs.
+This report assesses the completion status of each sprint based on the project structure, documentation, and daily logs.
 
-## ✅ Completed Phases
+## ✅ Completed Sprints
 
-### Phase 0 – Project Setup & Documentation Foundation
+### Sprint 0 – Project Setup & Documentation Foundation
 **Status: COMPLETED**  
 - ✅ Dedicated project folder created (`Stage_PFE`)  
 - ✅ Git repository initialized (on branch `main`, up to date with `origin/main`)  
@@ -18,7 +18,7 @@ This report assesses the completion status of each phase based on the project st
 - ✅ Daily logs folder created in `docs/daily-logs/`  
 - ✅ Documentation reorganized (Feb 23): phases/ and tracking/ subdirectories created  
 
-### Phase 1 – Environment & First Tests
+### Sprint 1 – Environment & First Tests
 **Status: COMPLETED**  
 - ✅ Python environment set up (requirements.txt installed)  
 - ✅ Core packages installed: ultralytics, supervision, opencv-python, numpy, pandas, etc.  
@@ -28,7 +28,7 @@ This report assesses the completion status of each phase based on the project st
 - ✅ Queue analysis logic implemented (`src/queue_analyzer.py`)  
 - ✅ CLI interface working (`src/main.py`)  
 
-### Phase 2 – Basic People Counting in Zone
+### Sprint 2 – Basic People Counting in Zone
 **Status: COMPLETED**  
 - ✅ GUI implementation (`src/gui/app.py`)  
 - ✅ Zone selector tool (`src/utils/zone_selector.py`)  
@@ -40,7 +40,7 @@ This report assesses the completion status of each phase based on the project st
 - ✅ Unit tests for `get_analysis_commands()` – 4 tests passing (`test_gui_app.py`)  
 - ✅ README updated with multi-video GUI workflow documentation  
 
-### Phase 3 – Add Rate Estimation & Basic Wait Time
+### Sprint 3 – Add Rate Estimation & Basic Wait Time
 **Status: COMPLETED**  
 - ✅ Arrival rate (λ) and service rate (μ) calculation  
 - ✅ Wait time estimation using M/M/1 queuing theory  
@@ -48,7 +48,7 @@ This report assesses the completion status of each phase based on the project st
 - ✅ Real-time metrics overlay (`src/utils/drawing.py`)  
 - ✅ Logging functionality  
 
-### Phase 4 – Uncertainty Quantification (first version)
+### Sprint 4 – Uncertainty Quantification (first version)
 **Status: COMPLETED**  
 - ✅ Bayesian Gamma-based rate uncertainty (λ, μ)
 - ✅ Variance-based wait time confidence intervals
@@ -58,27 +58,10 @@ This report assesses the completion status of each phase based on the project st
 - ✅ Display in CLI, logging, and metrics overlay
 - ✅ 16 unit tests passing (100%)
 - ✅ Daily log created with comprehensive documentation
+
 ## 🔄 In Progress / Partially Done
 
-### Phase 7 – Dashboard (real-time supervision)
-**Status: MOSTLY COMPLETED**  
-- ✅ GUI dashboard implemented (`src/gui/app.py`)  
-- ✅ Real-time metrics display  
-- ⚠️ Time series charts and alert history may need enhancement  
-- ⚠️ Full Streamlit dashboard not confirmed  
-
-### Phase 8 – Final Testing & Evaluation
-**Status: PARTIALLY COMPLETED**  
-- ✅ Basic testing scripts created  
-- ✅ STATUS_REPORT.md documenting fixes and architecture  
-- ✅ Some scenario testing done  
-- ✅ Unit tests for GUI command builder (`test_gui_app.py`, 4 tests, 100% pass)  
-- ⚠️ Comprehensive testing with various scenarios not complete  
-- ⚠️ Ground truth comparison not documented  
-
-## ❌ Remaining Phases
-
-### Phase 5 – Send Data to n8n
+### Sprint 5 – Send Data to n8n
 **Status: IN PROGRESS**  
 - ✅ n8n webhook setup and deployment complete
 - ✅ JSON payload structure designed (17 fields)
@@ -90,14 +73,32 @@ This report assesses the completion status of each phase based on the project st
 - ⏳ Telegram bot setup and integration pending
 - ⏳ Persistence checking with n8n state pending  
 
-### Phase 6 – Alerts & Recommendations Logic (in n8n)
+### Sprint 7 – Dashboard (real-time supervision)
+**Status: MOSTLY COMPLETED**  
+- ✅ GUI dashboard implemented (`src/gui/app.py`)  
+- ✅ Real-time metrics display  
+- ⚠️ Time series charts and alert history may need enhancement  
+- ⚠️ Full Streamlit dashboard not confirmed  
+
+### Sprint 8 – Final Testing & Evaluation
+**Status: PARTIALLY COMPLETED**  
+- ✅ Basic testing scripts created  
+- ✅ STATUS_REPORT.md documenting fixes and architecture  
+- ✅ Some scenario testing done  
+- ✅ Unit tests for GUI command builder (`test_gui_app.py`, 4 tests, 100% pass)  
+- ⚠️ Comprehensive testing with various scenarios not complete  
+- ⚠️ Ground truth comparison not documented  
+
+## ❌ Remaining Sprints
+
+### Sprint 6 – Alerts & Recommendations Logic (in n8n)
 **Status: NOT STARTED**  
 - ❌ Alert rules not defined  
 - ❌ Persistence checks not implemented  
 - ❌ Telegram integration not done  
 - ❌ Inline buttons not added  
 
-### Phase 9 – Report & Presentation
+### Sprint 9 – Report & Presentation
 **Status: NOT STARTED**  
 - ❌ Full report sections not written  
 - ❌ Architecture diagram not created  
@@ -106,17 +107,17 @@ This report assesses the completion status of each phase based on the project st
 
 ## 📊 Overall Progress Summary
 
-- **Completed Phases:** 0, 1, 2, 3, 4 (5 phases)  
-- **Total Phases:** 10 (0-9)  
+- **Completed Sprints:** 0, 1, 2, 3, 4 (5 sprints)  
+- **Total Sprints:** 10 (0-9)  
 - **Completion Rate:** ~55%  
-- **Current Focus:** Multi-video GUI (completed Feb 20); next is Phase 5 Telegram/n8n alerts  
+- **Current Focus:** Sprint 5 Telegram/n8n alerts  
 
 ## 🎯 Next Immediate Tasks
 
-1. **Complete Phase 5:** Telegram bot setup and integration with n8n  
-2. **Phase 6:** Define alert persistence rules and implement inline Telegram buttons  
+1. **Complete Sprint 5:** Telegram bot setup and integration with n8n  
+2. **Sprint 6:** Define alert persistence rules and implement inline Telegram buttons  
 3. **Enhance Testing:** Run comprehensive end-to-end tests with multiple simultaneous video feeds  
-4. **Phase 8 Testing:** Evaluate system under various scenarios (normal, crowd, slow service)  
+4. **Sprint 8 Testing:** Evaluate system under various scenarios (normal, crowd, slow service)  
 
 ## 📝 Notes
 
@@ -126,7 +127,7 @@ This report assesses the completion status of each phase based on the project st
 - Project is ahead of schedule for core functionality  
 - Integration with external systems (n8n) is the main remaining work  
 - **Note:** `videos/` and `notebooks/` folders are on primary development machine and excluded from git via .gitignore  
-- Documentation structure reorganized (Feb 23): created `docs/phases/` and `docs/tracking/` subdirectories; removed redundant PHASE_TRACKING.md  
+- Documentation structure reorganized (Feb 24): added `docs/sprints/` and sprint mapping docs  
 
 ---
 
@@ -134,4 +135,4 @@ This report assesses the completion status of each phase based on the project st
 - Feb 21: Queue metrics data generated (queue_metrics_2026-02-21.csv)  
 - Feb 23: Documentation reorganization and cleanup completed  
 
-*This report was updated as of February 23, 2026.*
+*This report was updated as of February 24, 2026.*

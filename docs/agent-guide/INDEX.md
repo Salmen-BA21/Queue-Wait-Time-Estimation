@@ -25,11 +25,11 @@
 **Purpose:** Know where the project stands right now and what needs to be done.
 
 **Topics covered:**
-- 📍 Current phase (Phase 5 – 90% complete)
+- 📍 Current sprint (Sprint 5 – 90% complete)
 - ✅ What's already implemented
 - 🔄 Next immediate tasks (3-4 items)
 - 📁 Project folder structure
-- 🔑 Key files for the current phase
+- 🔑 Key files for the current sprint
 - 📈 Overall project completion percentage
 
 **Reading time:** 5 minutes
@@ -37,12 +37,12 @@
 ---
 
 ### 3️⃣ **[../tracking/PROGRESS.md](../tracking/PROGRESS.md)** – Full Details
-**Purpose:** Get comprehensive phase-by-phase breakdown with detailed completion status.
+**Purpose:** Get comprehensive sprint-by-sprint breakdown with detailed completion status.
 
 **Topics covered:**
-- ✅ All completed phases with specific achievements
-- 🔄 Partially completed phases with blockers
-- ❌ Remaining phases and blockers
+- ✅ All completed sprints with specific achievements
+- 🔄 Partially completed sprints with blockers
+- ❌ Remaining sprints and blockers
 - 📊 Overall progress metrics
 - 🎯 Next immediate tasks
 - 📝 Project notes and context
@@ -58,15 +58,15 @@
 
 ---
 
-### 5️⃣ **[../phases/](../phases/)** – Phase-Specific Details
-Deep dives into specific phases:
-- `PHASE4_SUMMARY.md` – Uncertainty quantification implementation
-- `PHASE5_SETUP.md` – n8n webhook integration setup
+### 5️⃣ **[../sprints/](../sprints/)** – Sprint-Specific Details
+Deep dives into specific sprints:
+- `SPRINT4_SUMMARY.md` – Uncertainty quantification implementation
+- `SPRINT5_SETUP.md` – n8n webhook integration setup
 
 ---
 
 ### 6️⃣ **[../daily-logs/](../daily-logs/)** – Development History
-Daily logs organized by phase and date. Useful for understanding design decisions.
+Daily logs organized by date and sprint activity. Useful for understanding design decisions.
 
 ---
 
@@ -79,12 +79,12 @@ Daily logs organized by phase and date. Useful for understanding design decision
 → Read **AGENT_CONTEXT.md**
 
 ### **I need full details on everything**
-→ Read in order: PROJECT_CONCEPT → AGENT_CONTEXT → PROGRESS.md → specific phase docs
+→ Read in order: PROJECT_CONCEPT → AGENT_CONTEXT → PROGRESS.md → specific sprint docs
 
-### **I'm implementing Phase 5 (Telegram/n8n)**
+### **I'm implementing Sprint 5 (Telegram/n8n)**
 1. **AGENT_CONTEXT.md** – Status
-2. **PROGRESS.md** – Phase 5 section
-3. **phases/PHASE5_SETUP.md** – Setup instructions
+2. **PROGRESS.md** – Sprint 5 section
+3. **sprints/SPRINT5_SETUP.md** – Setup instructions
 4. **Code**: `src/webhook_client.py`, `src/threshold_detector.py`, `src/main.py`
 
 ### **I'm fixing a bug**
@@ -104,12 +104,13 @@ docs/agent-guide/          ← YOU ARE HERE
 └── AGENT_CONTEXT.md       (where are we now?)
 
 docs/tracking/             (project status)
-├── PROGRESS.md            (phase-by-phase breakdown)
+├── PROGRESS.md            (sprint-by-sprint breakdown)
 └── STATUS_REPORT.md       (recent fixes & architecture)
 
-docs/phases/               (phase-specific deep dives)
-├── PHASE4_SUMMARY.md      (uncertainty quantification)
-└── PHASE5_SETUP.md        (n8n integration)
+docs/sprints/              (sprint-specific deep dives)
+├── SPRINT4_SUMMARY.md     (uncertainty quantification)
+├── SPRINT5_SETUP.md       (n8n integration)
+└── SPRINT_MAPPING.md      (legacy mapping)
 
 docs/daily-logs/           (development history)
 ├── 2026-02-12__Phase1__...
@@ -131,7 +132,7 @@ docs/daily-logs/           (development history)
 
 ---
 
-**Last Updated:** February 23, 2026
+**Last Updated:** February 24, 2026
 
 Welcome to the Queue Wait-Time Estimation System! 🚀
 
