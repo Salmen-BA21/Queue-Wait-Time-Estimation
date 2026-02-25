@@ -30,6 +30,12 @@
 
 \usepackage{tocloft}
 \usepackage{etoc}
+\addto\captionsenglish{%
+\renewcommand{\contentsname}{Table of Content}%
+\renewcommand{\listfigurename}{List of Figures}%
+\renewcommand{\listtablename}{List of Tables}%
+}
+\renewcommand{\contentsname}{Table of Content}
 \renewcommand{\cftchapfont}{\bfseries}
 \renewcommand{\cftsecfont}{\normalfont}
 \renewcommand{\cftsubsecfont}{\normalfont}
@@ -40,12 +46,38 @@
 \setcounter{secnumdepth}{4}
 \setcounter{tocdepth}{4}
 
+\makeatletter
+\newcommand\fronttableofcontents{%
+\clearpage
+\phantomsection
+\chapter*{\contentsname}%
+\@mkboth{\contentsname}{\contentsname}%
+\@starttoc{toc}%
+}
+\newcommand\frontlistoffigures{%
+\clearpage
+\phantomsection
+\chapter*{\listfigurename}%
+\addcontentsline{toc}{chapter}{\listfigurename}%
+\@mkboth{\listfigurename}{\listfigurename}%
+\@starttoc{lof}%
+}
+\newcommand\frontlistoftables{%
+\clearpage
+\phantomsection
+\chapter*{\listtablename}%
+\addcontentsline{toc}{chapter}{\listtablename}%
+\@mkboth{\listtablename}{\listtablename}%
+\@starttoc{lot}%
+}
+\makeatother
+
 \newcommand{\chaptertoc}{%
 	\begingroup
 	\etocsetnexttocdepth{subsection}
 	\etocsettocstyle{%
 		\vspace{0.8cm}%
-		{\Large Contents\par}%
+		{\Large Table of Content\par}%
 		\vspace{0.2cm}%
 		\hrule
 		\vspace{0.35cm}%
@@ -65,12 +97,40 @@
 	{0pt}
 	{%
 		\noindent
-		\begin{minipage}{0.06\textwidth}
-			\vspace{0.1cm}
-			{\color{black}\rule{\linewidth}{1.4cm}}
+		\begin{minipage}{0.08\textwidth}
+			\centering
+			{\small Chapter}\\[4pt]
+			\colorbox{black}{%
+				\parbox[c][1.4cm][c]{1.2cm}{%
+					\centering\huge\color{white}\bfseries \thechapter
+				}%
+			}
 		\end{minipage}%
 		\hfill
-		\begin{minipage}{0.88\textwidth}
+		\begin{minipage}{0.86\textwidth}
+			\vspace{0.6cm}
+			{\raggedright\LARGE\bfseries #1\\[6pt]}
+			\noindent\rule{0.95\linewidth}{0.5pt}
+		\end{minipage}
+	}
+\titleformat{name=\chapter,numberless}[block]
+	{\normalfont}
+	{}
+	{0pt}
+	{%
+		\noindent
+		\begin{minipage}{0.08\textwidth}
+			\centering
+			\vspace{0.4cm}
+			\colorbox{black}{%
+				\parbox[c][1.4cm][c]{1.2cm}{%
+					\centering\huge\color{white}\bfseries \phantom{0}
+				}%
+			}
+		\end{minipage}%
+		\hfill
+		\begin{minipage}{0.86\textwidth}
+			\vspace{0.6cm}
 			{\raggedright\LARGE\bfseries #1\\[6pt]}
 			\noindent\rule{0.95\linewidth}{0.5pt}
 		\end{minipage}
