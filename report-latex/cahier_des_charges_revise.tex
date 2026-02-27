@@ -1,0 +1,120 @@
+% Cahier des charges réorganisé - Queue Wait Time Estimation
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{hyperref}
+\geometry{margin=25mm}
+\title{Cahier des charges — Système d'estimation du temps d'attente aux caisses}
+\author{Stage PFE — Salmen Ben Ammar}
+\date{Version révisée -- 26 février 2026}
+
+\begin{document}
+\maketitle
+\vspace{5mm}
+
+\section{Contexte et définition du problème}
+La surveillance des files d'attente en zone caisses à l'aide de caméras de surveillance permet d'optimiser les ressources opérationnelles (ouverture de caisses, appel d'agents) sans dépendre des données internes des caisses.
+
+Le problème adressé est l'estimation fiable, en temps réel, de la longueur des files, du débit de service et du temps d'attente uniquement à partir d'observations vidéo, en tenant compte des incertitudes liées aux détections, aux occlusions et à la variabilité opérationnelle.
+
+\section{Objectif de projet}
+Fournir un système autonome capable de :
+\begin{itemize}
+  \item détecter et suivre les clients dans des zones d'intérêt configurables ;
+  \item estimer le nombre de personnes en file, le débit de service et le temps d'attente en quasi‑temps réel ;
+  \item quantifier l'incertitude des estimations ;
+  \item générer des alertes et recommandations opérationnelles basées sur les estimations et leur fiabilité ;
+  \item exposer les indicateurs via un tableau de bord et permettre l'historisation et l'export.
+\end{itemize}
+
+\section{Acteurs}
+\begin{itemize}
+  \item \textbf{Superviseur / Responsable magasin} : réceptionne alertes, décide ouverture de caisses.
+  \item \textbf{Opérateur système} : configuration des zones, seuils et maintenance du système.
+  \item \textbf{Système (automatisé)} : détecte, calcule métriques, émet alertes et stocke historiques.
+\end{itemize}
+
+\section{Les actions associées à chaque acteur}
+\begin{itemize}
+  \item Superviseur : consulter dashboard, valider ou rejeter recommandations, planifier ressources.
+  \item Opérateur système : définir polygones de zones, configurer seuils/persistance, surveiller logs et qualité de détection.
+  \item Système : générer événements (arrivée, sortie), calculer taux et temps d'attente, estimer incertitudes, déclencher webhooks/notifications.
+\end{itemize}
+
+% Force sections 5-7 to start on page 2
+\clearpage
+\section{Choix de technologie}
+Technologies effectivement utilisées dans le projet (extrait de `requirements.txt` et du code) :
+\begin{itemize}
+  \item Langage : Python 3.x
+  \item Détection : Ultralytics YOLO26 via le package `ultralytics` (modèles `yolo26*.pt`).
+  \item Traitement d'image : `opencv-python` (OpenCV) et `supervision` pour aides géométriques/tracking.
+  \item Tracking / helpers : `supervision` (SORT/associations) et logique interne dans `src/tracker.py`.
+  \item Calculs et data : `numpy`, `pandas`.
+  \item GUI : `tkinter` (interface locale) et `Pillow` (PIL) pour gestion d'images.
+  \item Intégration & webhooks : `requests` pour envoi d'alertes HTTP.
+  \item Outils dev / visualisation : `jupyter`, `matplotlib`.
+  \item Stockage : exports CSV (via `csv_logger`), option SQLite pour historisation.
+\end{itemize}
+
+\paragraph{Site web / API}
+Le projet comprendra un backend REST et un dashboard web. Backend recommandé : \textbf{FastAPI} + `uvicorn` exposant endpoints (ex. `/metrics`, `/alerts`, `/history`, `/zones`) et un webhook ; WebSocket/SSE pour mises à jour temps réel. Frontend : React/Vue (production) ou \textbf{Streamlit} (prototype).
+
+Dépendances web requises : `fastapi`, `uvicorn`, `websockets`/`python-socketio` et (optionnel) toolchain frontend.
+
+\section{Module à développer}
+La solution se compose des modules suivants :
+\begin{itemize}
+  \item \texttt{detector} : intégration du modèle de détection et prétraitement des frames.
+  \item \texttt{tracker} : association des détections et maintien des identifiants persistants.
+  \item \texttt{zone\_manager} : définition et gestion des zones d'intérêt, détection des transitions.
+  \item \texttt{queue\\_analyzer} : comptage, estimation des taux (arrivée/service) et calcul du temps d'attente.
+  \item \texttt{uncertainty} : propagation des incertitudes et production d'intervalles ou scores de fiabilité.
+  \item \texttt{webhook} / \texttt{notifier} : règles d'alerte et envoi de notifications/executions d'actions.
+  \item \texttt{gui} / \texttt{dashboard} : affichage en temps réel et historisation.
+  \item \texttt{api} / \texttt{backend} : API REST et services temps réel (WebSocket/SSE) exposant métriques, historiques et contrôles.
+  \item \texttt{frontend} : application web (React/Vue) ou prototype Streamlit consommant l'API pour supervision distante.
+  \item \texttt{csv\\_logger} : export et stockage des métriques pour analyse offline.
+\end{itemize}
+
+\section{Méthodologie de conception adoptée}
+Approche incrémentale et modulaire : développement par sprints courts, tests sur vidéos d'évaluation et validation empirique.
+
+Principes adoptés :
+\begin{itemize}
+  \item séparation claire des responsabilités (détection, tracking, analyse, interface) ;
+  \item pipeline temps réel avec traitements par fenêtres temporelles pour lissage et stabilisation ;
+  \item quantification d'incertitude depuis les entrées (incertitude de détection, perte d'observabilité) par propagation analytique ou Monte‑Carlo simplifié ;
+  \item règles d'alerte paramétrables et testables automatiquement.
+\end{itemize}
+
+% Force architecture to start on page 3
+\clearpage
+\section{Architecture}
+L'architecture proposée comprend :
+\begin{itemize}
+  \item Acquisition vidéo (RTSP/MP4) \rightarrow Prétraitement des frames.
+  \item Module de détection \rightarrow Module de tracking \rightarrow Zone Manager (génération d'événements).
+  \item Queue Analyzer et Uncertainty Engine qui calculent indicateurs et intervalles.
+  \item Notifier/Rules Engine qui déclenche alertes (webhook/email) et stocke métriques via CSV/DB.
+  \item Dashboard (GUI) qui consomme API pour affichage temps réel et historiques.
+\end{itemize}
+
+Un diagramme d'architecture peut être ajouté en annexe (schéma bloc représentant les flux entre modules).
+
+\section{Choix technologiques (détaillés)}
+\begin{itemize}
+  \item Modèle de détection : utiliser un modèle quantique‑prêt pour inférence CPU/GPU selon disponibilité (YOLO family).
+  \item Tracking : SORT pour simplicité/latence, DeepSORT si ré‑identification requise.
+  \item Backend web/API : \textbf{FastAPI} + `uvicorn` pour endpoints REST et WebSocket/SSE ; `python-socketio` ou `websockets` si nécessaire.
+  \item Base de données : SQLite pour preuve de concept; Postgres pour déploiement multi‑instance.
+  \item Observabilité : logs structurés (JSON), métriques simples (latence, fps, taux d'erreur) exposées via endpoint.
+  \item Déploiement : containerisation possible (Docker), exécution locale pour prototypes.
+\end{itemize}
+
+\vfill
+\noindent PDF généré depuis le dépôt "Queue-Wait-Time-Estimation" — version réorganisée.
+
+\end{document}
