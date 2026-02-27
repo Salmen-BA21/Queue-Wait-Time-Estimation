@@ -6,27 +6,26 @@
 
 ## 📍 Current Sprint
 
-**Sprint 5 – Send Data to n8n Integration**  
-**Status:** IN PROGRESS (mostly complete)
+**Sprint 10 – Web Application UI/UX Design**  
+**Status:** COMPLETED ✅
 
-- ✅ n8n webhook setup and deployment complete
-- ✅ JSON payload structure designed (17 fields)
-- ✅ Python webhook client created with retry logic
-- ✅ Main.py integration complete (webhook sends every 5 seconds)
-- ✅ End-to-end testing successful (HTTP 200 responses)
-- ✅ CSV backup logging implemented
-- ✅ Queue threshold detection logic implemented
-- ⏳ **Telegram bot setup and integration PENDING**
-- ⏳ **Persistence checking with n8n state PENDING**
+- ✅ Complete design system created ("Terminal Minimal" dark theme)
+- ✅ 7 pages designed in Pencil MCP (1440×900px each)
+- ✅ Landing Page, Dashboard, Setup Wizard, Zone Editor, Analytics, Settings, Heatmap
+- ✅ Design specification written (`design/DESIGN_SPEC.md`)
+- ✅ Agent handoff guide written (`design/README.md`)
+- ✅ All pages verified with screenshots
+
+**Next Up: Implement Web Frontend from Design Specs**
 
 ---
 
 ## 🎯 Next Immediate Tasks
 
-1. **Complete Sprint 5:** Implement Telegram bot setup and integration with n8n
-2. **Sprint 6:** Define alert persistence rules and implement inline Telegram buttons
-3. **Enhance Testing:** Run comprehensive end-to-end tests with multiple simultaneous video feeds
-4. **Sprint 8 Testing:** Evaluate system under various scenarios (normal, crowd, slow service)
+1. **Implement Web Frontend:** Build React/Next.js app from `design/DESIGN_SPEC.md` — see `design/README.md` for full guide
+2. **Create REST API:** Wrap existing Python backend in API endpoints for the web app
+3. **Complete Sprint 5:** Implement Telegram bot setup and integration with n8n
+4. **Sprint 6:** Define alert persistence rules and implement inline Telegram buttons
 
 ---
 
@@ -34,6 +33,7 @@
 
 - **Sprints 0-4:** Core functionality with uncertainty quantification ✅
 - **Sprint 7:** Dashboard GUI implemented ✅
+- **Sprint 10:** Complete web UI/UX design (7 pages) ✅ ⭐ NEW
 - **n8n integration:** Webhook + CSV logging ✅
 - **Queue analysis:** YOLO26 + ByteTrack + zone detection ✅
 - **Uncertainty quantification:** Bayesian Gamma distributions ✅
@@ -44,6 +44,11 @@
 ## 📁 Project Structure
 
 ```
+design/                    ⭐ WEB DESIGN (NEW)
+  ├── README.md              (Quick-start guide for frontend implementation)
+  ├── DESIGN_SPEC.md         (Full technical design spec – 7 pages)
+  └── pencil-new.pen         (Pencil MCP design file – DO NOT read with text tools)
+
 docs/
   ├── README.md              (📖 Documentation index)
   ├── agent-guide/           (Agent onboarding docs)
@@ -70,24 +75,26 @@ src/
 
 ---
 
-## 🔑 Key Files For This Sprint
+## 🔑 Key Files For Next Sprint (Web Frontend Implementation)
 
 | File | Purpose |
 |------|---------|
-| [../../src/webhook_client.py](../../src/webhook_client.py) | Send metrics to n8n webhook with retry logic |
-| [../../src/threshold_detector.py](../../src/threshold_detector.py) | Detect queue alerts (wait time, backlog, spikes, etc.) |
-| [../../src/csv_logger.py](../../src/csv_logger.py) | Backup CSV logging for offline metrics |
-| [../../src/main.py](../../src/main.py) | Main loop integrating webhook sends every 5 sec |
-| [../sprints/SPRINT5_SETUP.md](../sprints/SPRINT5_SETUP.md) | n8n webhook setup instructions |
+| [../../design/DESIGN_SPEC.md](../../design/DESIGN_SPEC.md) | Complete design specification with layouts, colors, components, TypeScript models |
+| [../../design/README.md](../../design/README.md) | Quick-start guide for frontend implementation |
+| [../../pencil-new.pen](../../pencil-new.pen) | Pencil design file (use Pencil MCP tools to view) |
+| [../../src/config.py](../../src/config.py) | Backend configuration (maps to Settings page) |
+| [../../src/queue_analyzer.py](../../src/queue_analyzer.py) | Queue metrics logic (maps to Dashboard KPIs) |
+| [../../src/uncertainty.py](../../src/uncertainty.py) | Uncertainty calculations (maps to Analytics CI bands) |
+| [../../src/threshold_detector.py](../../src/threshold_detector.py) | Alert logic (maps to Dashboard alert sidebar) |
 
 ---
 
 ## 📈 Project Completion
 
-- **Completed:** Sprints 0, 1, 2, 3, 4 (5 sprints = ~50%)
+- **Completed:** Sprints 0, 1, 2, 3, 4, 10 (6 sprints = ~55%)
 - **In Progress:** Sprint 5 (~90% complete, missing Telegram), Sprint 7 (mostly complete), Sprint 8 (partially complete)
 - **Not Started:** Sprints 6 and 9
-- **Overall:** ~55% complete
+- **Overall:** ~60% complete
 
 ---
 
@@ -103,5 +110,5 @@ src/
 
 ---
 
-**Last Updated:** February 24, 2026
+**Last Updated:** February 27, 2026
 

@@ -58,14 +58,27 @@
 
 ---
 
-### 5️⃣ **[../sprints/](../sprints/)** – Sprint-Specific Details
+### 5️⃣ **[../../design/README.md](../../design/README.md)** – Web Design Guide ⭐ NEW
+**Purpose:** Understand the complete web frontend design — 7 pages designed in Pencil MCP.
+
+**Topics covered:**
+- 🎨 Design system (colors, fonts, spacing)
+- 📐 All 7 page layouts with component breakdowns
+- 🚀 Implementation roadmap for the next agent
+- 📁 File references and Pencil MCP node IDs
+
+**Reading time:** 5 minutes (then read `design/DESIGN_SPEC.md` for full 20-minute deep dive)
+
+---
+
+### 6️⃣ **[../sprints/](../sprints/)** – Sprint-Specific Details
 Deep dives into specific sprints:
 - `SPRINT4_SUMMARY.md` – Uncertainty quantification implementation
 - `SPRINT5_SETUP.md` – n8n webhook integration setup
 
 ---
 
-### 6️⃣ **[../daily-logs/](../daily-logs/)** – Development History
+### 7️⃣ **[../daily-logs/](../daily-logs/)** – Development History
 Daily logs organized by date and sprint activity. Useful for understanding design decisions.
 
 ---
@@ -80,6 +93,12 @@ Daily logs organized by date and sprint activity. Useful for understanding desig
 
 ### **I need full details on everything**
 → Read in order: PROJECT_CONCEPT → AGENT_CONTEXT → PROGRESS.md → specific sprint docs
+
+### **I'm implementing the web frontend** ⭐
+1. **design/README.md** – Quick start guide
+2. **design/DESIGN_SPEC.md** – Full technical spec (colors, layouts, components, TypeScript models)
+3. **pencil-new.pen** – Open with Pencil MCP tools for visual reference
+4. **Code**: `src/config.py`, `src/queue_analyzer.py`, `src/uncertainty.py`
 
 ### **I'm implementing Sprint 5 (Telegram/n8n)**
 1. **AGENT_CONTEXT.md** – Status
@@ -102,6 +121,11 @@ docs/agent-guide/          ← YOU ARE HERE
 ├── INDEX.md               (this file)
 ├── PROJECT_CONCEPT.md     (what is this project?)
 └── AGENT_CONTEXT.md       (where are we now?)
+
+design/                    ⭐ WEB DESIGN
+├── README.md              (quick-start for frontend implementation)
+├── DESIGN_SPEC.md         (full technical design specification)
+└── pencil-new.pen         (Pencil MCP design file – 7 pages)
 
 docs/tracking/             (project status)
 ├── PROGRESS.md            (sprint-by-sprint breakdown)
@@ -132,7 +156,7 @@ docs/daily-logs/           (development history)
 
 ---
 
-**Last Updated:** February 24, 2026
+**Last Updated:** February 27, 2026
 
 Welcome to the Queue Wait-Time Estimation System! 🚀
 

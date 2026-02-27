@@ -4,6 +4,12 @@ This directory contains all project documentation, now standardized around **Spr
 
 ## 📁 Folder Organization
 
+### 🔹 `/design/` ⭐ NEW
+Web application UI/UX design documentation:
+- **[README.md](../design/README.md)** – Quick-start guide for implementing the frontend
+- **[DESIGN_SPEC.md](../design/DESIGN_SPEC.md)** – Complete technical design specification (7 pages)
+- **pencil-new.pen** – Pencil design file (use Pencil MCP tools to view)
+
 ### 🔹 `/sprints/` (primary)
 Sprint-specific planning and execution documentation:
 - **README.md** – Sprint model and usage notes
@@ -30,10 +36,11 @@ Legacy phase documents are archived to preserve history. New updates should be w
 ## 🎯 Quick Navigation
 
 - **Getting Started?** → Start with `agent-guide/INDEX.md`
+- **Implementing the Web Frontend?** → See `design/README.md` then `design/DESIGN_SPEC.md`
 - **Tracking Progress?** → See `tracking/PROGRESS.md`
 - **Understanding a Sprint?** → Check `sprints/` or `daily-logs/`
 - **Checking Recent Work?** → See `tracking/STATUS_REPORT.md` or latest in `daily-logs/`
 
 ---
 
-*Last organized: February 24, 2026*
+*Last organized: February 27, 2026*
