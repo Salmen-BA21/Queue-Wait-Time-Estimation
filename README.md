@@ -66,6 +66,36 @@ pip install -r requirements.txt
 
 ---
 
+## 🐳 N8n Workflow Automation
+
+This project integrates with [n8n](https://n8n.io/) for workflow automation and alerting. The system sends webhook data every 5 seconds with queue metrics.
+
+### Running n8n with Docker
+
+1. **Install Docker** (if not already installed)
+
+2. **Start n8n container:**
+   ```bash
+   docker-compose up -d
+   ```
+
+3. **Access n8n web interface:**
+   - Open http://localhost:5678
+   - Login with: `admin` / `password`
+
+4. **Import the workflow template:**
+   - In n8n, click "Import" → "Upload" → select `n8n_workflow_template.json`
+   - Configure webhook URL in the workflow to match your setup
+
+5. **Stop the container:**
+   ```bash
+   docker-compose down
+   ```
+
+The Docker setup includes persistent data storage and mounts the workflow template for easy import.
+
+---
+
 ## ▶️ Quick Start
 
 ### Webcam (default)
