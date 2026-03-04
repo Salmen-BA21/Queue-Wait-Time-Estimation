@@ -12,7 +12,7 @@ This opens a graphical interface for:
 - Running the analysis without terminal commands
 """
 
-from src.gui.app import main
+from backend.src.gui.app import main
 
 if __name__ == "__main__":
     main()

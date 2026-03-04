@@ -56,6 +56,17 @@ DEFAULT_LOG_INTERVAL_SEC: float = 5.0
 WINDOW_NAME: str = "Queue Estimation"
 
 
+# ─── RTSP Camera ──────────────────────────────────────────────
+# Maximum seconds to wait for an RTSP stream to open
+RTSP_CONNECTION_TIMEOUT_SEC: float = 10.0
+# How many times to re-try after a dropped stream (0 = no retry)
+RTSP_RECONNECT_ATTEMPTS: int = 5
+# Seconds to wait between reconnect attempts
+RTSP_RECONNECT_DELAY_SEC: float = 3.0
+# FFMPEG-based RTSP transport – "tcp" is more reliable over lossy links
+RTSP_TRANSPORT: str = "tcp"  # "tcp" | "udp"
+
+
 # ─── Webhook / n8n Integration ────────────────────────────────
 # Local n8n webhook URL – change if n8n is on different host/port
 N8N_WEBHOOK_URL: str = "http://localhost:5678/webhook/queue-metrics"
@@ -75,6 +86,11 @@ class AppConfig:
     log_interval_sec: float = DEFAULT_LOG_INTERVAL_SEC
     confidence: float = DEFAULT_CONFIDENCE
     tracker_type: str = DEFAULT_TRACKER_TYPE
+    # RTSP-specific
+    rtsp_username: Optional[str] = None
+    rtsp_password: Optional[str] = None
+    rtsp_reconnect: int = RTSP_RECONNECT_ATTEMPTS
+    rtsp_transport: str = RTSP_TRANSPORT
 
     @property
     def model_path(self) -> str:

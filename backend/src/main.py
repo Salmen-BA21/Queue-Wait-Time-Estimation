@@ -32,7 +32,7 @@ from src.queue_analyzer import QueueAnalyzer, QueueMetrics
 from src.tracker import ObjectTracker
 from src.utils.drawing import create_annotators, draw_detections, draw_metrics_overlay
 from src.utils.logging_setup import setup_logging
-from src.video_capture import VideoStream
+from src.video_capture import VideoStream, open_video_source
 from src.webhook_client import WebhookClient
 from src.zone_manager import ZoneManager
 
@@ -99,6 +99,32 @@ def build_parser() -> argparse.ArgumentParser:
         default="INFO",
         help="Logging level: DEBUG, INFO, WARNING, ERROR. (default: INFO)",
     )
+    # ── RTSP-specific ─────────────────────────────────────────────
+    parser.add_argument(
+        "--rtsp-user",
+        type=str,
+        default=None,
+        help="Username for RTSP camera authentication (optional).",
+    )
+    parser.add_argument(
+        "--rtsp-pass",
+        type=str,
+        default=None,
+        help="Password for RTSP camera authentication (optional).",
+    )
+    parser.add_argument(
+        "--rtsp-reconnect",
+        type=int,
+        default=None,
+        help="Number of reconnect attempts on RTSP stream loss (default from config).",
+    )
+    parser.add_argument(
+        "--rtsp-transport",
+        type=str,
+        choices=["tcp", "udp"],
+        default=None,
+        help="RTSP transport protocol: tcp (reliable) or udp (low-latency). (default: tcp)",
+    )
     return parser
 
 
@@ -131,7 +157,14 @@ def run(cfg: AppConfig) -> None:
     # ── Initialise components ─────────────────────────────────
     detector = PersonDetector(model_path=cfg.model_path, confidence=cfg.confidence)
 
-    with VideoStream(cfg.source) as stream:
+    stream = open_video_source(
+        cfg.source,
+        rtsp_username=cfg.rtsp_username,
+        rtsp_password=cfg.rtsp_password,
+        rtsp_reconnect=cfg.rtsp_reconnect if cfg.rtsp_reconnect is not None else None,
+        rtsp_transport=cfg.rtsp_transport if cfg.rtsp_transport else None,
+    )
+    with stream:
         tracker = ObjectTracker(frame_rate=int(stream.fps))
         zone_mgr = ZoneManager(
             polygon_points=cfg.zone_polygon,
@@ -275,6 +308,10 @@ def main() -> None:
         zone_points=zone_pts,
         output_fps=args.output_fps,
         log_interval_sec=args.log_interval_sec,
+        rtsp_username=args.rtsp_user,
+        rtsp_password=args.rtsp_pass,
+        rtsp_reconnect=args.rtsp_reconnect,
+        rtsp_transport=args.rtsp_transport or "tcp",
     )
 
     logger.info("Configuration: %s", cfg)

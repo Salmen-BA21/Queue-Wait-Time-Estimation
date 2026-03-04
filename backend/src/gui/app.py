@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import subprocess
 import sys
 import tkinter as tk
@@ -18,6 +19,11 @@ from tkinter import filedialog, messagebox, ttk
 import cv2
 import numpy as np
 from PIL import Image, ImageTk
+
+# Ensure the backend root is in sys.path so imports work from anywhere
+_backend_root = Path(__file__).parent.parent.parent
+if str(_backend_root) not in sys.path:
+    sys.path.insert(0, str(_backend_root))
 
 logger = logging.getLogger("queue_system.gui")
 
@@ -256,6 +262,16 @@ class MainWindow:
         self.model_size = tk.StringVar(value="n")
         self.log_level = tk.StringVar(value="INFO")
 
+        # RTSP credentials store: maps source url -> {"username", "password", "transport"}
+        self.rtsp_credentials: dict[str, dict] = {}
+
+        # RTSP form tk vars (populated in show_step1)
+        self.rtsp_url_var = tk.StringVar()
+        self.rtsp_user_var = tk.StringVar()
+        self.rtsp_pass_var = tk.StringVar()
+        self.rtsp_transport_var = tk.StringVar(value="tcp")
+        self.rtsp_status_var = tk.StringVar(value="")
+
         self._setup_ui()
         self.show_step1()
 
@@ -316,16 +332,72 @@ class MainWindow:
         self.video_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         lb_scroll.pack(side=tk.LEFT, fill=tk.Y)
 
-        # Add / Remove buttons
+        # Add / Remove buttons + source-type tabs
         action_frame = ttk.Frame(video_frame)
         action_frame.pack(fill=tk.X, pady=(5, 0))
-        ttk.Button(action_frame, text="+ Add Video",
-                   command=self._add_video).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(action_frame, text="- Remove Selected",
-                   command=self._remove_video).pack(side=tk.LEFT, padx=5)
+                   command=self._remove_video).pack(side=tk.LEFT, padx=(0, 5))
 
-        ttk.Label(video_frame, text="Supported formats: MP4, AVI, MOV",
-                  font=("Arial", 9), foreground="gray").pack(anchor=tk.W, pady=(8, 0))
+        # ── Source-type notebook ───────────────────────────────
+        notebook = ttk.Notebook(video_frame)
+        notebook.pack(fill=tk.X, pady=(8, 0))
+
+        # Tab 1 – Video File
+        file_tab = ttk.Frame(notebook, padding=8)
+        notebook.add(file_tab, text="  Video File  ")
+        ttk.Label(file_tab, text="Supported: MP4, AVI, MOV",
+                  font=("Arial", 9), foreground="gray").pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(file_tab, text="+ Browse File",
+                   command=self._add_video).pack(side=tk.LEFT)
+
+        # Tab 2 – IP Camera (RTSP)
+        rtsp_tab = ttk.Frame(notebook, padding=8)
+        notebook.add(rtsp_tab, text="  IP Camera (RTSP)  ")
+
+        r = 0
+        ttk.Label(rtsp_tab, text="RTSP URL:", font=("Arial", 9)).grid(
+            row=r, column=0, sticky=tk.W, padx=(0, 5), pady=3)
+        ttk.Entry(rtsp_tab, textvariable=self.rtsp_url_var, width=45,
+                  font=("Arial", 9)).grid(row=r, column=1, columnspan=3,
+                                          sticky=tk.EW, pady=3)
+        ttk.Label(rtsp_tab, text="e.g. rtsp://192.168.1.10:554/live/main",
+                  font=("Arial", 8), foreground="gray").grid(
+            row=r, column=4, sticky=tk.W, padx=(5, 0), pady=3)
+
+        r += 1
+        ttk.Label(rtsp_tab, text="Username:", font=("Arial", 9)).grid(
+            row=r, column=0, sticky=tk.W, padx=(0, 5), pady=3)
+        ttk.Entry(rtsp_tab, textvariable=self.rtsp_user_var, width=18,
+                  font=("Arial", 9)).grid(row=r, column=1, sticky=tk.W, pady=3)
+        ttk.Label(rtsp_tab, text="Password:", font=("Arial", 9)).grid(
+            row=r, column=2, sticky=tk.W, padx=(10, 5), pady=3)
+        ttk.Entry(rtsp_tab, textvariable=self.rtsp_pass_var, width=18,
+                  show="*", font=("Arial", 9)).grid(row=r, column=3, sticky=tk.W, pady=3)
+
+        r += 1
+        ttk.Label(rtsp_tab, text="Transport:", font=("Arial", 9)).grid(
+            row=r, column=0, sticky=tk.W, padx=(0, 5), pady=3)
+        ttk.Combobox(rtsp_tab, textvariable=self.rtsp_transport_var,
+                     values=["tcp", "udp"], state="readonly",
+                     width=6, font=("Arial", 9)).grid(row=r, column=1, sticky=tk.W, pady=3)
+        ttk.Label(rtsp_tab, text="(tcp = reliable,  udp = low-latency)",
+                  font=("Arial", 8), foreground="gray").grid(
+            row=r, column=2, columnspan=3, sticky=tk.W, padx=(10, 0), pady=3)
+
+        r += 1
+        btn_row = ttk.Frame(rtsp_tab)
+        btn_row.grid(row=r, column=0, columnspan=5, sticky=tk.W, pady=(6, 0))
+        ttk.Button(btn_row, text="Test Connection",
+                   command=self._test_rtsp_from_form).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(btn_row, text="+ Add Camera",
+                   command=self._add_camera_from_form).pack(side=tk.LEFT)
+
+        self.rtsp_status_label = ttk.Label(rtsp_tab, textvariable=self.rtsp_status_var,
+                                           font=("Arial", 9))
+        self.rtsp_status_label.grid(row=r, column=0, columnspan=5,
+                                    sticky=tk.W, pady=(3, 0))
+        # configure column weights so URL entry stretches
+        rtsp_tab.columnconfigure(1, weight=1)
 
         # Populate from existing selection (e.g. after Back navigation)
         self._refresh_listbox()
@@ -376,14 +448,18 @@ class MainWindow:
             return
         self.video_listbox.delete(0, tk.END)
         for i, p in enumerate(self.video_paths):
-            self.video_listbox.insert(tk.END, f"{i+1}.  {Path(p).name}")
+            if p.lower().startswith("rtsp://"):
+                label = f"{i+1}.  [CAM] {p}"
+            else:
+                label = f"{i+1}.  {Path(p).name}"
+            self.video_listbox.insert(tk.END, label)
         # update count status label
         expected = self.video_count.get()
         n = len(self.video_paths)
         color = "green" if n == expected else ("orange" if n > 0 else "red")
         if self.count_status_label is not None:
             self.count_status_label.config(
-                text=f"{n} of {expected} video(s) selected", foreground=color)
+                text=f"{n} of {expected} source(s) selected", foreground=color)
         # keep backward-compatible single-path var
         self.video_path.set(self.video_paths[0] if self.video_paths else "")
 
@@ -391,24 +467,110 @@ class MainWindow:
         """Clear previous selections when the count spinbox changes."""
         self.video_paths.clear()
         self.zone_points_map.clear()
+        self.rtsp_credentials.clear()
         self.video_path.set("")
         self._refresh_listbox()
+
+    def _add_camera_from_form(self):
+        """Validate the RTSP form and add the camera URL to the source list."""
+        expected = self.video_count.get()
+        if len(self.video_paths) >= expected:
+            messagebox.showwarning(
+                "Limit reached",
+                f"You already have {expected} source(s) selected.\n"
+                "Remove one first or increase the count.",
+            )
+            return
+
+        url = self.rtsp_url_var.get().strip()
+        if not url:
+            messagebox.showerror("Missing URL", "Please enter an RTSP URL.")
+            return
+        if not url.lower().startswith("rtsp://"):
+            messagebox.showerror(
+                "Invalid URL",
+                "URL must start with rtsp://\n"
+                "Example: rtsp://192.168.1.10:554/live/main",
+            )
+            return
+        if url in self.video_paths:
+            messagebox.showwarning("Duplicate", "This camera URL is already in the list.")
+            return
+
+        self.rtsp_credentials[url] = {
+            "username": self.rtsp_user_var.get().strip() or None,
+            "password": self.rtsp_pass_var.get().strip() or None,
+            "transport": self.rtsp_transport_var.get() or "tcp",
+        }
+        self.video_paths.append(url)
+        self._refresh_listbox()
+        self.rtsp_status_var.set("")
+
+    def _test_rtsp_from_form(self):
+        """Test the RTSP URL entered in the form and show the result."""
+        url = self.rtsp_url_var.get().strip()
+        if not url:
+            messagebox.showerror("Missing URL", "Please enter an RTSP URL first.")
+            return
+        if not url.lower().startswith("rtsp://"):
+            messagebox.showerror(
+                "Invalid URL",
+                "URL must start with rtsp://\n"
+                "Example: rtsp://192.168.1.10:554/live/main",
+            )
+            return
+
+        self.rtsp_status_var.set("Testing connection…")
+        if hasattr(self, "rtsp_status_label"):
+            self.rtsp_status_label.config(foreground="blue")
+        self.root.update_idletasks()
+
+        try:
+            from src.rtsp_camera import RTSPCamera
+            ok, info = RTSPCamera.test_connection(
+                url,
+                username=self.rtsp_user_var.get().strip() or None,
+                password=self.rtsp_pass_var.get().strip() or None,
+                transport=self.rtsp_transport_var.get() or "tcp",
+            )
+        except Exception as exc:
+            ok, info = False, {"error": str(exc)}
+
+        if ok:
+            msg = (
+                f"Connection successful!\n\n"
+                f"Resolution : {info['resolution']}\n"
+                f"FPS        : {info['fps']:.1f}\n"
+                f"Transport  : {info['transport']}"
+            )
+            self.rtsp_status_var.set(
+                f"OK  {info['resolution']} @ {info['fps']:.1f} FPS"
+            )
+            if hasattr(self, "rtsp_status_label"):
+                self.rtsp_status_label.config(foreground="green")
+            messagebox.showinfo("RTSP Test – OK", msg)
+        else:
+            err = info.get("error", "Unknown error")
+            self.rtsp_status_var.set(f"FAILED  {err}")
+            if hasattr(self, "rtsp_status_label"):
+                self.rtsp_status_label.config(foreground="red")
+            messagebox.showerror("RTSP Test – Failed", f"Could not connect:\n\n{err}")
 
     def _validate_and_go_step2(self):
         """Validate the video selection and advance to step 2."""
         expected = self.video_count.get()
         if not self.video_paths:
-            messagebox.showerror("Error", "Please select your video file(s)!")
+            messagebox.showerror("Error", "Please select your video file(s) or add a camera!")
             return
         if len(self.video_paths) != expected:
             messagebox.showerror(
                 "Error",
-                f"You need to select exactly {expected} video(s) "
+                f"You need to select exactly {expected} source(s) "
                 f"but {len(self.video_paths)} were chosen.",
             )
             return
         for p in self.video_paths:
-            if not Path(p).exists():
+            if not p.lower().startswith("rtsp://") and not Path(p).exists():
                 messagebox.showerror("Error", f"File not found:\n{p}")
                 return
         self.current_video_index = 0
@@ -496,12 +658,26 @@ class MainWindow:
         self._update_zone_status()
 
     def _select_zone(self):
-        """Open zone selector for the currently-selected video."""
+        """Open zone selector for the currently-selected source."""
         if not self.video_paths:
-            messagebox.showwarning("Warning", "Go back and select a video first!")
+            messagebox.showwarning("Warning", "Go back and select a source first!")
             return
         path = self.video_paths[self.current_video_index]
-        selector = ZoneSelectorWindow(path, parent=self.root)
+
+        # For RTSP sources, build the authenticated URL so cv2 can open it
+        if path.lower().startswith("rtsp://"):
+            creds = self.rtsp_credentials.get(path, {})
+            from src.rtsp_camera import _build_rtsp_url, _apply_rtsp_env
+            _apply_rtsp_env(creds.get("transport", "tcp"))
+            display_path = _build_rtsp_url(
+                path,
+                username=creds.get("username"),
+                password=creds.get("password"),
+            )
+        else:
+            display_path = path
+
+        selector = ZoneSelectorWindow(display_path, parent=self.root)
         result = selector.run()
         if result:
             self.zone_points_map[path] = result["pixel"]
@@ -556,11 +732,23 @@ class MainWindow:
 
         # Per-video info
         for idx, path in enumerate(self.video_paths, start=1):
-            ttk.Label(summary_frame, text=f"Video {idx}:",
+            is_rtsp = path.lower().startswith("rtsp://")
+            kind = "Camera (RTSP)" if is_rtsp else "Video"
+            ttk.Label(summary_frame, text=f"Source {idx}  [{kind}]:",
                       font=("Arial", 10, "bold")).pack(anchor=tk.W, pady=(10, 2))
             ttk.Label(summary_frame, text=path,
                       font=("Arial", 9), foreground="darkgreen").pack(
                 anchor=tk.W, padx=20, pady=(0, 2))
+
+            if is_rtsp:
+                creds = self.rtsp_credentials.get(path, {})
+                user = creds.get("username") or "(none)"
+                transport = creds.get("transport") or "tcp"
+                ttk.Label(
+                    summary_frame,
+                    text=f"User: {user}   Transport: {transport}",
+                    font=("Arial", 8), foreground="gray",
+                ).pack(anchor=tk.W, padx=40, pady=(0, 2))
 
             points = self.zone_points_map.get(path)
             if points:
@@ -603,11 +791,12 @@ class MainWindow:
     # ══════════════════════════════════════════════════════════
 
     def get_analysis_commands(self) -> list[list[str]]:
-        """Build one subprocess arg-list per selected video.
+        """Build one subprocess arg-list per selected source.
 
         Each command invokes ``python -m src.main`` with the appropriate
         ``--source``, ``--model-size``, ``--log-level``, and (optionally)
-        ``--zone-points`` flags.
+        ``--zone-points`` flags.  RTSP sources also receive ``--rtsp-user``,
+        ``--rtsp-pass``, and ``--rtsp-transport``.
         """
         model_size = self.model_size.get().split()[0]  # "n (nano ...)" -> "n"
         commands: list[list[str]] = []
@@ -621,6 +810,15 @@ class MainWindow:
             pts = self.zone_points_map.get(path)
             if pts:
                 cmd.extend(["--zone-points", json.dumps(pts)])
+            # RTSP-specific flags
+            if path.lower().startswith("rtsp://"):
+                creds = self.rtsp_credentials.get(path, {})
+                if creds.get("username"):
+                    cmd.extend(["--rtsp-user", creds["username"]])
+                if creds.get("password"):
+                    cmd.extend(["--rtsp-pass", creds["password"]])
+                transport = creds.get("transport") or "tcp"
+                cmd.extend(["--rtsp-transport", transport])
             commands.append(cmd)
         return commands
 

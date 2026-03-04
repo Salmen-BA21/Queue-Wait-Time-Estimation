@@ -32,6 +32,10 @@ data/
 *.mkv
 *.mov
 
+# Temporary workspace folders created by the Claude tool (not part of the project)
+tmpclaude*/
+backend/tmpclaude*/
+
 # YOLO weights (downloaded automatically)
 *.pt
 
