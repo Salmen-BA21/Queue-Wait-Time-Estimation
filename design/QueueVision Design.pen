@@ -298,7 +298,8 @@
                       "fill": "#94A3B8",
                       "content": "View on GitHub",
                       "fontFamily": "Inter",
-                      "fontSize": 16
+                      "fontSize": 16,
+                      "fontWeight": "normal"
                     },
                     {
                       "type": "icon_font",
@@ -1873,8 +1874,8 @@
     {
       "type": "frame",
       "id": "OPPgB",
-      "x": 1540,
-      "y": 0,
+      "x": 1586,
+      "y": -19,
       "name": "Dashboard",
       "width": 1440,
       "height": 900,
@@ -9780,7 +9781,8 @@
                   "fill": "#CBD5E1",
                   "content": "Admin-only dashboard for queue monitoring and control.",
                   "fontFamily": "Inter",
-                  "fontSize": 14
+                  "fontSize": 14,
+                  "fontWeight": "normal"
                 },
                 {
                   "type": "frame",
@@ -9806,7 +9808,8 @@
                       "fill": "#64748B",
                       "content": "Username or Email",
                       "fontFamily": "Inter",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 },
@@ -9834,7 +9837,8 @@
                       "fill": "#64748B",
                       "content": "Password",
                       "fontFamily": "Inter",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 },
