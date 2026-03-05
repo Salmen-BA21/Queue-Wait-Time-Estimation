@@ -31,6 +31,10 @@ Thumbs.db
 # ────────────────── Project-specific ──────────────────
 videos/
 data/
+backend/data/
+*.db
+*.sqlite
+*.sqlite3
 *.mp4
 *.avi
 *.mkv

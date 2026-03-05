@@ -125,6 +125,25 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="RTSP transport protocol: tcp (reliable) or udp (low-latency). (default: tcp)",
     )
+    # ── Metadata tracking ──────────────────────────────────────────
+    parser.add_argument(
+        "--establishment-id",
+        type=int,
+        default=None,
+        help="Database ID of the establishment (company/store) (optional).",
+    )
+    parser.add_argument(
+        "--section-id",
+        type=int,
+        default=None,
+        help="Database ID of the section/zone being monitored (optional).",
+    )
+    parser.add_argument(
+        "--employee-id",
+        type=int,
+        default=None,
+        help="Database ID of the cashier/employee working in this section (optional).",
+    )
     return parser
 
 
@@ -312,6 +331,9 @@ def main() -> None:
         rtsp_password=args.rtsp_pass,
         rtsp_reconnect=args.rtsp_reconnect,
         rtsp_transport=args.rtsp_transport or "tcp",
+        establishment_id=args.establishment_id,
+        section_id=args.section_id,
+        employee_id=args.employee_id,
     )
 
     logger.info("Configuration: %s", cfg)

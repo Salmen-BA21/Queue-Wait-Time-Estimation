@@ -36,7 +36,8 @@ class CSVMetricsLogger:
             "arrival_rate_lower", "arrival_rate_upper",
             "service_rate_lower", "service_rate_upper",
             "wait_time_lower", "wait_time_upper",
-            "uncertainty_level", "queue_stable", "alert_triggered", "alert_message"
+            "uncertainty_level", "queue_stable", "alert_triggered", "alert_message",
+            "establishment_name", "section_name", "employee_name"
         ]
         
         # Write headers if file is new

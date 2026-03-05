@@ -272,7 +272,19 @@ class MainWindow:
         self.rtsp_transport_var = tk.StringVar(value="tcp")
         self.rtsp_status_var = tk.StringVar(value="")
 
+        # Metadata tracking variables
+        self.establishment_var = tk.StringVar(value="")  # maps to establishment_id
+        self.section_var = tk.StringVar(value="")  # maps to section_id
+        self.employee_var = tk.StringVar(value="")  # maps to employee_id
+        self.establishment_id: int | None = None
+        self.section_id: int | None = None
+        self.employee_id: int | None = None
+
+        # Database hierarchy cache (will be populated on startup)
+        self.db_hierarchy: dict = {}
+
         self._setup_ui()
+        self._init_database()
         self.show_step1()
 
     # ── helpers ───────────────────────────────────────────────
@@ -285,6 +297,21 @@ class MainWindow:
     def _setup_ui(self):
         """Reserved for future global UI setup."""
         pass
+
+    def _init_database(self):
+        """Initialize metadata database on first run."""
+        try:
+            from src.database import init_db, get_full_hierarchy
+            # Initialize database schema
+            init_db()
+            # Load hierarchy into memory for quick dropdown updates
+            self.db_hierarchy = get_full_hierarchy()
+            logger.info("Database initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize metadata database: {e}")
+            messagebox.showerror("Database Error",
+                f"Could not initialize database:\n{e}\n\n"
+                "Metadata tracking will be skipped.")
 
     # ══════════════════════════════════════════════════════════
     # Step 1 – Select Videos
@@ -401,6 +428,49 @@ class MainWindow:
 
         # Populate from existing selection (e.g. after Back navigation)
         self._refresh_listbox()
+
+        # ── Metadata tracking ─────────────────────────────────────
+        metadata_frame = ttk.LabelFrame(self.root, text="Job Information (Optional)", padding=15)
+        metadata_frame.pack(fill=tk.X, padx=20, pady=10)
+
+        # Establishment selector
+        est_frame = ttk.Frame(metadata_frame)
+        est_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(est_frame, text="Establishment:", font=("Arial", 10)).pack(side=tk.LEFT, padx=(0, 10))
+        self.establishment_combo = ttk.Combobox(
+            est_frame, textvariable=self.establishment_var, state="readonly",
+            width=35, font=("Arial", 9)
+        )
+        self.establishment_combo.pack(side=tk.LEFT, padx=(0, 5))
+        self.establishment_combo.bind("<<ComboboxSelected>>", lambda _: self._on_establishment_select())
+        ttk.Button(est_frame, text="+ New", command=self._create_new_establishment).pack(side=tk.LEFT)
+
+        # Section selector
+        sec_frame = ttk.Frame(metadata_frame)
+        sec_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(sec_frame, text="Section/Zone:", font=("Arial", 10)).pack(side=tk.LEFT, padx=(0, 10))
+        self.section_combo = ttk.Combobox(
+            sec_frame, textvariable=self.section_var, state="readonly",
+            width=35, font=("Arial", 9)
+        )
+        self.section_combo.pack(side=tk.LEFT, padx=(0, 5))
+        self.section_combo.bind("<<ComboboxSelected>>", lambda _: self._on_section_select())
+        ttk.Button(sec_frame, text="+ New", command=self._create_new_section).pack(side=tk.LEFT)
+
+        # Employee selector
+        emp_frame = ttk.Frame(metadata_frame)
+        emp_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(emp_frame, text="Cashier/Employee:", font=("Arial", 10)).pack(side=tk.LEFT, padx=(0, 10))
+        self.employee_combo = ttk.Combobox(
+            emp_frame, textvariable=self.employee_var, state="readonly",
+            width=35, font=("Arial", 9)
+        )
+        self.employee_combo.pack(side=tk.LEFT, padx=(0, 5))
+        self.employee_combo.bind("<<ComboboxSelected>>", lambda _: self._on_employee_select())
+        ttk.Button(emp_frame, text="+ New", command=self._create_new_employee).pack(side=tk.LEFT)
+
+        # Populate establishment dropdown
+        self._refresh_establishment_combo()
 
         # ── Nav buttons ───────────────────────────────────────
         btn = ttk.Frame(self.root)
@@ -555,6 +625,198 @@ class MainWindow:
             if hasattr(self, "rtsp_status_label"):
                 self.rtsp_status_label.config(foreground="red")
             messagebox.showerror("RTSP Test – Failed", f"Could not connect:\n\n{err}")
+
+    # ── Metadata helpers ──────────────────────────────────────
+
+    def _refresh_establishment_combo(self):
+        """Populate establishment dropdown from database."""
+        if not self.db_hierarchy:
+            self.establishment_combo.config(values=[])
+            return
+        establishments = [f"{est['name']} (ID: {est_id})"
+                         for est_id, est in self.db_hierarchy.items()]
+        self.establishment_combo.config(values=establishments)
+
+    def _on_establishment_select(self):
+        """When establishment is selected, populate sections."""
+        selection = self.establishment_var.get()
+        if not selection:
+            self.section_combo.config(values=[])
+            self.employee_combo.config(values=[])
+            self.establishment_id = None
+            return
+
+        # Extract ID from "Name (ID: 123)" format
+        try:
+            est_id = int(selection.split("ID: ")[1].rstrip(")"))
+            self.establishment_id = est_id
+        except (ValueError, IndexError):
+            return
+
+        # Load sections for this establishment
+        est_data = self.db_hierarchy.get(est_id, {})
+        sections_dict = est_data.get('sections', {})
+        sections = [f"{sec['name']} (ID: {sec_id})"
+                   for sec_id, sec in sections_dict.items()]
+        self.section_combo.config(values=sections)
+        self.section_var.set("")
+        self.section_id = None
+        self.employee_combo.config(values=[])
+        self.employee_var.set("")
+        self.employee_id = None
+
+    def _on_section_select(self):
+        """When section is selected, populate employees."""
+        selection = self.section_var.get()
+        if not selection or self.establishment_id is None:
+            self.employee_combo.config(values=[])
+            self.section_id = None
+            return
+
+        try:
+            sec_id = int(selection.split("ID: ")[1].rstrip(")"))
+            self.section_id = sec_id
+        except (ValueError, IndexError):
+            return
+
+        # Load employees for this section
+        est_data = self.db_hierarchy.get(self.establishment_id, {})
+        sec_data = est_data.get('sections', {}).get(sec_id, {})
+        employees_dict = sec_data.get('employees', {})
+        employees = [f"{emp_name} (ID: {emp_id})"
+                    for emp_id, emp_name in employees_dict.items()]
+        self.employee_combo.config(values=employees)
+        self.employee_var.set("")
+        self.employee_id = None
+
+    def _on_employee_select(self):
+        """When employee is selected, store the ID."""
+        selection = self.employee_var.get()
+        if not selection:
+            self.employee_id = None
+            return
+
+        try:
+            emp_id = int(selection.split("ID: ")[1].rstrip(")"))
+            self.employee_id = emp_id
+        except (ValueError, IndexError):
+            pass
+
+    def _create_new_establishment(self):
+        """Dialog to create a new establishment."""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("New Establishment")
+        dialog.geometry("400x150")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        ttk.Label(dialog, text="Establishment Name:", font=("Arial", 10)).pack(pady=10, padx=20)
+        name_entry = ttk.Entry(dialog, font=("Arial", 10), width=35)
+        name_entry.pack(pady=(0, 20), padx=20)
+        name_entry.focus()
+
+        def save_establishment():
+            name = name_entry.get().strip()
+            if not name:
+                messagebox.showwarning("Required", "Please enter an establishment name.")
+                return
+            try:
+                from src.database import create_establishment
+                est_id = create_establishment(name)
+                # Reload hierarchy
+                from src.database import get_full_hierarchy
+                self.db_hierarchy = get_full_hierarchy()
+                self._refresh_establishment_combo()
+                # Select the newly created establishment
+                self.establishment_var.set(f"{name} (ID: {est_id})")
+                self._on_establishment_select()
+                dialog.destroy()
+                messagebox.showinfo("Success", f"Created establishment: {name}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not create establishment:\n{e}")
+
+        ttk.Button(dialog, text="Create", command=save_establishment).pack(side=tk.LEFT, padx=10)
+        ttk.Button(dialog, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=10)
+
+    def _create_new_section(self):
+        """Dialog to create a new section."""
+        if self.establishment_id is None:
+            messagebox.showwarning("Required", "Please select an establishment first.")
+            return
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("New Section")
+        dialog.geometry("400x150")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        ttk.Label(dialog, text="Section/Zone Name:", font=("Arial", 10)).pack(pady=10, padx=20)
+        name_entry = ttk.Entry(dialog, font=("Arial", 10), width=35)
+        name_entry.pack(pady=(0, 20), padx=20)
+        name_entry.focus()
+
+        def save_section():
+            name = name_entry.get().strip()
+            if not name:
+                messagebox.showwarning("Required", "Please enter a section name.")
+                return
+            try:
+                from src.database import create_section
+                sec_id = create_section(name, self.establishment_id)
+                # Reload hierarchy
+                from src.database import get_full_hierarchy
+                self.db_hierarchy = get_full_hierarchy()
+                self._on_establishment_select()  # Refresh section dropdown
+                # Select the newly created section
+                self.section_var.set(f"{name} (ID: {sec_id})")
+                self._on_section_select()
+                dialog.destroy()
+                messagebox.showinfo("Success", f"Created section: {name}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not create section:\n{e}")
+
+        ttk.Button(dialog, text="Create", command=save_section).pack(side=tk.LEFT, padx=10)
+        ttk.Button(dialog, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=10)
+
+    def _create_new_employee(self):
+        """Dialog to create a new employee."""
+        if self.section_id is None:
+            messagebox.showwarning("Required", "Please select a section first.")
+            return
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("New Cashier/Employee")
+        dialog.geometry("400x150")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        ttk.Label(dialog, text="Employee Name:", font=("Arial", 10)).pack(pady=10, padx=20)
+        name_entry = ttk.Entry(dialog, font=("Arial", 10), width=35)
+        name_entry.pack(pady=(0, 20), padx=20)
+        name_entry.focus()
+
+        def save_employee():
+            name = name_entry.get().strip()
+            if not name:
+                messagebox.showwarning("Required", "Please enter an employee name.")
+                return
+            try:
+                from src.database import create_employee
+                emp_id = create_employee(name, self.section_id)
+                # Reload hierarchy
+                from src.database import get_full_hierarchy
+                self.db_hierarchy = get_full_hierarchy()
+                self._on_section_select()  # Refresh employee dropdown
+                # Select the newly created employee
+                self.employee_var.set(f"{name} (ID: {emp_id})")
+                self._on_employee_select()
+                dialog.destroy()
+                messagebox.showinfo("Success", f"Created employee: {name}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not create employee:\n{e}")
+
+        ttk.Button(dialog, text="Create", command=save_employee).pack(side=tk.LEFT, padx=10)
+        ttk.Button(dialog, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=10)
 
     def _validate_and_go_step2(self):
         """Validate the video selection and advance to step 2."""
@@ -819,6 +1081,13 @@ class MainWindow:
                     cmd.extend(["--rtsp-pass", creds["password"]])
                 transport = creds.get("transport") or "tcp"
                 cmd.extend(["--rtsp-transport", transport])
+            # Metadata arguments (optional)
+            if self.establishment_id is not None:
+                cmd.extend(["--establishment-id", str(self.establishment_id)])
+            if self.section_id is not None:
+                cmd.extend(["--section-id", str(self.section_id)])
+            if self.employee_id is not None:
+                cmd.extend(["--employee-id", str(self.employee_id)])
             commands.append(cmd)
         return commands
 

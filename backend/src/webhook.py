@@ -51,7 +51,10 @@ class QueuePayload:
     # Additional metadata
     system_uptime_sec: float = 0.0
     confidence_scores: list[float] = field(default_factory=list)  # YOLO scores
-    
+    establishment_name: str | None = None
+    section_name: str | None = None
+    employee_name: str | None = None
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return asdict(self)
@@ -117,6 +120,9 @@ EXAMPLE_PAYLOAD = {
     "alert_severity": "info",
     "system_uptime_sec": 3600.5,
     "confidence_scores": [0.95, 0.93, 0.96, 0.94],
+    "establishment_name": "Downtown Store",
+    "section_name": "Checkout Zone A",
+    "employee_name": "John Doe",
 }
 
 

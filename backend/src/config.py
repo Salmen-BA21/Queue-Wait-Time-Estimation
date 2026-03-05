@@ -91,6 +91,10 @@ class AppConfig:
     rtsp_password: Optional[str] = None
     rtsp_reconnect: int = RTSP_RECONNECT_ATTEMPTS
     rtsp_transport: str = RTSP_TRANSPORT
+    # Metadata tracking (database IDs)
+    establishment_id: Optional[int] = None
+    section_id: Optional[int] = None
+    employee_id: Optional[int] = None
 
     @property
     def model_path(self) -> str:
