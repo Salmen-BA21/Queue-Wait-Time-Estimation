@@ -99,6 +99,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="INFO",
         help="Logging level: DEBUG, INFO, WARNING, ERROR. (default: INFO)",
     )
+    parser.add_argument(
+        "--resize-scale",
+        type=float,
+        default=1.0,
+        help="Scale factor to resize the frame (e.g., 0.5 for 50%). (default: 1.0)",
+    )
     # ── RTSP-specific ─────────────────────────────────────────────
     parser.add_argument(
         "--rtsp-user",
@@ -224,6 +230,10 @@ def run(cfg: AppConfig) -> None:
             frame = zone_mgr.annotate(frame)
             frame = draw_metrics_overlay(frame, _metrics_dict(metrics))
 
+            # Resize frame if scale != 1.0
+            if cfg.resize_scale != 1.0:
+                frame = cv2.resize(frame, (0, 0), fx=cfg.resize_scale, fy=cfg.resize_scale)
+
             # 6. Show
             cv2.imshow(WINDOW_NAME, frame)
             key = cv2.waitKey(frame_delay) & 0xFF
@@ -327,6 +337,7 @@ def main() -> None:
         zone_points=zone_pts,
         output_fps=args.output_fps,
         log_interval_sec=args.log_interval_sec,
+        resize_scale=args.resize_scale,
         rtsp_username=args.rtsp_user,
         rtsp_password=args.rtsp_pass,
         rtsp_reconnect=args.rtsp_reconnect,

@@ -12,7 +12,7 @@ import sqlite3
 import json
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, List, Tuple, Dict, Any
+from typing import Optional, List, Tuple, Dict, Any, cast
 
 
 DB_PATH = Path(__file__).parent.parent / "data" / "queue_metrics.db"
@@ -111,7 +111,7 @@ def create_establishment(name: str) -> int:
         cursor.execute("INSERT INTO establishments (name) VALUES (?)", (name,))
         conn.commit()
         est_id = cursor.lastrowid
-        return est_id
+        return cast(int, est_id)
     finally:
         conn.close()
 
@@ -168,7 +168,7 @@ def create_section(name: str, establishment_id: int, zone_points: Optional[List]
         )
         conn.commit()
         section_id = cursor.lastrowid
-        return section_id
+        return cast(int, section_id)
     finally:
         conn.close()
 
@@ -256,7 +256,7 @@ def create_employee(name: str, section_id: int) -> int:
         )
         conn.commit()
         emp_id = cursor.lastrowid
-        return emp_id
+        return cast(int, emp_id)
     finally:
         conn.close()
 
@@ -321,7 +321,7 @@ def create_video_session(
         )
         conn.commit()
         session_id = cursor.lastrowid
-        return session_id
+        return cast(int, session_id)
     finally:
         conn.close()
 

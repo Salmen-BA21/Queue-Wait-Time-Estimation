@@ -12,10 +12,13 @@ Use :func:`open_video_source` as a factory instead of constructing
 from __future__ import annotations
 
 import logging
-from typing import Generator, Union
+from typing import Generator, Union, TYPE_CHECKING, cast
 
 import cv2
 import numpy as np
+
+if TYPE_CHECKING:
+    from src.rtsp_camera import RTSPCamera
 
 logger = logging.getLogger("queue_system.video_capture")
 
@@ -119,7 +122,7 @@ def open_video_source(
     rtsp_password: str | None = None,
     rtsp_reconnect: int | None = None,
     rtsp_transport: str | None = None,
-) -> "Union[VideoStream, RTSPCamera]":  # noqa: F821  – RTSPCamera imported below
+) -> VideoStream | RTSPCamera:
     """Return the appropriate stream object for *source*.
 
     * ``int`` or digit string  → webcam via :class:`VideoStream`
@@ -142,6 +145,6 @@ def open_video_source(
             kwargs["reconnect_attempts"] = rtsp_reconnect
         if rtsp_transport is not None:
             kwargs["transport"] = rtsp_transport
-        return RTSPCamera(source, **kwargs)
+        return RTSPCamera(cast(str, source), **kwargs)
 
     return VideoStream(source)

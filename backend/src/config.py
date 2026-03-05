@@ -86,6 +86,7 @@ class AppConfig:
     log_interval_sec: float = DEFAULT_LOG_INTERVAL_SEC
     confidence: float = DEFAULT_CONFIDENCE
     tracker_type: str = DEFAULT_TRACKER_TYPE
+    resize_scale: float = 1.0
     # RTSP-specific
     rtsp_username: Optional[str] = None
     rtsp_password: Optional[str] = None
