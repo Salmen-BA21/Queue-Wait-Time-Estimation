@@ -25,10 +25,10 @@
 **Purpose:** Know where the project stands right now and what needs to be done.
 
 **Topics covered:**
-- 📍 Current sprint (Sprint 5 – 90% complete)
+- 📍 Current sprint (Sprint 11 – Web Frontend Implementation, in progress)
 - ✅ What's already implemented
-- 🔄 Next immediate tasks (3-4 items)
-- 📁 Project folder structure
+- 🔄 Next immediate tasks (frontend-backend integration)
+- 📁 Project folder structure (backend/ and frontend/)
 - 🔑 Key files for the current sprint
 - 📈 Overall project completion percentage
 
@@ -94,17 +94,18 @@ Daily logs organized by date and sprint activity. Useful for understanding desig
 ### **I need full details on everything**
 → Read in order: PROJECT_CONCEPT → AGENT_CONTEXT → PROGRESS.md → specific sprint docs
 
-### **I'm implementing the web frontend** ⭐
-1. **design/README.md** – Quick start guide
-2. **design/DESIGN_SPEC.md** – Full technical spec (colors, layouts, components, TypeScript models)
-3. **pencil-new.pen** – Open with Pencil MCP tools for visual reference
-4. **Code**: `src/config.py`, `src/queue_analyzer.py`, `src/uncertainty.py`
+### **I'm implementing the web frontend (HTML/CSS/React/TypeScript)** ⭐ NEW
+1. **frontend/README.md** – Development environment setup
+2. **design/DESIGN_SPEC.md** – Full technical design spec (colors, layouts, components)
+3. **frontend/src/pages/** – All 7 page implementations
+4. **frontend/src/components/** – UI components library (55+ shadcn/ui components)
+5. **Backend reference**: `backend/src/config.py`, `backend/src/queue_analyzer.py`, `backend/src/uncertainty.py`
 
 ### **I'm implementing Sprint 5 (Telegram/n8n)**
 1. **AGENT_CONTEXT.md** – Status
 2. **PROGRESS.md** – Sprint 5 section
 3. **sprints/SPRINT5_SETUP.md** – Setup instructions
-4. **Code**: `src/webhook_client.py`, `src/threshold_detector.py`, `src/main.py`
+4. **Code**: `backend/src/webhook_client.py`, `backend/src/threshold_detector.py`, `backend/src/main.py`, `backend/src/rtsp_camera.py` (RTSP support added)
 
 ### **I'm fixing a bug**
 → Check **STATUS_REPORT.md** for recent fixes, then dive into relevant code
@@ -121,6 +122,18 @@ docs/agent-guide/          ← YOU ARE HERE
 ├── INDEX.md               (this file)
 ├── PROJECT_CONCEPT.md     (what is this project?)
 └── AGENT_CONTEXT.md       (where are we now?)
+
+backend/                   ⭐ PYTHON BACKEND
+├── src/                   (core analysis pipeline)
+├── scripts/               (testing utilities)
+└── gui/                   (Tkinter GUI)
+
+frontend/                  ⭐ REACT FRONTEND (NEW)
+├── src/
+│   ├── pages/             (7 application pages)
+│   ├── components/        (UI components & layouts)
+│   └── hooks/             (custom React hooks)
+└── package.json           (dependencies)
 
 design/                    ⭐ WEB DESIGN
 ├── README.md              (quick-start for frontend implementation)
@@ -156,7 +169,7 @@ docs/daily-logs/           (development history)
 
 ---
 
-**Last Updated:** February 27, 2026
+**Last Updated:** March 5, 2026
 
 Welcome to the Queue Wait-Time Estimation System! 🚀
 

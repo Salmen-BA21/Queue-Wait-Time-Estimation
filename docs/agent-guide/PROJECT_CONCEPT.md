@@ -33,10 +33,20 @@ At supermarket checkouts, banks, or service centers:
 
 ### Step 1: Video Input
 ```
-Camera Feed (webcam, RTSP, MP4 file)
+Camera Feed (webcam, RTSP stream, MP4 file)
          ↓
     Video Stream
 ```
+
+**Video Sources Supported (as of Mar 5):**
+- 📹 **Webcam** – USB camera or built-in laptop camera
+- 🔗 **RTSP Stream** – IP cameras with authentication (username/password, TCP/UDP transport)
+- 📂 **MP4 File** – Pre-recorded video for testing
+- **RTSP Features:**
+  - Support for username/password authentication
+  - TCP and UDP transport protocol options
+  - Automatic reconnection on stream loss
+  - Connection testing utility to validate setup before analysis
 
 ### Step 2: People Detection
 ```
@@ -293,6 +303,7 @@ For W (wait time):
 | **Threshold Detector** | Need alerts for abnormal situations | Compare metrics against configurable thresholds |
 | **Webhook Client** | Need external alerting (Telegram, Sheets) | HTTP POST to n8n REST API |
 | **CSV Logger** | n8n might be down, data shouldn't be lost | Local CSV backup persistence |
+| **RTSP Camera** | Support IP cameras in addition to webcams | Authentication, transport options, auto-reconnect (Mar 5) |
 | **GUI** | Multi-video + zone setup should be easy | Tkinter GUI with zone selector + video manager |
 
 ---
@@ -358,11 +369,12 @@ For deeper technical details:
 - **Sprint 4 Summary:** [../sprints/SPRINT4_SUMMARY.md](../sprints/SPRINT4_SUMMARY.md) – Uncertainty implementation
 - **Sprint 5 Setup:** [../sprints/SPRINT5_SETUP.md](../sprints/SPRINT5_SETUP.md) – n8n integration details
 - **Daily Logs:** [../daily-logs/](../daily-logs/) – Development decisions logged per sprint activity
-- **Code:** Start with [../../src/main.py](../../src/main.py) to see the full pipeline
+- **Code:** Start with [../../backend/src/main.py](../../backend/src/main.py) to see the full pipeline
+- **Frontend:** Check [../../frontend/src/pages/](../../frontend/src/pages/) for React implementation
 
 ---
 
 **Summary:** This is a **smart queue monitoring system** that uses computer vision + statistics to give real-time, confidence-aware wait time estimates.
 
-*Last Updated: February 23, 2026*
+*Last Updated: March 5, 2026*
 

@@ -20,6 +20,10 @@ ENV/
 *.swo
 *~
 
+# ────────────────── Claude Code ──────────────────
+.claude
+.claude-context
+
 # ────────────────── OS ──────────────────
 .DS_Store
 Thumbs.db
