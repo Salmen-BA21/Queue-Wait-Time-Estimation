@@ -484,6 +484,16 @@ class RTSPCamera:
         return True, info
 
     @staticmethod
+    def discover_ip_devices(timeout: float = 5.0) -> list[dict]:
+        """Backward-compatible alias for :meth:`discover_onvif_devices`.
+
+        This method is provided to match older documentation and examples
+        that refer to ``discover_ip_devices``. New code should prefer
+        :meth:`discover_onvif_devices`.
+        """
+        return RTSPCamera.discover_onvif_devices(timeout)
+
+    @staticmethod
     def discover_onvif_devices(timeout: float = 5.0) -> list[dict]:
         """Discover ONVIF-compatible IP cameras on the local network.
 

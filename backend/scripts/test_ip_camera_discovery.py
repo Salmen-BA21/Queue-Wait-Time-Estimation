@@ -7,10 +7,7 @@ import logging
 import sys
 import os
 
-# Add backend/src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
-# Also add backend to path for src imports
+# Add backend to path so the 'src' package can be imported
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.rtsp_camera import RTSPCamera

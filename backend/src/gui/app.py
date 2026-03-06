@@ -522,7 +522,7 @@ class MainWindow:
         # ── Nav buttons (fixed at bottom) ───────────────────────────────────
         btn = ttk.Frame(self.root)
         btn.pack(fill=tk.X, padx=20, pady=20)
-        btn.pack(fill=tk.X, padx=20, pady=20)
+
         ttk.Button(btn, text="Next ->", command=self._validate_and_go_step2).pack(side=tk.RIGHT, padx=5)
         ttk.Button(btn, text="Exit", command=self.root.quit).pack(side=tk.LEFT, padx=5)
 

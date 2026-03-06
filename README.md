@@ -82,7 +82,7 @@ python backend/scripts/test_ip_discovery.py
 
 ---
 
-## �🚀 Installation
+## 🚀 Installation
 
 ### 1. Create a Python virtual environment (venv)
 

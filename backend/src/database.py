@@ -27,7 +27,10 @@ def _table_exists(cursor: sqlite3.Cursor, table_name: str) -> bool:
 
 def _get_table_columns(cursor: sqlite3.Cursor, table_name: str) -> set[str]:
     """Return the column names defined for a SQLite table."""
-    cursor.execute(f"PRAGMA table_info({table_name})")
+    # Validate table name to avoid SQL injection when interpolating into PRAGMA.
+    if not table_name.isidentifier():
+        raise ValueError(f"Invalid table name: {table_name!r}")
+    cursor.execute(f'PRAGMA table_info("{table_name}")')
     return {row[1] for row in cursor.fetchall()}
 
 

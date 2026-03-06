@@ -139,10 +139,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Database ID of the establishment (company/store) (optional).",
     )
     parser.add_argument(
-        "--caisse-id",
+        "--register-id",
+        dest="caisse_id",
         type=int,
         default=None,
-        help="Database ID of the caisse/register being monitored (optional).",
+        help="Database ID of the checkout/register being monitored (optional).",
     )
     parser.add_argument(
         "--disable-webhook",
