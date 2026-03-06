@@ -462,14 +462,66 @@ class MainWindow:
                                            font=("Arial", 9))
         self.rtsp_status_label.grid(row=r, column=0, columnspan=5,
                                     sticky=tk.W, pady=(3, 0))
-        # configure column weights so URL entry stretches
-        rtsp_tab.columnconfigure(1, weight=1)
+        # Tab 3 – ONVIF Discovery
+        onvif_tab = ttk.Frame(notebook, padding=8)
+        notebook.add(onvif_tab, text="  ONVIF Discovery  ")
 
-        # Populate from existing selection (e.g. after Back navigation)
-        self._refresh_listbox()
+        # Discovery section
+        discovery_frame = ttk.LabelFrame(onvif_tab, text="Network Discovery", padding=8)
+        discovery_frame.pack(fill=tk.X, pady=(0, 8))
+
+        ttk.Label(discovery_frame, text="Automatically find ONVIF IP cameras on your network",
+                  font=("Arial", 9), foreground="blue").pack(anchor=tk.W, pady=(0, 8))
+
+        btn_frame = ttk.Frame(discovery_frame)
+        btn_frame.pack(fill=tk.X)
+        ttk.Button(btn_frame, text="🔍 Discover Cameras",
+                   command=self._discover_onvif_cameras).pack(side=tk.LEFT, padx=(0, 8))
+        self.onvif_status_var = tk.StringVar(value="")
+        self.onvif_status_label = ttk.Label(btn_frame, textvariable=self.onvif_status_var,
+                                           font=("Arial", 9))
+        self.onvif_status_label.pack(side=tk.LEFT)
+
+        # Results section
+        results_frame = ttk.LabelFrame(onvif_tab, text="Discovered Cameras", padding=8)
+        results_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 8))
+
+        # Camera list
+        list_frame = ttk.Frame(results_frame)
+        list_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 8))
+
+        scrollbar = ttk.Scrollbar(list_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.onvif_listbox = tk.Listbox(list_frame, height=6, font=("Arial", 9),
+                                       yscrollcommand=scrollbar.set,
+                                       selectmode=tk.MULTIPLE)
+        self.onvif_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=self.onvif_listbox.yview)
+
+        # Camera details
+        self.onvif_details_text = tk.Text(results_frame, height=4, font=("Arial", 9),
+                                         wrap=tk.WORD, state=tk.DISABLED)
+        self.onvif_details_text.pack(fill=tk.X, pady=(8, 0))
+
+        # Bind selection change to show details
+        self.onvif_listbox.bind('<<ListboxSelect>>', self._on_onvif_selection_change)
+
+        # Action buttons
+        action_frame = ttk.Frame(onvif_tab)
+        action_frame.pack(fill=tk.X, pady=(8, 0))
+
+        ttk.Button(action_frame, text="Test Selected Camera",
+                   command=self._test_selected_onvif_camera).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(action_frame, text="+ Add Selected Cameras",
+                   command=self._add_selected_onvif_cameras).pack(side=tk.LEFT)
+
+        # Store discovered cameras
+        self.discovered_cameras: list[dict] = []
 
         # ── Nav buttons (fixed at bottom) ───────────────────────────────────
         btn = ttk.Frame(self.root)
+        btn.pack(fill=tk.X, padx=20, pady=20)
         btn.pack(fill=tk.X, padx=20, pady=20)
         ttk.Button(btn, text="Next ->", command=self._validate_and_go_step2).pack(side=tk.RIGHT, padx=5)
         ttk.Button(btn, text="Exit", command=self.root.quit).pack(side=tk.LEFT, padx=5)
@@ -621,6 +673,266 @@ class MainWindow:
             if hasattr(self, "rtsp_status_label"):
                 self.rtsp_status_label.config(foreground="red")
             messagebox.showerror("RTSP Test – Failed", f"Could not connect:\n\n{err}")
+
+    # ── ONVIF discovery helpers ───────────────────────────────────────
+
+    def _discover_onvif_cameras(self):
+        """Discover ONVIF cameras on the network."""
+        self.onvif_status_var.set("🔍 Discovering cameras...")
+        self.onvif_status_label.config(foreground="blue")
+        self.onvif_listbox.delete(0, tk.END)
+        self.onvif_details_text.config(state=tk.NORMAL)
+        self.onvif_details_text.delete(1.0, tk.END)
+        self.onvif_details_text.config(state=tk.DISABLED)
+        self.root.update_idletasks()
+
+        try:
+            from src.rtsp_camera import RTSPCamera
+
+            # Discover cameras
+            self.discovered_cameras = RTSPCamera.discover_onvif_devices(timeout=5.0)
+
+            if not self.discovered_cameras:
+                self.onvif_status_var.set("❌ No ONVIF cameras found")
+                self.onvif_status_label.config(foreground="red")
+                messagebox.showinfo("Discovery Complete", "No ONVIF cameras found on the network.\n\nPossible reasons:\n• No ONVIF cameras connected\n• Cameras not ONVIF-compliant\n• Firewall blocking multicast traffic\n• Cameras on different subnet")
+                return
+
+            # Populate listbox
+            for i, camera in enumerate(self.discovered_cameras):
+                name = camera.get('name', 'Unknown')
+                manufacturer = camera.get('manufacturer', 'Unknown')
+                model = camera.get('model', 'Unknown')
+                ip = camera.get('ip', 'Unknown')
+
+                display_text = f"{name} - {manufacturer} {model} ({ip})"
+                self.onvif_listbox.insert(tk.END, display_text)
+
+            self.onvif_status_var.set(f"✅ Found {len(self.discovered_cameras)} camera(s)")
+            self.onvif_status_label.config(foreground="green")
+
+            messagebox.showinfo("Discovery Complete",
+                              f"Found {len(self.discovered_cameras)} ONVIF camera(s)!\n\n"
+                              "Select cameras from the list to view details and add them to your analysis.")
+
+        except Exception as e:
+            self.onvif_status_var.set("❌ Discovery failed")
+            self.onvif_status_label.config(foreground="red")
+            messagebox.showerror("Discovery Error", f"Failed to discover cameras:\n\n{str(e)}")
+
+    def _on_onvif_selection_change(self, event):
+        """Update camera details when selection changes."""
+        selection = self.onvif_listbox.curselection()
+        if not selection:
+            self.onvif_details_text.config(state=tk.NORMAL)
+            self.onvif_details_text.delete(1.0, tk.END)
+            self.onvif_details_text.config(state=tk.DISABLED)
+            return
+
+        # Show details for first selected camera
+        idx = selection[0]
+        if idx < len(self.discovered_cameras):
+            camera = self.discovered_cameras[idx]
+
+            details = f"📹 Camera Details:\n\n"
+            details += f"Name: {camera.get('name', 'Unknown')}\n"
+            details += f"IP Address: {camera.get('ip', 'Unknown')}\n"
+            details += f"Manufacturer: {camera.get('manufacturer', 'Unknown')}\n"
+            details += f"Model: {camera.get('model', 'Unknown')}\n"
+            details += f"Serial: {camera.get('serial', 'Unknown')}\n"
+            details += f"Hardware: {camera.get('hardware', 'Unknown')}\n"
+            details += f"Location: {camera.get('location', 'Unknown')}\n\n"
+
+            if camera.get('services'):
+                details += "🔗 Available Services:\n"
+                for service, url in camera['services'].items():
+                    details += f"• {service}: {url}\n"
+
+            self.onvif_details_text.config(state=tk.NORMAL)
+            self.onvif_details_text.delete(1.0, tk.END)
+            self.onvif_details_text.insert(1.0, details)
+            self.onvif_details_text.config(state=tk.DISABLED)
+
+    def _test_selected_onvif_camera(self):
+        """Test connection to selected ONVIF camera."""
+        selection = self.onvif_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a camera to test.")
+            return
+
+        idx = selection[0]
+        if idx >= len(self.discovered_cameras):
+            return
+
+        camera = self.discovered_cameras[idx]
+
+        # Ask for credentials
+        cred_dialog = tk.Toplevel(self.root)
+        cred_dialog.title("Camera Credentials")
+        cred_dialog.geometry("350x200")
+        cred_dialog.transient(self.root)
+        cred_dialog.grab_set()
+
+        ttk.Label(cred_dialog, text=f"Test connection to:\n{camera.get('name', 'Unknown')}",
+                  font=("Arial", 10)).pack(pady=10)
+
+        ttk.Label(cred_dialog, text="Username (optional):", font=("Arial", 9)).pack(anchor=tk.W, padx=20)
+        username_var = tk.StringVar()
+        ttk.Entry(cred_dialog, textvariable=username_var, font=("Arial", 9)).pack(fill=tk.X, padx=20, pady=(0, 10))
+
+        ttk.Label(cred_dialog, text="Password (optional):", font=("Arial", 9)).pack(anchor=tk.W, padx=20)
+        password_var = tk.StringVar()
+        ttk.Entry(cred_dialog, textvariable=password_var, show="*", font=("Arial", 9)).pack(fill=tk.X, padx=20, pady=(0, 15))
+
+        test_result = {"success": False, "streams": []}
+
+        def test_connection():
+            try:
+                from src.rtsp_camera import RTSPCamera
+
+                username = username_var.get().strip() or None
+                password = password_var.get().strip() or None
+
+                # Get RTSP streams
+                streams = RTSPCamera.get_rtsp_urls_from_onvif_device(
+                    camera, username=username, password=password
+                )
+
+                if not streams:
+                    test_result["success"] = False
+                    test_result["error"] = "No RTSP streams found"
+                    return
+
+                # Test first stream
+                ok, info = RTSPCamera.test_connection(
+                    streams[0], username=username, password=password
+                )
+
+                test_result["success"] = ok
+                test_result["streams"] = streams
+                test_result["info"] = info
+
+            except Exception as e:
+                test_result["success"] = False
+                test_result["error"] = str(e)
+
+            cred_dialog.destroy()
+
+        btn_frame = ttk.Frame(cred_dialog)
+        btn_frame.pack(fill=tk.X, padx=20, pady=10)
+        ttk.Button(btn_frame, text="Test", command=test_connection).pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Button(btn_frame, text="Cancel", command=cred_dialog.destroy).pack(side=tk.RIGHT)
+
+        cred_dialog.wait_window()
+
+        # Show results
+        if test_result["success"]:
+            info = test_result["info"]
+            streams = test_result["streams"]
+            msg = (f"✅ Connection successful!\n\n"
+                   f"Resolution: {info['resolution']}\n"
+                   f"FPS: {info['fps']:.1f}\n"
+                   f"Available streams: {len(streams)}\n\n"
+                   f"First stream: {streams[0][:60]}...")
+            messagebox.showinfo("Camera Test - Success", msg)
+        else:
+            error = test_result.get("error", "Unknown error")
+            messagebox.showerror("Camera Test - Failed", f"Could not connect:\n\n{error}")
+
+    def _add_selected_onvif_cameras(self):
+        """Add selected ONVIF cameras to the video sources list."""
+        selection = self.onvif_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select cameras to add.")
+            return
+
+        expected = self.video_count.get()
+        added_count = 0
+
+        for idx in selection:
+            if idx >= len(self.discovered_cameras):
+                continue
+
+            if len(self.video_paths) >= expected:
+                messagebox.showwarning("Limit Reached",
+                                     f"Cannot add more cameras. You have {expected} source(s) selected.\n"
+                                     "Remove some sources first or increase the count.")
+                break
+
+            camera = self.discovered_cameras[idx]
+
+            # Ask for credentials
+            cred_dialog = tk.Toplevel(self.root)
+            cred_dialog.title("Camera Credentials")
+            cred_dialog.geometry("350x200")
+            cred_dialog.transient(self.root)
+            cred_dialog.grab_set()
+
+            ttk.Label(cred_dialog, text=f"Add camera:\n{camera.get('name', 'Unknown')}",
+                      font=("Arial", 10)).pack(pady=10)
+
+            ttk.Label(cred_dialog, text="Username (optional):", font=("Arial", 9)).pack(anchor=tk.W, padx=20)
+            username_var = tk.StringVar()
+            ttk.Entry(cred_dialog, textvariable=username_var, font=("Arial", 9)).pack(fill=tk.X, padx=20, pady=(0, 10))
+
+            ttk.Label(cred_dialog, text="Password (optional):", font=("Arial", 9)).pack(anchor=tk.W, padx=20)
+            password_var = tk.StringVar()
+            ttk.Entry(cred_dialog, textvariable=password_var, show="*", font=("Arial", 9)).pack(fill=tk.X, padx=20, pady=(0, 15))
+
+            credentials = {"username": None, "password": None, "rtsp_url": None}
+
+            def add_camera():
+                try:
+                    from src.rtsp_camera import RTSPCamera
+
+                    username = username_var.get().strip() or None
+                    password = password_var.get().strip() or None
+
+                    # Get RTSP streams
+                    streams = RTSPCamera.get_rtsp_urls_from_onvif_device(
+                        camera, username=username, password=password
+                    )
+
+                    if not streams:
+                        messagebox.showerror("No Streams", "No RTSP streams found for this camera.")
+                        return
+
+                    # Use first stream
+                    rtsp_url = streams[0]
+                    credentials["username"] = username
+                    credentials["password"] = password
+                    credentials["rtsp_url"] = rtsp_url
+
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to get camera streams:\n\n{str(e)}")
+                    return
+
+                cred_dialog.destroy()
+
+            btn_frame = ttk.Frame(cred_dialog)
+            btn_frame.pack(fill=tk.X, padx=20, pady=10)
+            ttk.Button(btn_frame, text="Add Camera", command=add_camera).pack(side=tk.RIGHT, padx=(5, 0))
+            ttk.Button(btn_frame, text="Cancel", command=cred_dialog.destroy).pack(side=tk.RIGHT)
+
+            cred_dialog.wait_window()
+
+            # Add to video list if we got credentials
+            if credentials["rtsp_url"]:
+                rtsp_url = credentials["rtsp_url"]
+                if rtsp_url not in self.video_paths:
+                    self.rtsp_credentials[rtsp_url] = {
+                        "username": credentials["username"],
+                        "password": credentials["password"],
+                        "transport": "tcp",  # Default to TCP for reliability
+                    }
+                    self.video_paths.append(rtsp_url)
+                    added_count += 1
+                else:
+                    messagebox.showinfo("Duplicate", "This camera is already in the list.")
+
+        if added_count > 0:
+            self._refresh_listbox()
+            messagebox.showinfo("Cameras Added", f"Successfully added {added_count} camera(s) to the analysis list!")
 
     # ── step-2 creation helpers ────────────────────────────────────────
 
