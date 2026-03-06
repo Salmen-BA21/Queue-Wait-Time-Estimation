@@ -76,16 +76,16 @@ This report assesses the completion status of each sprint based on the project s
   - ✅ Connection testing and validation (`backend/scripts/test_connection.py`)
   - ✅ GUI integration for RTSP camera management
   - ✅ Automatic reconnection logic
-- ✅ **ONVIF Camera Discovery Added (Mar 6):**
+- ✅ **IP Camera Discovery Added (Mar 6):**
   - ✅ WS-Discovery protocol implementation (`backend/src/rtsp_camera.py`)
-  - ✅ ONVIF device discovery with device information extraction
-  - ✅ RTSP stream URL retrieval from ONVIF media services
+  - ✅ IP camera discovery with device information extraction
+  - ✅ RTSP stream URL retrieval from camera media services
   - ✅ XML namespace fixes for SOAP parsing
-  - ✅ GUI integration with dedicated "ONVIF Discovery" tab
+  - ✅ GUI integration with dedicated "IP Camera Discovery" tab
   - ✅ Multi-camera selection and credential management
   - ✅ Connection testing and validation before adding cameras
-  - ✅ Documentation updated (`docs/ONVIF_DISCOVERY_README.md`, `README.md`)
-  - ✅ Test scripts created (`backend/scripts/discover_cameras.py`, `test_onvif_discovery.py`)
+  - ✅ Documentation updated (`docs/IP_CAMERA_DISCOVERY_README.md`, `README.md`)
+  - ✅ Test scripts created (`backend/scripts/discover_cameras.py`, `test_ip_camera_discovery.py`)
   - ✅ Code cleanup (removed duplicate files, fixed import paths)
 - ⏳ Telegram bot setup and integration pending
 - ⏳ Persistence checking with n8n state pending  

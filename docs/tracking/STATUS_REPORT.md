@@ -1,15 +1,15 @@
 # Queue Wait-Time Estimation System - Status Report
 
-## ✅ FIXED: ONVIF Camera Discovery Implementation
+## ✅ FIXED: IP Camera Discovery Implementation
 
 ### Overview
-Implemented complete ONVIF device discovery system with GUI integration, allowing automatic detection and configuration of IP cameras on the network.
+Implemented complete IP camera discovery system with GUI integration, allowing automatic detection and configuration of network cameras.
 
 ### Features Added
-- **WS-Discovery Protocol**: Automatic camera discovery using ONVIF standards
+- **WS-Discovery Protocol**: Automatic camera discovery using standard protocols
 - **Device Information Extraction**: Name, manufacturer, model, IP, serial, hardware
 - **RTSP Stream Retrieval**: Automatic extraction of streaming URLs from camera media services
-- **GUI Integration**: Dedicated "ONVIF Discovery" tab in video source selection
+- **GUI Integration**: Dedicated "IP Camera Discovery" tab in video source selection
 - **Connection Testing**: Validate camera connectivity before adding to monitoring
 - **Multi-Camera Support**: Select and add multiple cameras simultaneously
 - **Credential Management**: Secure credential entry for authenticated cameras
@@ -21,11 +21,11 @@ Implemented complete ONVIF device discovery system with GUI integration, allowin
 - **Documentation**: Updated README, created detailed ONVIF guide
 
 ### Files Created/Modified
-- `backend/src/rtsp_camera.py`: Added ONVIFDiscovery class and methods
-- `backend/src/gui/app.py`: Added ONVIF discovery tab and handlers
+- `backend/src/rtsp_camera.py`: Added IP Camera Discovery class and methods
+- `backend/src/gui/app.py`: Added IP Camera Discovery tab and handlers
 - `backend/scripts/discover_cameras.py`: Discovery example script
-- `backend/scripts/test_onvif_discovery.py`: Basic discovery test
-- `docs/ONVIF_DISCOVERY_README.md`: Complete usage guide
+- `backend/scripts/test_ip_discovery.py`: Basic discovery test
+- `docs/IP_CAMERA_DISCOVERY_README.md`: Complete usage guide
 - `README.md`: Updated with GUI integration instructions
 
 ### Testing

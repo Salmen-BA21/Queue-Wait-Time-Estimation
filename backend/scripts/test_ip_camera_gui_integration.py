@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Quick test script for ONVIF discovery integration in GUI.
+Quick test script for IP camera discovery integration in GUI.
 Tests that the discovery methods can be called without GUI.
 """
 
@@ -10,8 +10,8 @@ import os
 # Add backend to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'backend'))
 
-def test_onvif_discovery_import():
-    """Test that ONVIF discovery can be imported."""
+def test_ip_camera_discovery_import():
+    """Test that IP camera discovery can be imported."""
     try:
         from src.rtsp_camera import RTSPCamera
         print("✅ RTSPCamera import successful")
@@ -34,18 +34,18 @@ def test_onvif_discovery_import():
         print(f"❌ Import failed: {e}")
         return False
 
-def test_gui_onvif_methods():
-    """Test that GUI ONVIF methods exist."""
+def test_gui_ip_camera_methods():
+    """Test that GUI IP camera methods exist."""
     try:
         from src.gui.app import MainWindow
         print("✅ MainWindow import successful")
 
         # Check if methods exist
         methods_to_check = [
-            '_discover_onvif_cameras',
-            '_on_onvif_selection_change',
-            '_test_selected_onvif_camera',
-            '_add_selected_onvif_cameras'
+            '_discover_ip_cameras',
+            '_on_ip_camera_selection_change',
+            '_test_selected_ip_camera',
+            '_add_selected_ip_cameras'
         ]
 
         for method in methods_to_check:
@@ -61,17 +61,17 @@ def test_gui_onvif_methods():
         return False
 
 if __name__ == "__main__":
-    print("Testing ONVIF discovery integration...")
+    print("Testing IP camera discovery integration...")
     print("=" * 50)
 
     success = True
-    success &= test_onvif_discovery_import()
+    success &= test_ip_camera_discovery_import()
     print()
-    success &= test_gui_onvif_methods()
+    success &= test_gui_ip_camera_methods()
 
     print()
     if success:
-        print("🎉 All tests passed! ONVIF discovery is properly integrated.")
+        print("🎉 All tests passed! IP camera discovery is properly integrated.")
     else:
         print("❌ Some tests failed. Check the output above.")
         sys.exit(1)

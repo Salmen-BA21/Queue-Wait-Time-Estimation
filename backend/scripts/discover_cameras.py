@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-ONVIF Camera Discovery Example
+IP Camera Discovery Example
 
-This script demonstrates how to automatically discover ONVIF IP cameras
+This script demonstrates how to automatically discover IP cameras
 on your network and extract their RTSP stream URLs.
 
 Usage:
@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.join(backend_dir, 'src'))
 from src.rtsp_camera import RTSPCamera
 
 def main():
-    print("🔍 ONVIF Camera Discovery Example")
+    print("🔍 IP Camera Discovery Example")
     print("=" * 50)
 
     # Discover ONVIF devices

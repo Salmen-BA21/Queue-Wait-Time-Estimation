@@ -462,21 +462,21 @@ class MainWindow:
                                            font=("Arial", 9))
         self.rtsp_status_label.grid(row=r, column=0, columnspan=5,
                                     sticky=tk.W, pady=(3, 0))
-        # Tab 3 – ONVIF Discovery
+        # Tab 3 – IP Camera Discovery
         onvif_tab = ttk.Frame(notebook, padding=8)
-        notebook.add(onvif_tab, text="  ONVIF Discovery  ")
+        notebook.add(onvif_tab, text="  IP Camera Discovery  ")
 
         # Discovery section
         discovery_frame = ttk.LabelFrame(onvif_tab, text="Network Discovery", padding=8)
         discovery_frame.pack(fill=tk.X, pady=(0, 8))
 
-        ttk.Label(discovery_frame, text="Automatically find ONVIF IP cameras on your network",
+        ttk.Label(discovery_frame, text="Automatically find IP cameras on your network",
                   font=("Arial", 9), foreground="blue").pack(anchor=tk.W, pady=(0, 8))
 
         btn_frame = ttk.Frame(discovery_frame)
         btn_frame.pack(fill=tk.X)
         ttk.Button(btn_frame, text="🔍 Discover Cameras",
-                   command=self._discover_onvif_cameras).pack(side=tk.LEFT, padx=(0, 8))
+                   command=self._discover_ip_cameras).pack(side=tk.LEFT, padx=(0, 8))
         self.onvif_status_var = tk.StringVar(value="")
         self.onvif_status_label = ttk.Label(btn_frame, textvariable=self.onvif_status_var,
                                            font=("Arial", 9))
@@ -505,16 +505,16 @@ class MainWindow:
         self.onvif_details_text.pack(fill=tk.X, pady=(8, 0))
 
         # Bind selection change to show details
-        self.onvif_listbox.bind('<<ListboxSelect>>', self._on_onvif_selection_change)
+        self.onvif_listbox.bind('<<ListboxSelect>>', self._on_ip_camera_selection_change)
 
         # Action buttons
         action_frame = ttk.Frame(onvif_tab)
         action_frame.pack(fill=tk.X, pady=(8, 0))
 
         ttk.Button(action_frame, text="Test Selected Camera",
-                   command=self._test_selected_onvif_camera).pack(side=tk.LEFT, padx=(0, 8))
+                   command=self._test_selected_ip_camera).pack(side=tk.LEFT, padx=(0, 8))
         ttk.Button(action_frame, text="+ Add Selected Cameras",
-                   command=self._add_selected_onvif_cameras).pack(side=tk.LEFT)
+                   command=self._add_selected_ip_cameras).pack(side=tk.LEFT)
 
         # Store discovered cameras
         self.discovered_cameras: list[dict] = []
@@ -674,9 +674,9 @@ class MainWindow:
                 self.rtsp_status_label.config(foreground="red")
             messagebox.showerror("RTSP Test – Failed", f"Could not connect:\n\n{err}")
 
-    # ── ONVIF discovery helpers ───────────────────────────────────────
+    # ── IP Camera discovery helpers ───────────────────────────────────────
 
-    def _discover_onvif_cameras(self):
+    def _discover_ip_cameras(self):
         """Discover ONVIF cameras on the network."""
         self.onvif_status_var.set("🔍 Discovering cameras...")
         self.onvif_status_label.config(foreground="blue")
@@ -693,9 +693,9 @@ class MainWindow:
             self.discovered_cameras = RTSPCamera.discover_onvif_devices(timeout=5.0)
 
             if not self.discovered_cameras:
-                self.onvif_status_var.set("❌ No ONVIF cameras found")
+                self.onvif_status_var.set("❌ No IP cameras found")
                 self.onvif_status_label.config(foreground="red")
-                messagebox.showinfo("Discovery Complete", "No ONVIF cameras found on the network.\n\nPossible reasons:\n• No ONVIF cameras connected\n• Cameras not ONVIF-compliant\n• Firewall blocking multicast traffic\n• Cameras on different subnet")
+                messagebox.showinfo("Discovery Complete", "No IP cameras found on the network.\n\nPossible reasons:\n• No IP cameras connected\n• Cameras not ONVIF-compliant\n• Firewall blocking multicast traffic\n• Cameras on different subnet")
                 return
 
             # Populate listbox
@@ -720,7 +720,7 @@ class MainWindow:
             self.onvif_status_label.config(foreground="red")
             messagebox.showerror("Discovery Error", f"Failed to discover cameras:\n\n{str(e)}")
 
-    def _on_onvif_selection_change(self, event):
+    def _on_ip_camera_selection_change(self, event):
         """Update camera details when selection changes."""
         selection = self.onvif_listbox.curselection()
         if not selection:
@@ -753,7 +753,7 @@ class MainWindow:
             self.onvif_details_text.insert(1.0, details)
             self.onvif_details_text.config(state=tk.DISABLED)
 
-    def _test_selected_onvif_camera(self):
+    def _test_selected_ip_camera(self):
         """Test connection to selected ONVIF camera."""
         selection = self.onvif_listbox.curselection()
         if not selection:
@@ -839,7 +839,7 @@ class MainWindow:
             error = test_result.get("error", "Unknown error")
             messagebox.showerror("Camera Test - Failed", f"Could not connect:\n\n{error}")
 
-    def _add_selected_onvif_cameras(self):
+    def _add_selected_ip_cameras(self):
         """Add selected ONVIF cameras to the video sources list."""
         selection = self.onvif_listbox.curselection()
         if not selection:

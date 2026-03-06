@@ -1,10 +1,10 @@
-# ONVIF Device Discovery
+# IP Camera Discovery
 
-This feature automatically discovers ONVIF-compatible IP cameras on your local network, similar to ODM Device Manager.
+This feature automatically discovers IP cameras on your local network using standard discovery protocols.
 
 ## 🎯 Features
 
-- **Automatic Discovery**: Uses WS-Discovery protocol to find ONVIF devices
+- **Automatic Discovery**: Uses WS-Discovery protocol to find IP cameras
 - **Device Information**: Extracts camera details (name, manufacturer, model, IP, etc.)
 - **RTSP Stream Detection**: Automatically retrieves RTSP stream URLs from discovered devices
 - **Authentication Support**: Handles username/password authentication for device queries
@@ -13,7 +13,7 @@ This feature automatically discovers ONVIF-compatible IP cameras on your local n
 
 ## 🚀 GUI Integration
 
-The ONVIF discovery feature is fully integrated into the main GUI application:
+The IP camera discovery feature is fully integrated into the main GUI application:
 
 ### Step-by-Step Usage
 
@@ -24,7 +24,7 @@ The ONVIF discovery feature is fully integrated into the main GUI application:
 
 2. **Navigate to Step 1** (Video Source Selection)
 
-3. **Select "ONVIF Discovery" Tab**:
+3. **Select "IP Camera Discovery" Tab**:
    - Choose this tab from the notebook interface
    - Click "🔍 Discover Cameras" to scan your network
    - Wait for the discovery process (typically 5 seconds)
@@ -61,8 +61,8 @@ The ONVIF discovery feature is fully integrated into the main GUI application:
 ```python
 from backend.src.rtsp_camera import RTSPCamera
 
-# Discover all ONVIF devices on the network
-devices = RTSPCamera.discover_onvif_devices()
+# Discover all IP cameras on the network
+devices = RTSPCamera.discover_ip_devices()
 
 for device in devices:
     print(f"Found camera: {device['name']}")
@@ -75,7 +75,7 @@ for device in devices:
 
 ```python
 # Get RTSP URLs from a discovered device
-rtsp_urls = RTSPCamera.get_rtsp_urls_from_onvif_device(
+rtsp_urls = RTSPCamera.get_rtsp_urls_from_device(
     device,
     username="admin",  # Optional
     password="password123"  # Optional
@@ -95,11 +95,11 @@ for url in rtsp_urls:
 
 ```python
 # Discover cameras and automatically add them to your queue monitoring
-devices = RTSPCamera.discover_onvif_devices()
+devices = RTSPCamera.discover_ip_devices()
 
 camera_configs = []
 for device in devices:
-    rtsp_urls = RTSPCamera.get_rtsp_urls_from_onvif_device(device)
+    rtsp_urls = RTSPCamera.get_rtsp_urls_from_device(device)
 
     for rtsp_url in rtsp_urls:
         # Test connection first
@@ -121,50 +121,14 @@ for config in camera_configs:
 
 | Feature | GUI Method | Programmatic Method |
 |---------|------------|-------------------|
-| **Discovery** | Click "Discover Cameras" button | `RTSPCamera.discover_onvif_devices()` |
+| **Discovery** | Click "Discover Cameras" button | `RTSPCamera.discover_ip_devices()` |
 | **Device Selection** | Multi-select from listbox | Iterate through devices list |
 | **Credential Entry** | Secure dialog prompts | Pass username/password parameters |
 | **Connection Testing** | Built-in test button | `RTSPCamera.test_connection()` |
 | **Integration** | Automatic addition to video sources | Manual configuration building |
 | **Best For** | Interactive setup, multiple cameras | Scripting, automation, CI/CD |
-    device,
-    username="admin",  # Optional
-    password="password123"  # Optional
-)
 
-for url in rtsp_urls:
-    print(f"RTSP Stream: {url}")
-
-    # Test the connection
-    ok, info = RTSPCamera.test_connection(url, username="admin", password="password123")
-    if ok:
-        print(f"  Resolution: {info['width']}x{info['height']}")
-        print(f"  FPS: {info['fps']}")
-```
-
-### Integration with Queue System
-
-```python
-# Discover cameras and automatically add them to your queue monitoring
-devices = RTSPCamera.discover_onvif_devices()
-
-for device in devices:
-    rtsp_urls = RTSPCamera.get_rtsp_urls_from_onvif_device(device)
-
-    for rtsp_url in rtsp_urls:
-        # Test connection first
-        ok, info = RTSPCamera.test_connection(rtsp_url)
-        if ok:
-            print(f"Adding camera {device['name']} to monitoring")
-            # Add to your camera configuration
-            # camera_config.append({
-            #     'name': device['name'],
-            #     'url': rtsp_url,
-            #     'resolution': f"{info['width']}x{info['height']}"
-            # })
-```
-
-## Device Information Structure
+## 📋 Device Information Structure
 
 Each discovered device returns a dictionary with:
 
@@ -177,21 +141,15 @@ Each discovered device returns a dictionary with:
     "serial": "DS2CD2043G0I123456",  # Serial number
     "hardware": "DS-2CD2043G0-I",    # Hardware version
     "location": "Building A",        # Physical location
-    "services": {                    # ONVIF service endpoints
-        "device": "http://192.168.1.100:80/onvif/device_service",
-        "media": "http://192.168.1.100:80/onvif/media",
-        "ptz": "http://192.168.1.100:80/onvif/ptz",
-        "events": "http://192.168.1.100:80/onvif/events"
+    "services": {                    # Device service endpoints
+        "device": "http://192.168.1.100:80/device_service",
+        "media": "http://192.168.1.100:80/media",
+        "ptz": "http://192.168.1.100:80/ptz",
+        "events": "http://192.168.1.100:80/events"
     },
-    "xaddrs": "http://192.168.1.100:80/onvif/device_service ..."  # Raw endpoints
+    "xaddrs": "http://192.168.1.100:80/device_service ..."  # Raw endpoints
 }
 ```
-
-## Requirements
-
-- `lxml` library for XML parsing (automatically installed)
-- Network access to multicast UDP traffic (port 3702)
-- ONVIF-compliant IP cameras
 
 ## 🔧 Troubleshooting
 
@@ -200,11 +158,11 @@ Each discovered device returns a dictionary with:
 #### Discovery Button Not Working
 - **Symptom**: Clicking "Discover Cameras" shows no progress or hangs
 - **Solution**: Check Windows Firewall settings for multicast UDP traffic
-- **Test**: Run `python backend/scripts/test_onvif_discovery.py` from command line
+- **Test**: Run `python backend/scripts/test_ip_discovery.py` from command line
 
 #### Cameras Not Appearing in List
 - **Symptom**: Discovery completes but no cameras shown
-- **Solution**: 
+- **Solution**:
   - Ensure cameras are powered on and connected to the same network
   - Check if cameras are behind a different subnet/router
   - Try running the GUI as Administrator (right-click → Run as administrator)
@@ -221,12 +179,12 @@ Each discovered device returns a dictionary with:
 #### No Devices Found
 - **Network**: Ensure cameras are on the same subnet as your computer
 - **Firewall**: Verify multicast UDP traffic (port 3702) isn't blocked
-- **ONVIF Support**: Confirm cameras support ONVIF protocol (check manufacturer specs)
-- **Timeout**: Try increasing timeout: `discover_onvif_devices(timeout=10.0)`
+- **Compatibility**: Confirm cameras support standard IP camera protocols
+- **Timeout**: Try increasing timeout: `discover_ip_devices(timeout=10.0)`
 
 #### Authentication Issues
 - Some cameras require authentication for media service queries
-- Try providing username/password to `get_rtsp_urls_from_onvif_device()`
+- Try providing username/password to `get_rtsp_urls_from_device()`
 - Default credentials vary by manufacturer:
   - Hikvision: `admin`/`12345`
   - Dahua: `admin`/`admin`
@@ -237,13 +195,19 @@ Each discovered device returns a dictionary with:
 - Check RTSP transport settings (TCP vs UDP)
 - Verify camera RTSP service is enabled in camera web interface
 
-## Example Output
+## 📋 Requirements
+
+- `lxml` library for XML parsing (automatically installed)
+- Network access to multicast UDP traffic (port 3702)
+- IP cameras supporting standard discovery protocols
+
+## 📊 Example Output
 
 ```
-🔍 Discovering ONVIF devices on the network...
-INFO: Sent ONVIF discovery probe, listening for responses...
-INFO: Discovered ONVIF device: Front Door Camera at 192.168.1.100
-INFO: ONVIF discovery completed. Found 1 devices.
+🔍 Discovering IP cameras on the network...
+INFO: Sent discovery probe, listening for responses...
+INFO: Discovered device: Front Door Camera at 192.168.1.100
+INFO: Discovery completed. Found 1 devices.
 
 📹 Device 1:
    Name: Front Door Camera
@@ -254,10 +218,10 @@ INFO: ONVIF discovery completed. Found 1 devices.
    Hardware: DS-2CD2043G0-I
    Location: Building A
    Services:
-     device: http://192.168.1.100:80/onvif/device_service
-     media: http://192.168.1.100:80/onvif/media
-     ptz: http://192.168.1.100:80/onvif/ptz
-     events: http://192.168.1.100:80/onvif/events
+     device: http://192.168.1.100:80/device_service
+     media: http://192.168.1.100:80/media
+     ptz: http://192.168.1.100:80/ptz
+     events: http://192.168.1.100:80/events
 
    RTSP Streams:
      rtsp://192.168.1.100:554/Streaming/Channels/101

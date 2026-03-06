@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for ONVIF device discovery functionality.
+Test script for IP camera discovery functionality.
 """
 
 import logging
