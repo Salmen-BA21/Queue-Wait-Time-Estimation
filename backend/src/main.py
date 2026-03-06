@@ -139,16 +139,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Database ID of the establishment (company/store) (optional).",
     )
     parser.add_argument(
-        "--section-id",
+        "--register-id",
+        dest="caisse_id",
         type=int,
         default=None,
-        help="Database ID of the section/zone being monitored (optional).",
+        help="Database ID of the checkout/register being monitored (optional).",
     )
     parser.add_argument(
-        "--employee-id",
-        type=int,
-        default=None,
-        help="Database ID of the cashier/employee working in this section (optional).",
+        "--disable-webhook",
+        action="store_true",
+        help="Disable sending queue metrics to the configured webhook endpoint.",
     )
     return parser
 
@@ -197,7 +197,7 @@ def run(cfg: AppConfig) -> None:
         )
         analyzer = QueueAnalyzer()
         annotators = create_annotators()
-        webhook_client = WebhookClient(N8N_WEBHOOK_URL) if WEBHOOK_ENABLED else None
+        webhook_client = WebhookClient(N8N_WEBHOOK_URL) if cfg.webhook_enabled else None
 
         frame_delay = int(1000 / cfg.output_fps) if cfg.output_fps > 0 else 1
         last_log_time = time.monotonic()
@@ -343,8 +343,8 @@ def main() -> None:
         rtsp_reconnect=args.rtsp_reconnect,
         rtsp_transport=args.rtsp_transport or "tcp",
         establishment_id=args.establishment_id,
-        section_id=args.section_id,
-        employee_id=args.employee_id,
+        caisse_id=args.caisse_id,
+        webhook_enabled=WEBHOOK_ENABLED and not args.disable_webhook,
     )
 
     logger.info("Configuration: %s", cfg)

@@ -29,6 +29,59 @@ Detects people, tracks them across frames, counts how many stand inside a config
 
 ---
 
+## 📹 IP Camera Discovery
+
+**Automatically discover and configure IP cameras on your network!**
+
+This feature works like network device discovery tools - it finds IP cameras without needing to know their addresses in advance.
+
+### GUI Integration
+
+The discovery feature is fully integrated into the GUI application:
+
+1. **Launch the GUI**: `python -m backend.src.gui.app`
+2. **Step 1**: Select "IP Camera Discovery" tab
+3. **Discover**: Click "🔍 Discover Cameras" to scan your network
+4. **Select & Test**: Choose cameras from the list and test connections
+5. **Add to Analysis**: Add discovered cameras to your monitoring setup
+
+### Programmatic Usage
+
+```python
+from backend.src.rtsp_camera import RTSPCamera
+
+# Discover all IP cameras on your network
+devices = RTSPCamera.discover_ip_devices()
+
+for device in devices:
+    print(f"Found: {device['name']} ({device['manufacturer']} {device['model']})")
+    print(f"IP: {device['ip']}")
+
+    # Get RTSP stream URLs
+    rtsp_urls = RTSPCamera.get_rtsp_urls_from_device(device)
+    for url in rtsp_urls:
+        print(f"Stream: {url}")
+```
+
+### Try it out
+
+```bash
+# Run the GUI with IP camera discovery
+python -m backend.src.gui.app
+
+# Or run the discovery example
+python backend/scripts/discover_cameras.py
+
+# Or run the basic test
+python backend/scripts/test_ip_discovery.py
+```
+
+### Documentation
+
+📖 [Complete IP Camera Discovery Guide](docs/IP_CAMERA_DISCOVERY_README.md)
+
+---
+
 ## 🚀 Installation
 
 ### 1. Create a Python virtual environment (venv)

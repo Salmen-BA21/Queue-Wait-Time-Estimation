@@ -1,11 +1,9 @@
-"""
-Database module for queue metrics metadata tracking.
+"""Database module for queue metrics metadata tracking.
 
 Provides SQLite database initialization and helper functions for managing:
 - Establishments (companies/stores)
-- Sections (checkout zones/areas)
-- Employees (cashiers/staff)
-- Video Sessions (tracking which metadata was used for each video)
+- Caisses (checkout counters/registers)
+- Video sessions (tracking which metadata was used for each video)
 """
 
 import sqlite3
@@ -18,17 +16,26 @@ from typing import Optional, List, Tuple, Dict, Any, cast
 DB_PATH = Path(__file__).parent.parent / "data" / "queue_metrics.db"
 
 
-def init_db() -> None:
-    """Initialize database schema if it doesn't exist. Idempotent - safe to call multiple times."""
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+def _table_exists(cursor: sqlite3.Cursor, table_name: str) -> bool:
+    """Return True when the requested table exists."""
+    cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+        (table_name,),
+    )
+    return cursor.fetchone() is not None
 
-    conn = sqlite3.connect(str(DB_PATH))
-    cursor = conn.cursor()
 
-    # Enable foreign keys
-    cursor.execute("PRAGMA foreign_keys = ON")
+def _get_table_columns(cursor: sqlite3.Cursor, table_name: str) -> set[str]:
+    """Return the column names defined for a SQLite table."""
+    # Validate table name to avoid SQL injection when interpolating into PRAGMA.
+    if not table_name.isidentifier():
+        raise ValueError(f"Invalid table name: {table_name!r}")
+    cursor.execute(f'PRAGMA table_info("{table_name}")')
+    return {row[1] for row in cursor.fetchall()}
 
-    # Create tables
+
+def _create_current_schema(cursor: sqlite3.Cursor) -> None:
+    """Create the current metadata schema if it does not exist."""
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS establishments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,7 +45,7 @@ def init_db() -> None:
     """)
 
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS sections (
+        CREATE TABLE IF NOT EXISTS caisses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             establishment_id INTEGER NOT NULL,
@@ -50,31 +57,84 @@ def init_db() -> None:
     """)
 
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS employees (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            section_id INTEGER NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (section_id) REFERENCES sections (id),
-            UNIQUE(name, section_id)
-        )
-    """)
-
-    cursor.execute("""
         CREATE TABLE IF NOT EXISTS video_sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             video_source TEXT NOT NULL,
             establishment_id INTEGER,
-            section_id INTEGER,
-            employee_id INTEGER,
+            caisse_id INTEGER,
             start_time TIMESTAMP,
             end_time TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (establishment_id) REFERENCES establishments (id),
-            FOREIGN KEY (section_id) REFERENCES sections (id),
-            FOREIGN KEY (employee_id) REFERENCES employees (id)
+            FOREIGN KEY (caisse_id) REFERENCES caisses (id)
         )
     """)
+
+
+def _migrate_legacy_sections_to_caisses(cursor: sqlite3.Cursor) -> None:
+    """Copy legacy section rows into the caisse table when needed."""
+    if not _table_exists(cursor, "sections"):
+        return
+
+    cursor.execute("""
+        INSERT OR IGNORE INTO caisses (id, name, establishment_id, zone_points_json, created_at)
+        SELECT id, name, establishment_id, zone_points_json, created_at
+        FROM sections
+    """)
+
+
+def _migrate_legacy_video_sessions(cursor: sqlite3.Cursor) -> None:
+    """Upgrade legacy video_sessions rows to the current caisse-based schema."""
+    if not _table_exists(cursor, "video_sessions"):
+        return
+
+    columns = _get_table_columns(cursor, "video_sessions")
+    if "caisse_id" in columns and "employee_id" not in columns:
+        return
+
+    cursor.execute("ALTER TABLE video_sessions RENAME TO video_sessions_legacy")
+    _create_current_schema(cursor)
+
+    legacy_columns = _get_table_columns(cursor, "video_sessions_legacy")
+    caisse_expr = "caisse_id" if "caisse_id" in legacy_columns else "section_id"
+    end_time_expr = "end_time" if "end_time" in legacy_columns else "NULL"
+    created_at_expr = "created_at" if "created_at" in legacy_columns else "CURRENT_TIMESTAMP"
+
+    cursor.execute(f"""
+        INSERT INTO video_sessions (
+            id,
+            video_source,
+            establishment_id,
+            caisse_id,
+            start_time,
+            end_time,
+            created_at
+        )
+        SELECT
+            id,
+            video_source,
+            establishment_id,
+            {caisse_expr},
+            start_time,
+            {end_time_expr},
+            {created_at_expr}
+        FROM video_sessions_legacy
+    """)
+    cursor.execute("DROP TABLE video_sessions_legacy")
+
+
+def init_db() -> None:
+    """Initialize database schema if it doesn't exist. Idempotent - safe to call multiple times."""
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    conn = sqlite3.connect(str(DB_PATH))
+    cursor = conn.cursor()
+
+    cursor.execute("PRAGMA foreign_keys = OFF")
+    _create_current_schema(cursor)
+    _migrate_legacy_sections_to_caisses(cursor)
+    _migrate_legacy_video_sessions(cursor)
+    cursor.execute("PRAGMA foreign_keys = ON")
 
     conn.commit()
     conn.close()
@@ -140,152 +200,91 @@ def get_establishment_by_id(est_id: int) -> Optional[Dict[str, Any]]:
 
 
 # ============================================================================
-# SECTION OPERATIONS
+# CAISSE OPERATIONS
 # ============================================================================
 
-def create_section(name: str, establishment_id: int, zone_points: Optional[List] = None) -> int:
+def create_caisse(name: str, establishment_id: int, zone_points: Optional[List] = None) -> int:
     """
-    Create a new section within an establishment.
+    Create a new caisse within an establishment.
 
     Args:
-        name: Section name (unique within establishment)
+        name: Caisse name or number (unique within establishment)
         establishment_id: Parent establishment ID
         zone_points: Optional list of [x, y] coordinates defining zone polygon
 
     Returns:
-        Section ID
+        Caisse ID
 
     Raises:
-        sqlite3.IntegrityError: If section name already exists in this establishment
+        sqlite3.IntegrityError: If caisse name already exists in this establishment
     """
     conn = get_connection()
     cursor = conn.cursor()
     try:
         zone_json = json.dumps(zone_points) if zone_points else None
         cursor.execute(
-            "INSERT INTO sections (name, establishment_id, zone_points_json) VALUES (?, ?, ?)",
+            "INSERT INTO caisses (name, establishment_id, zone_points_json) VALUES (?, ?, ?)",
             (name, establishment_id, zone_json)
         )
         conn.commit()
-        section_id = cursor.lastrowid
-        return cast(int, section_id)
+        caisse_id = cursor.lastrowid
+        return cast(int, caisse_id)
     finally:
         conn.close()
 
 
-def get_sections_by_establishment(establishment_id: int) -> List[Dict[str, Any]]:
-    """Get all sections for an establishment."""
+def get_caisses_by_establishment(establishment_id: int) -> List[Dict[str, Any]]:
+    """Get all caisses for an establishment."""
     conn = get_connection()
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "SELECT id, name, establishment_id, zone_points_json, created_at FROM sections WHERE establishment_id = ? ORDER BY name",
+            "SELECT id, name, establishment_id, zone_points_json, created_at FROM caisses WHERE establishment_id = ? ORDER BY name",
             (establishment_id,)
         )
-        sections = []
+        caisses = []
         for row in cursor.fetchall():
-            section = dict(row)
-            if section['zone_points_json']:
-                section['zone_points'] = json.loads(section['zone_points_json'])
+            caisse = dict(row)
+            if caisse['zone_points_json']:
+                caisse['zone_points'] = json.loads(caisse['zone_points_json'])
             else:
-                section['zone_points'] = None
-            sections.append(section)
-        return sections
+                caisse['zone_points'] = None
+            caisses.append(caisse)
+        return caisses
     finally:
         conn.close()
 
 
-def get_section_by_id(section_id: int) -> Optional[Dict[str, Any]]:
-    """Get section by ID."""
+def get_caisse_by_id(caisse_id: int) -> Optional[Dict[str, Any]]:
+    """Get caisse by ID."""
     conn = get_connection()
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "SELECT id, name, establishment_id, zone_points_json, created_at FROM sections WHERE id = ?",
-            (section_id,)
+            "SELECT id, name, establishment_id, zone_points_json, created_at FROM caisses WHERE id = ?",
+            (caisse_id,)
         )
         row = cursor.fetchone()
         if not row:
             return None
-        section = dict(row)
-        if section['zone_points_json']:
-            section['zone_points'] = json.loads(section['zone_points_json'])
+        caisse = dict(row)
+        if caisse['zone_points_json']:
+            caisse['zone_points'] = json.loads(caisse['zone_points_json'])
         else:
-            section['zone_points'] = None
-        return section
+            caisse['zone_points'] = None
+        return caisse
     finally:
         conn.close()
 
 
-def update_section_zone_points(section_id: int, zone_points: List) -> None:
-    """Update zone points for a section."""
+def update_caisse_zone_points(caisse_id: int, zone_points: List) -> None:
+    """Update zone points for a caisse."""
     conn = get_connection()
     cursor = conn.cursor()
     try:
         zone_json = json.dumps(zone_points)
-        cursor.execute("UPDATE sections SET zone_points_json = ? WHERE id = ?", (zone_json, section_id))
+        cursor.execute("UPDATE caisses SET zone_points_json = ? WHERE id = ?", (zone_json, caisse_id))
         conn.commit()
-    finally:
-        conn.close()
-
-
-# ============================================================================
-# EMPLOYEE OPERATIONS
-# ============================================================================
-
-def create_employee(name: str, section_id: int) -> int:
-    """
-    Create a new employee in a section.
-
-    Args:
-        name: Employee name (unique within section)
-        section_id: Parent section ID
-
-    Returns:
-        Employee ID
-
-    Raises:
-        sqlite3.IntegrityError: If employee name already exists in this section
-    """
-    conn = get_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            "INSERT INTO employees (name, section_id) VALUES (?, ?)",
-            (name, section_id)
-        )
-        conn.commit()
-        emp_id = cursor.lastrowid
-        return cast(int, emp_id)
-    finally:
-        conn.close()
-
-
-def get_employees_by_section(section_id: int) -> List[Dict[str, Any]]:
-    """Get all employees for a section."""
-    conn = get_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            "SELECT id, name, section_id, created_at FROM employees WHERE section_id = ? ORDER BY name",
-            (section_id,)
-        )
-        return [dict(row) for row in cursor.fetchall()]
-    finally:
-        conn.close()
-
-
-def get_employee_by_id(employee_id: int) -> Optional[Dict[str, Any]]:
-    """Get employee by ID."""
-    conn = get_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute(
-            "SELECT id, name, section_id, created_at FROM employees WHERE id = ?",
-            (employee_id,)
-        )
-        row = cursor.fetchone()
-        return dict(row) if row else None
     finally:
         conn.close()
 
@@ -297,8 +296,7 @@ def get_employee_by_id(employee_id: int) -> Optional[Dict[str, Any]]:
 def create_video_session(
     video_source: str,
     establishment_id: Optional[int] = None,
-    section_id: Optional[int] = None,
-    employee_id: Optional[int] = None
+    caisse_id: Optional[int] = None,
 ) -> int:
     """
     Create a video session record linking video to metadata.
@@ -306,8 +304,7 @@ def create_video_session(
     Args:
         video_source: File path or RTSP URL
         establishment_id: Associated establishment
-        section_id: Associated section
-        employee_id: Associated employee
+        caisse_id: Associated caisse
 
     Returns:
         Video session ID
@@ -316,8 +313,8 @@ def create_video_session(
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO video_sessions (video_source, establishment_id, section_id, employee_id, start_time) VALUES (?, ?, ?, ?, ?)",
-            (video_source, establishment_id, section_id, employee_id, datetime.now())
+            "INSERT INTO video_sessions (video_source, establishment_id, caisse_id, start_time) VALUES (?, ?, ?, ?)",
+            (video_source, establishment_id, caisse_id, datetime.now())
         )
         conn.commit()
         session_id = cursor.lastrowid
@@ -328,10 +325,10 @@ def create_video_session(
 
 def get_metadata_for_video(video_source: str) -> Optional[Dict[str, Any]]:
     """
-    Get the most recent metadata for a video source (establishment, section, employee names).
+    Get the most recent metadata for a video source.
 
     Returns:
-        Dict with keys: establishment_name, section_name, employee_name (or None if not available)
+        Dict with keys: establishment_name, caisse_name (or None if not available)
     """
     conn = get_connection()
     cursor = conn.cursor()
@@ -339,12 +336,10 @@ def get_metadata_for_video(video_source: str) -> Optional[Dict[str, Any]]:
         cursor.execute("""
             SELECT
                 e.name as establishment_name,
-                s.name as section_name,
-                emp.name as employee_name
+                c.name as caisse_name
             FROM video_sessions vs
             LEFT JOIN establishments e ON vs.establishment_id = e.id
-            LEFT JOIN sections s ON vs.section_id = s.id
-            LEFT JOIN employees emp ON vs.employee_id = emp.id
+            LEFT JOIN caisses c ON vs.caisse_id = c.id
             WHERE vs.video_source = ?
             ORDER BY vs.created_at DESC
             LIMIT 1
@@ -377,10 +372,10 @@ def end_video_session(session_id: int) -> None:
 
 def get_full_hierarchy() -> Dict[int, Dict[str, Any]]:
     """
-    Get complete hierarchy: establishments with sections with employees.
+    Get complete hierarchy: establishments with caisses.
 
     Returns:
-        Dict[establishment_id] -> {name, sections: Dict[section_id] -> {name, zone_points, employees}}
+        Dict[establishment_id] -> {name, caisses: Dict[caisse_id] -> {name, zone_points}}
     """
     conn = get_connection()
     cursor = conn.cursor()
@@ -393,31 +388,21 @@ def get_full_hierarchy() -> Dict[int, Dict[str, Any]]:
         est_id = est_row['id']
         hierarchy[est_id] = {
             'name': est_row['name'],
-            'sections': {}
+            'caisses': {}
         }
 
-        # Get sections for this establishment
+        # Get caisses for this establishment
         cursor.execute(
-            "SELECT id, name, zone_points_json FROM sections WHERE establishment_id = ? ORDER BY name",
+            "SELECT id, name, zone_points_json FROM caisses WHERE establishment_id = ? ORDER BY name",
             (est_id,)
         )
-        for sec_row in cursor.fetchall():
-            sec_id = sec_row['id']
-            zone_points = json.loads(sec_row['zone_points_json']) if sec_row['zone_points_json'] else None
-            hierarchy[est_id]['sections'][sec_id] = {
-                'name': sec_row['name'],
+        for caisse_row in cursor.fetchall():
+            caisse_id = caisse_row['id']
+            zone_points = json.loads(caisse_row['zone_points_json']) if caisse_row['zone_points_json'] else None
+            hierarchy[est_id]['caisses'][caisse_id] = {
+                'name': caisse_row['name'],
                 'zone_points': zone_points,
-                'employees': {}
             }
-
-            # Get employees for this section
-            cursor.execute(
-                "SELECT id, name FROM employees WHERE section_id = ? ORDER BY name",
-                (sec_id,)
-            )
-            for emp_row in cursor.fetchall():
-                emp_id = emp_row['id']
-                hierarchy[est_id]['sections'][sec_id]['employees'][emp_id] = emp_row['name']
 
     conn.close()
     return hierarchy

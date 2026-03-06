@@ -1,7 +1,7 @@
 # Project Progress Report - Queue Wait-Time Estimation System
 
-**Current Date:** March 5, 2026
-**Last Updated:** March 5, 2026  
+**Current Date:** March 6, 2026
+**Last Updated:** March 6, 2026  
 
 This report assesses the completion status of each sprint based on the project structure, documentation, and daily logs.
 
@@ -76,6 +76,17 @@ This report assesses the completion status of each sprint based on the project s
   - ✅ Connection testing and validation (`backend/scripts/test_connection.py`)
   - ✅ GUI integration for RTSP camera management
   - ✅ Automatic reconnection logic
+- ✅ **IP Camera Discovery Added (Mar 6):**
+  - ✅ WS-Discovery protocol implementation (`backend/src/rtsp_camera.py`)
+  - ✅ IP camera discovery with device information extraction
+  - ✅ RTSP stream URL retrieval from camera media services
+  - ✅ XML namespace fixes for SOAP parsing
+  - ✅ GUI integration with dedicated "IP Camera Discovery" tab
+  - ✅ Multi-camera selection and credential management
+  - ✅ Connection testing and validation before adding cameras
+  - ✅ Documentation updated (`docs/IP_CAMERA_DISCOVERY_README.md`, `README.md`)
+  - ✅ Test scripts created (`backend/scripts/discover_cameras.py`, `test_ip_camera_discovery.py`)
+  - ✅ Code cleanup (removed duplicate files, fixed import paths)
 - ⏳ Telegram bot setup and integration pending
 - ⏳ Persistence checking with n8n state pending  
 

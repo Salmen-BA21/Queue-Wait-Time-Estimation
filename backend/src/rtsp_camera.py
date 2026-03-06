@@ -18,18 +18,27 @@ Typical usage
         password="secret",
     ) as cam:
         ...
+
+    # Discover ONVIF devices on network
+    devices = RTSPCamera.discover_onvif_devices()
+    for device in devices:
+        print(f"Found camera: {device['name']} at {device['ip']}")
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import socket
 import time
+import uuid
 from typing import Generator
 from urllib.parse import urlparse, urlunparse
+from xml.etree import ElementTree as ET
 
 import cv2
 import numpy as np
+import requests
 
 from src.config import (
     RTSP_CONNECTION_TIMEOUT_SEC,
@@ -84,6 +93,177 @@ def _safe_url(url: str) -> str:
 def _apply_rtsp_env(transport: str) -> None:
     """Set OpenCV / FFMPEG environment variables for RTSP transport."""
     os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", f"rtsp_transport;{transport}")
+
+
+# ──────────────────────────────────────────────────────────────────────
+# ONVIF Device Discovery
+# ──────────────────────────────────────────────────────────────────────
+
+class ONVIFDiscovery:
+    """ONVIF device discovery using WS-Discovery protocol."""
+
+    MULTICAST_ADDR = "239.255.255.250"
+    MULTICAST_PORT = 3702
+    DISCOVERY_TIMEOUT = 5.0
+
+    @staticmethod
+    def _create_probe_message() -> str:
+        """Create WS-Discovery Probe message for ONVIF devices."""
+        message_id = str(uuid.uuid4())
+        return f"""<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
+               xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing"
+               xmlns:dn="http://www.onvif.org/ver10/network/wsdl">
+    <soap:Header>
+        <wsa:MessageID>uuid:{message_id}</wsa:MessageID>
+        <wsa:To>urn:schemas-xmlsoap-org:ws:2005:04:discovery</wsa:To>
+        <wsa:Action>http://schemas.xmlsoap.org/ws/2005/04/discovery/Probe</wsa:Action>
+    </soap:Header>
+    <soap:Body>
+        <dn:Probe>
+            <dn:Types>dn:NetworkVideoTransmitter</dn:Types>
+        </dn:Probe>
+    </soap:Body>
+</soap:Envelope>"""
+
+    @staticmethod
+    def _parse_probe_match(response_data: str, sender_addr: tuple) -> dict | None:
+        """Parse ProbeMatch response and extract device information."""
+        try:
+            root = ET.fromstring(response_data)
+
+            # Define namespaces for XPath queries
+            namespaces = {
+                'dn': 'http://www.onvif.org/ver10/network/wsdl',
+                'soap': 'http://www.w3.org/2003/05/soap-envelope'
+            }
+
+            # Extract XAddrs (device service endpoints)
+            xaddrs_elem = root.find(".//dn:XAddrs", namespaces)
+            if xaddrs_elem is None or not xaddrs_elem.text:
+                return None
+
+            xaddrs = xaddrs_elem.text.strip()
+            device_ip = sender_addr[0]
+
+            # Extract device information from scopes
+            scopes_elem = root.find(".//dn:Scopes", namespaces)
+            scopes = scopes_elem.text if scopes_elem is not None else ""
+
+            # Parse scopes for device info
+            device_info = {
+                "ip": device_ip,
+                "name": "Unknown",
+                "manufacturer": "Unknown",
+                "model": "Unknown",
+                "serial": "Unknown",
+                "hardware": "Unknown",
+                "location": "Unknown"
+            }
+
+            if scopes:
+                scope_parts = scopes.split()
+                for scope in scope_parts:
+                    if scope.startswith("onvif://www.onvif.org/name/"):
+                        device_info["name"] = scope.replace("onvif://www.onvif.org/name/", "")
+                    elif scope.startswith("onvif://www.onvif.org/manufacturer/"):
+                        device_info["manufacturer"] = scope.replace("onvif://www.onvif.org/manufacturer/", "")
+                    elif scope.startswith("onvif://www.onvif.org/model/"):
+                        device_info["model"] = scope.replace("onvif://www.onvif.org/model/", "")
+                    elif scope.startswith("onvif://www.onvif.org/hardware/"):
+                        device_info["hardware"] = scope.replace("onvif://www.onvif.org/hardware/", "")
+                    elif scope.startswith("onvif://www.onvif.org/serial/"):
+                        device_info["serial"] = scope.replace("onvif://www.onvif.org/serial/", "")
+                    elif scope.startswith("onvif://www.onvif.org/location/"):
+                        device_info["location"] = scope.replace("onvif://www.onvif.org/location/", "")
+
+            # Extract service endpoints
+            services = {}
+            for addr in xaddrs.split():
+                if "device_service" in addr or "/onvif/device" in addr:
+                    services["device"] = addr
+                elif "media" in addr or "/onvif/media" in addr:
+                    services["media"] = addr
+                elif "ptz" in addr or "/onvif/ptz" in addr:
+                    services["ptz"] = addr
+                elif "events" in addr or "/onvif/events" in addr:
+                    services["events"] = addr
+
+            device_info["services"] = services
+            device_info["xaddrs"] = xaddrs
+
+            return device_info
+
+        except ET.ParseError as e:
+            logger.warning(
+                "Failed to parse ONVIF ProbeMatch response from %s: %s",
+                sender_addr[0],
+                e,
+            )
+            return None
+
+    @staticmethod
+    def discover_devices(timeout: float = DISCOVERY_TIMEOUT) -> list[dict]:
+        """Discover ONVIF devices on the network using WS-Discovery.
+
+        Returns
+        -------
+        list[dict]
+            List of discovered devices with their information.
+        """
+        devices = []
+
+        # Create UDP socket for multicast
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
+        sock.settimeout(timeout)
+
+        try:
+            # Bind to a random port
+            sock.bind(("", 0))
+
+            # Join multicast group
+            sock.setsockopt(
+                socket.IPPROTO_IP,
+                socket.IP_ADD_MEMBERSHIP,
+                socket.inet_aton(ONVIFDiscovery.MULTICAST_ADDR) + socket.inet_aton("0.0.0.0")
+            )
+
+            # Send Probe message
+            probe_msg = ONVIFDiscovery._create_probe_message()
+            sock.sendto(
+                probe_msg.encode('utf-8'),
+                (ONVIFDiscovery.MULTICAST_ADDR, ONVIFDiscovery.MULTICAST_PORT)
+            )
+
+            logger.info("Sent ONVIF discovery probe, listening for responses...")
+
+            # Listen for responses
+            start_time = time.time()
+            while time.time() - start_time < timeout:
+                try:
+                    data, addr = sock.recvfrom(8192)
+                    response = data.decode('utf-8', errors='ignore')
+
+                    # Check if this is a ProbeMatch response
+                    if "ProbeMatch" in response:
+                        device = ONVIFDiscovery._parse_probe_match(response, addr)
+                        if device:
+                            # Avoid duplicates
+                            if not any(d["ip"] == device["ip"] for d in devices):
+                                devices.append(device)
+                                logger.info("Discovered ONVIF device: %s at %s", device["name"], device["ip"])
+
+                except socket.timeout:
+                    break
+                except OSError:
+                    continue
+
+        finally:
+            sock.close()
+
+        logger.info("ONVIF discovery completed. Found %d devices.", len(devices))
+        return devices
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -302,3 +482,153 @@ class RTSPCamera:
             "RTSP test OK – %dx%d @ %.1f FPS", width, height, fps
         )
         return True, info
+
+    @staticmethod
+    def discover_ip_devices(timeout: float = 5.0) -> list[dict]:
+        """Backward-compatible alias for :meth:`discover_onvif_devices`.
+
+        This method is provided to match older documentation and examples
+        that refer to ``discover_ip_devices``. New code should prefer
+        :meth:`discover_onvif_devices`.
+        """
+        return RTSPCamera.discover_onvif_devices(timeout)
+
+    @staticmethod
+    def discover_onvif_devices(timeout: float = 5.0) -> list[dict]:
+        """Discover ONVIF-compatible IP cameras on the local network.
+
+        This method uses WS-Discovery protocol to automatically find
+        ONVIF devices without needing to know their IP addresses in advance.
+
+        Parameters
+        ----------
+        timeout : float
+            Seconds to wait for device responses (default: 5.0).
+
+        Returns
+        -------
+        list[dict]
+            List of discovered devices. Each device dict contains:
+            - ip: Device IP address
+            - name: Device name
+            - manufacturer: Device manufacturer
+            - model: Device model
+            - serial: Device serial number
+            - hardware: Hardware version
+            - location: Physical location
+            - services: Dict of ONVIF service endpoints
+            - xaddrs: Raw service addresses string
+
+        Example
+        -------
+        ::
+
+            devices = RTSPCamera.discover_onvif_devices()
+            for device in devices:
+                print(f"Camera: {device['name']} ({device['manufacturer']} {device['model']})")
+                print(f"IP: {device['ip']}")
+                if 'media' in device['services']:
+                    print(f"Media service: {device['services']['media']}")
+        """
+        return ONVIFDiscovery.discover_devices(timeout)
+
+    @staticmethod
+    def get_rtsp_urls_from_onvif_device(device: dict, username: str | None = None, password: str | None = None) -> list[str]:
+        """Extract RTSP stream URLs from an ONVIF device.
+
+        Queries the device's media service to get available stream profiles
+        and their RTSP URLs.
+
+        Parameters
+        ----------
+        device : dict
+            Device info from discover_onvif_devices()
+        username : str | None
+            Optional username for authentication
+        password : str | None
+            Optional password for authentication
+
+        Returns
+        -------
+        list[str]
+            List of RTSP URLs for available streams
+        """
+        rtsp_urls = []
+
+        if 'media' not in device['services']:
+            logger.warning("No media service found for device %s", device['ip'])
+            return rtsp_urls
+
+        media_url = device['services']['media']
+
+        try:
+            # Create SOAP request for GetProfiles
+            auth = (username, password) if username and password else None
+            headers = {
+                'Content-Type': 'application/soap+xml; charset=utf-8',
+                'SOAPAction': '"http://www.onvif.org/ver10/media/wsdl/GetProfiles"'
+            }
+
+            # GetProfiles request
+            profiles_soap = f"""<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
+               xmlns:media="http://www.onvif.org/ver10/media/wsdl">
+    <soap:Body>
+        <media:GetProfiles/>
+    </soap:Body>
+</soap:Envelope>"""
+
+            response = requests.post(media_url, data=profiles_soap, headers=headers, auth=auth, timeout=10)
+
+            if response.status_code == 200:
+                root = ET.fromstring(response.content)
+
+                # Define namespaces for XPath queries
+                namespaces = {
+                    'media': 'http://www.onvif.org/ver10/media/wsdl',
+                    'soap': 'http://www.w3.org/2003/05/soap-envelope'
+                }
+
+                # Extract profile tokens
+                profiles = root.findall(".//media:Profiles", namespaces)
+                for profile in profiles:
+                    profile_token = profile.get('token')
+                    if profile_token:
+                        # GetStreamUri request for this profile
+                        stream_soap = f"""<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
+               xmlns:media="http://www.onvif.org/ver10/media/wsdl">
+    <soap:Body>
+        <media:GetStreamUri>
+            <media:StreamSetup>
+                <media:Stream>RTP-Unicast</media:Stream>
+                <media:Transport>
+                    <media:Protocol>RTSP</media:Protocol>
+                </media:Transport>
+            </media:StreamSetup>
+            <media:ProfileToken>{profile_token}</media:ProfileToken>
+        </media:GetStreamUri>
+    </soap:Body>
+</soap:Envelope>"""
+
+                        stream_response = requests.post(media_url, data=stream_soap, headers=headers, auth=auth, timeout=10)
+
+                        if stream_response.status_code == 200:
+                            stream_root = ET.fromstring(stream_response.content)
+                            uri_elem = stream_root.find(".//media:Uri", namespaces)
+                            if uri_elem is not None and uri_elem.text:
+                                rtsp_url = uri_elem.text.strip()
+                                if username and password:
+                                    rtsp_url = _build_rtsp_url(rtsp_url, username, password)
+                                rtsp_urls.append(rtsp_url)
+                                logger.info("Found RTSP stream: %s", _safe_url(rtsp_url))
+
+            else:
+                logger.warning("Failed to get profiles from %s: HTTP %d", media_url, response.status_code)
+
+        except requests.RequestException as e:
+            logger.warning("Failed to query media service %s: %s", media_url, e)
+        except ET.ParseError as e:
+            logger.warning("Failed to parse SOAP response from %s: %s", media_url, e)
+
+        return rtsp_urls

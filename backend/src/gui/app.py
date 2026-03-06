@@ -250,7 +250,7 @@ class MainWindow:
         self.video_paths: list[str] = []
         self.current_video_index: int = 0
         self.zone_points_map: dict[str, list[list[int]]] = {}
-        # Per-video job information: maps video path -> {"establishment_id", "section_id", "employee_id"}
+        # Per-video job information: maps video path -> {"establishment_id", "caisse_id"}
         self.video_metadata_map: dict[str, dict[str, int | None]] = {}
 
         # tk helpers
@@ -262,12 +262,12 @@ class MainWindow:
 
         # Per-video job info UI variables (used in Step 2)
         self.video_establishment_var = tk.StringVar(value="")
-        self.video_section_var = tk.StringVar(value="")
-        self.video_employee_var = tk.StringVar(value="")
+        self.video_caisse_var = tk.StringVar(value="")
 
         # config state
         self.model_size = tk.StringVar(value="n")
         self.log_level = tk.StringVar(value="INFO")
+        self.webhook_enabled = tk.BooleanVar(value=True)
 
         # RTSP credentials store: maps source url -> {"username", "password", "transport"}
         self.rtsp_credentials: dict[str, dict] = {}
@@ -462,15 +462,67 @@ class MainWindow:
                                            font=("Arial", 9))
         self.rtsp_status_label.grid(row=r, column=0, columnspan=5,
                                     sticky=tk.W, pady=(3, 0))
-        # configure column weights so URL entry stretches
-        rtsp_tab.columnconfigure(1, weight=1)
+        # Tab 3 – IP Camera Discovery
+        onvif_tab = ttk.Frame(notebook, padding=8)
+        notebook.add(onvif_tab, text="  IP Camera Discovery  ")
 
-        # Populate from existing selection (e.g. after Back navigation)
-        self._refresh_listbox()
+        # Discovery section
+        discovery_frame = ttk.LabelFrame(onvif_tab, text="Network Discovery", padding=8)
+        discovery_frame.pack(fill=tk.X, pady=(0, 8))
+
+        ttk.Label(discovery_frame, text="Automatically find IP cameras on your network",
+                  font=("Arial", 9), foreground="blue").pack(anchor=tk.W, pady=(0, 8))
+
+        btn_frame = ttk.Frame(discovery_frame)
+        btn_frame.pack(fill=tk.X)
+        ttk.Button(btn_frame, text="🔍 Discover Cameras",
+                   command=self._discover_ip_cameras).pack(side=tk.LEFT, padx=(0, 8))
+        self.onvif_status_var = tk.StringVar(value="")
+        self.onvif_status_label = ttk.Label(btn_frame, textvariable=self.onvif_status_var,
+                                           font=("Arial", 9))
+        self.onvif_status_label.pack(side=tk.LEFT)
+
+        # Results section
+        results_frame = ttk.LabelFrame(onvif_tab, text="Discovered Cameras", padding=8)
+        results_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 8))
+
+        # Camera list
+        list_frame = ttk.Frame(results_frame)
+        list_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 8))
+
+        scrollbar = ttk.Scrollbar(list_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.onvif_listbox = tk.Listbox(list_frame, height=6, font=("Arial", 9),
+                                       yscrollcommand=scrollbar.set,
+                                       selectmode=tk.MULTIPLE)
+        self.onvif_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=self.onvif_listbox.yview)
+
+        # Camera details
+        self.onvif_details_text = tk.Text(results_frame, height=4, font=("Arial", 9),
+                                         wrap=tk.WORD, state=tk.DISABLED)
+        self.onvif_details_text.pack(fill=tk.X, pady=(8, 0))
+
+        # Bind selection change to show details
+        self.onvif_listbox.bind('<<ListboxSelect>>', self._on_ip_camera_selection_change)
+
+        # Action buttons
+        action_frame = ttk.Frame(onvif_tab)
+        action_frame.pack(fill=tk.X, pady=(8, 0))
+
+        ttk.Button(action_frame, text="Test Selected Camera",
+                   command=self._test_selected_ip_camera).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(action_frame, text="+ Add Selected Cameras",
+                   command=self._add_selected_ip_cameras).pack(side=tk.LEFT)
+
+        # Store discovered cameras
+        self.discovered_cameras: list[dict] = []
 
         # ── Nav buttons (fixed at bottom) ───────────────────────────────────
         btn = ttk.Frame(self.root)
         btn.pack(fill=tk.X, padx=20, pady=20)
+
         ttk.Button(btn, text="Next ->", command=self._validate_and_go_step2).pack(side=tk.RIGHT, padx=5)
         ttk.Button(btn, text="Exit", command=self.root.quit).pack(side=tk.LEFT, padx=5)
 
@@ -622,6 +674,266 @@ class MainWindow:
                 self.rtsp_status_label.config(foreground="red")
             messagebox.showerror("RTSP Test – Failed", f"Could not connect:\n\n{err}")
 
+    # ── IP Camera discovery helpers ───────────────────────────────────────
+
+    def _discover_ip_cameras(self):
+        """Discover ONVIF cameras on the network."""
+        self.onvif_status_var.set("🔍 Discovering cameras...")
+        self.onvif_status_label.config(foreground="blue")
+        self.onvif_listbox.delete(0, tk.END)
+        self.onvif_details_text.config(state=tk.NORMAL)
+        self.onvif_details_text.delete(1.0, tk.END)
+        self.onvif_details_text.config(state=tk.DISABLED)
+        self.root.update_idletasks()
+
+        try:
+            from src.rtsp_camera import RTSPCamera
+
+            # Discover cameras
+            self.discovered_cameras = RTSPCamera.discover_onvif_devices(timeout=5.0)
+
+            if not self.discovered_cameras:
+                self.onvif_status_var.set("❌ No IP cameras found")
+                self.onvif_status_label.config(foreground="red")
+                messagebox.showinfo("Discovery Complete", "No IP cameras found on the network.\n\nPossible reasons:\n• No IP cameras connected\n• Cameras not ONVIF-compliant\n• Firewall blocking multicast traffic\n• Cameras on different subnet")
+                return
+
+            # Populate listbox
+            for i, camera in enumerate(self.discovered_cameras):
+                name = camera.get('name', 'Unknown')
+                manufacturer = camera.get('manufacturer', 'Unknown')
+                model = camera.get('model', 'Unknown')
+                ip = camera.get('ip', 'Unknown')
+
+                display_text = f"{name} - {manufacturer} {model} ({ip})"
+                self.onvif_listbox.insert(tk.END, display_text)
+
+            self.onvif_status_var.set(f"✅ Found {len(self.discovered_cameras)} camera(s)")
+            self.onvif_status_label.config(foreground="green")
+
+            messagebox.showinfo("Discovery Complete",
+                              f"Found {len(self.discovered_cameras)} ONVIF camera(s)!\n\n"
+                              "Select cameras from the list to view details and add them to your analysis.")
+
+        except Exception as e:
+            self.onvif_status_var.set("❌ Discovery failed")
+            self.onvif_status_label.config(foreground="red")
+            messagebox.showerror("Discovery Error", f"Failed to discover cameras:\n\n{str(e)}")
+
+    def _on_ip_camera_selection_change(self, event):
+        """Update camera details when selection changes."""
+        selection = self.onvif_listbox.curselection()
+        if not selection:
+            self.onvif_details_text.config(state=tk.NORMAL)
+            self.onvif_details_text.delete(1.0, tk.END)
+            self.onvif_details_text.config(state=tk.DISABLED)
+            return
+
+        # Show details for first selected camera
+        idx = selection[0]
+        if idx < len(self.discovered_cameras):
+            camera = self.discovered_cameras[idx]
+
+            details = f"📹 Camera Details:\n\n"
+            details += f"Name: {camera.get('name', 'Unknown')}\n"
+            details += f"IP Address: {camera.get('ip', 'Unknown')}\n"
+            details += f"Manufacturer: {camera.get('manufacturer', 'Unknown')}\n"
+            details += f"Model: {camera.get('model', 'Unknown')}\n"
+            details += f"Serial: {camera.get('serial', 'Unknown')}\n"
+            details += f"Hardware: {camera.get('hardware', 'Unknown')}\n"
+            details += f"Location: {camera.get('location', 'Unknown')}\n\n"
+
+            if camera.get('services'):
+                details += "🔗 Available Services:\n"
+                for service, url in camera['services'].items():
+                    details += f"• {service}: {url}\n"
+
+            self.onvif_details_text.config(state=tk.NORMAL)
+            self.onvif_details_text.delete(1.0, tk.END)
+            self.onvif_details_text.insert(1.0, details)
+            self.onvif_details_text.config(state=tk.DISABLED)
+
+    def _test_selected_ip_camera(self):
+        """Test connection to selected ONVIF camera."""
+        selection = self.onvif_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a camera to test.")
+            return
+
+        idx = selection[0]
+        if idx >= len(self.discovered_cameras):
+            return
+
+        camera = self.discovered_cameras[idx]
+
+        # Ask for credentials
+        cred_dialog = tk.Toplevel(self.root)
+        cred_dialog.title("Camera Credentials")
+        cred_dialog.geometry("350x200")
+        cred_dialog.transient(self.root)
+        cred_dialog.grab_set()
+
+        ttk.Label(cred_dialog, text=f"Test connection to:\n{camera.get('name', 'Unknown')}",
+                  font=("Arial", 10)).pack(pady=10)
+
+        ttk.Label(cred_dialog, text="Username (optional):", font=("Arial", 9)).pack(anchor=tk.W, padx=20)
+        username_var = tk.StringVar()
+        ttk.Entry(cred_dialog, textvariable=username_var, font=("Arial", 9)).pack(fill=tk.X, padx=20, pady=(0, 10))
+
+        ttk.Label(cred_dialog, text="Password (optional):", font=("Arial", 9)).pack(anchor=tk.W, padx=20)
+        password_var = tk.StringVar()
+        ttk.Entry(cred_dialog, textvariable=password_var, show="*", font=("Arial", 9)).pack(fill=tk.X, padx=20, pady=(0, 15))
+
+        test_result = {"success": False, "streams": []}
+
+        def test_connection():
+            try:
+                from src.rtsp_camera import RTSPCamera
+
+                username = username_var.get().strip() or None
+                password = password_var.get().strip() or None
+
+                # Get RTSP streams
+                streams = RTSPCamera.get_rtsp_urls_from_onvif_device(
+                    camera, username=username, password=password
+                )
+
+                if not streams:
+                    test_result["success"] = False
+                    test_result["error"] = "No RTSP streams found"
+                    return
+
+                # Test first stream
+                ok, info = RTSPCamera.test_connection(
+                    streams[0], username=username, password=password
+                )
+
+                test_result["success"] = ok
+                test_result["streams"] = streams
+                test_result["info"] = info
+
+            except Exception as e:
+                test_result["success"] = False
+                test_result["error"] = str(e)
+
+            cred_dialog.destroy()
+
+        btn_frame = ttk.Frame(cred_dialog)
+        btn_frame.pack(fill=tk.X, padx=20, pady=10)
+        ttk.Button(btn_frame, text="Test", command=test_connection).pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Button(btn_frame, text="Cancel", command=cred_dialog.destroy).pack(side=tk.RIGHT)
+
+        cred_dialog.wait_window()
+
+        # Show results
+        if test_result["success"]:
+            info = test_result["info"]
+            streams = test_result["streams"]
+            msg = (f"✅ Connection successful!\n\n"
+                   f"Resolution: {info['resolution']}\n"
+                   f"FPS: {info['fps']:.1f}\n"
+                   f"Available streams: {len(streams)}\n\n"
+                   f"First stream: {streams[0][:60]}...")
+            messagebox.showinfo("Camera Test - Success", msg)
+        else:
+            error = test_result.get("error", "Unknown error")
+            messagebox.showerror("Camera Test - Failed", f"Could not connect:\n\n{error}")
+
+    def _add_selected_ip_cameras(self):
+        """Add selected ONVIF cameras to the video sources list."""
+        selection = self.onvif_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select cameras to add.")
+            return
+
+        expected = self.video_count.get()
+        added_count = 0
+
+        for idx in selection:
+            if idx >= len(self.discovered_cameras):
+                continue
+
+            if len(self.video_paths) >= expected:
+                messagebox.showwarning("Limit Reached",
+                                     f"Cannot add more cameras. You have {expected} source(s) selected.\n"
+                                     "Remove some sources first or increase the count.")
+                break
+
+            camera = self.discovered_cameras[idx]
+
+            # Ask for credentials
+            cred_dialog = tk.Toplevel(self.root)
+            cred_dialog.title("Camera Credentials")
+            cred_dialog.geometry("350x200")
+            cred_dialog.transient(self.root)
+            cred_dialog.grab_set()
+
+            ttk.Label(cred_dialog, text=f"Add camera:\n{camera.get('name', 'Unknown')}",
+                      font=("Arial", 10)).pack(pady=10)
+
+            ttk.Label(cred_dialog, text="Username (optional):", font=("Arial", 9)).pack(anchor=tk.W, padx=20)
+            username_var = tk.StringVar()
+            ttk.Entry(cred_dialog, textvariable=username_var, font=("Arial", 9)).pack(fill=tk.X, padx=20, pady=(0, 10))
+
+            ttk.Label(cred_dialog, text="Password (optional):", font=("Arial", 9)).pack(anchor=tk.W, padx=20)
+            password_var = tk.StringVar()
+            ttk.Entry(cred_dialog, textvariable=password_var, show="*", font=("Arial", 9)).pack(fill=tk.X, padx=20, pady=(0, 15))
+
+            credentials = {"username": None, "password": None, "rtsp_url": None}
+
+            def add_camera():
+                try:
+                    from src.rtsp_camera import RTSPCamera
+
+                    username = username_var.get().strip() or None
+                    password = password_var.get().strip() or None
+
+                    # Get RTSP streams
+                    streams = RTSPCamera.get_rtsp_urls_from_onvif_device(
+                        camera, username=username, password=password
+                    )
+
+                    if not streams:
+                        messagebox.showerror("No Streams", "No RTSP streams found for this camera.")
+                        return
+
+                    # Use first stream
+                    rtsp_url = streams[0]
+                    credentials["username"] = username
+                    credentials["password"] = password
+                    credentials["rtsp_url"] = rtsp_url
+
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to get camera streams:\n\n{str(e)}")
+                    return
+
+                cred_dialog.destroy()
+
+            btn_frame = ttk.Frame(cred_dialog)
+            btn_frame.pack(fill=tk.X, padx=20, pady=10)
+            ttk.Button(btn_frame, text="Add Camera", command=add_camera).pack(side=tk.RIGHT, padx=(5, 0))
+            ttk.Button(btn_frame, text="Cancel", command=cred_dialog.destroy).pack(side=tk.RIGHT)
+
+            cred_dialog.wait_window()
+
+            # Add to video list if we got credentials
+            if credentials["rtsp_url"]:
+                rtsp_url = credentials["rtsp_url"]
+                if rtsp_url not in self.video_paths:
+                    self.rtsp_credentials[rtsp_url] = {
+                        "username": credentials["username"],
+                        "password": credentials["password"],
+                        "transport": "tcp",  # Default to TCP for reliability
+                    }
+                    self.video_paths.append(rtsp_url)
+                    added_count += 1
+                else:
+                    messagebox.showinfo("Duplicate", "This camera is already in the list.")
+
+        if added_count > 0:
+            self._refresh_listbox()
+            messagebox.showinfo("Cameras Added", f"Successfully added {added_count} camera(s) to the analysis list!")
+
     # ── step-2 creation helpers ────────────────────────────────────────
 
     def _create_new_video_establishment(self):
@@ -659,84 +971,44 @@ class MainWindow:
         ttk.Button(dialog, text="Create", command=save_establishment).pack(side=tk.LEFT, padx=10)
         ttk.Button(dialog, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=10)
 
-    def _create_new_video_section(self):
-        """Dialog to create a new section (for Step 2)."""
+    def _create_new_video_caisse(self):
+        """Dialog to create a new caisse (for Step 2)."""
         est_id = self._get_video_establishment_id()
         if est_id is None:
             messagebox.showwarning("Required", "Please select an establishment first.")
             return
 
         dialog = tk.Toplevel(self.root)
-        dialog.title("New Section")
+        dialog.title("New Caisse")
         dialog.geometry("400x150")
         dialog.transient(self.root)
         dialog.grab_set()
 
-        ttk.Label(dialog, text="Section/Zone Name:", font=("Arial", 10)).pack(pady=10, padx=20)
+        ttk.Label(dialog, text="Caisse Number/Name:", font=("Arial", 10)).pack(pady=10, padx=20)
         name_entry = ttk.Entry(dialog, font=("Arial", 10), width=35)
         name_entry.pack(pady=(0, 20), padx=20)
         name_entry.focus()
 
-        def save_section():
+        def save_caisse():
             name = name_entry.get().strip()
             if not name:
-                messagebox.showwarning("Required", "Please enter a section name.")
+                messagebox.showwarning("Required", "Please enter a caisse number or name.")
                 return
             try:
-                from src.database import create_section, get_full_hierarchy
-                sec_id = create_section(name, est_id)
+                from src.database import create_caisse, get_full_hierarchy
+                caisse_id = create_caisse(name, est_id)
                 # Reload hierarchy
                 self.db_hierarchy = get_full_hierarchy()
-                self._refresh_video_section_combo(est_id)
-                # Select the newly created section
-                self.video_section_var.set(f"{name} (ID: {sec_id})")
-                self._on_video_section_select()
+                self._refresh_video_caisse_combo(est_id)
+                # Select the newly created caisse
+                self.video_caisse_var.set(f"{name} (ID: {caisse_id})")
+                self._on_video_caisse_select()
                 dialog.destroy()
-                messagebox.showinfo("Success", f"Created section: {name}")
+                messagebox.showinfo("Success", f"Created caisse: {name}")
             except Exception as e:
-                messagebox.showerror("Error", f"Could not create section:\n{e}")
+                messagebox.showerror("Error", f"Could not create caisse:\n{e}")
 
-        ttk.Button(dialog, text="Create", command=save_section).pack(side=tk.LEFT, padx=10)
-        ttk.Button(dialog, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=10)
-
-    def _create_new_video_employee(self):
-        """Dialog to create a new employee (for Step 2)."""
-        sec_id = self._get_video_section_id()
-        if sec_id is None:
-            messagebox.showwarning("Required", "Please select a section first.")
-            return
-
-        dialog = tk.Toplevel(self.root)
-        dialog.title("New Cashier/Employee")
-        dialog.geometry("400x150")
-        dialog.transient(self.root)
-        dialog.grab_set()
-
-        ttk.Label(dialog, text="Employee Name:", font=("Arial", 10)).pack(pady=10, padx=20)
-        name_entry = ttk.Entry(dialog, font=("Arial", 10), width=35)
-        name_entry.pack(pady=(0, 20), padx=20)
-        name_entry.focus()
-
-        def save_employee():
-            name = name_entry.get().strip()
-            if not name:
-                messagebox.showwarning("Required", "Please enter an employee name.")
-                return
-            try:
-                from src.database import create_employee, get_full_hierarchy
-                emp_id = create_employee(name, sec_id)
-                # Reload hierarchy
-                self.db_hierarchy = get_full_hierarchy()
-                self._refresh_video_employee_combo(sec_id)
-                # Select the newly created employee
-                self.video_employee_var.set(f"{name} (ID: {emp_id})")
-                self._on_video_employee_select()
-                dialog.destroy()
-                messagebox.showinfo("Success", f"Created employee: {name}")
-            except Exception as e:
-                messagebox.showerror("Error", f"Could not create employee:\n{e}")
-
-        ttk.Button(dialog, text="Create", command=save_employee).pack(side=tk.LEFT, padx=10)
+        ttk.Button(dialog, text="Create", command=save_caisse).pack(side=tk.LEFT, padx=10)
         ttk.Button(dialog, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=10)
 
     def _validate_and_go_step2(self):
@@ -762,8 +1034,7 @@ class MainWindow:
             if path not in self.video_metadata_map:
                 self.video_metadata_map[path] = {
                     "establishment_id": None,
-                    "section_id": None,
-                    "employee_id": None,
+                    "caisse_id": None,
                 }
         self.show_step2()
 
@@ -804,6 +1075,12 @@ class MainWindow:
                      values=["DEBUG", "INFO", "WARNING", "ERROR"],
                      state="readonly", width=30, font=("Arial", 10)).grid(
             row=1, column=1, sticky=tk.W, padx=5, pady=8)
+
+        ttk.Checkbutton(
+            model_frame,
+            text="Send data to webhook (http://localhost:5678/webhook/queue-metrics)",
+            variable=self.webhook_enabled,
+        ).grid(row=2, column=0, columnspan=2, sticky=tk.W, padx=5, pady=8)
 
         # ── Zone selection (per video) ────────────────────────
         zone_frame = ttk.LabelFrame(content_frame, text="Zone Selection (per video)", padding=10)
@@ -850,29 +1127,17 @@ class MainWindow:
         self.video_establishment_combo.bind("<<ComboboxSelected>>", lambda _: self._on_video_establishment_select())
         ttk.Button(est_frame, text="+ New", command=self._create_new_video_establishment).pack(side=tk.LEFT)
 
-        # Section selector
-        sec_frame = ttk.Frame(job_frame)
-        sec_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(sec_frame, text="Section/Zone:", font=("Arial", 10)).pack(side=tk.LEFT, padx=(0, 10))
-        self.video_section_combo = ttk.Combobox(
-            sec_frame, textvariable=self.video_section_var, state="readonly",
+        # Caisse selector
+        caisse_frame = ttk.Frame(job_frame)
+        caisse_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(caisse_frame, text="Caisse:", font=("Arial", 10)).pack(side=tk.LEFT, padx=(0, 10))
+        self.video_caisse_combo = ttk.Combobox(
+            caisse_frame, textvariable=self.video_caisse_var, state="readonly",
             width=35, font=("Arial", 9)
         )
-        self.video_section_combo.pack(side=tk.LEFT, padx=(0, 5))
-        self.video_section_combo.bind("<<ComboboxSelected>>", lambda _: self._on_video_section_select())
-        ttk.Button(sec_frame, text="+ New", command=self._create_new_video_section).pack(side=tk.LEFT)
-
-        # Employee selector
-        emp_frame = ttk.Frame(job_frame)
-        emp_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(emp_frame, text="Cashier/Employee:", font=("Arial", 10)).pack(side=tk.LEFT, padx=(0, 10))
-        self.video_employee_combo = ttk.Combobox(
-            emp_frame, textvariable=self.video_employee_var, state="readonly",
-            width=35, font=("Arial", 9)
-        )
-        self.video_employee_combo.pack(side=tk.LEFT, padx=(0, 5))
-        self.video_employee_combo.bind("<<ComboboxSelected>>", lambda _: self._on_video_employee_select())
-        ttk.Button(emp_frame, text="+ New", command=self._create_new_video_employee).pack(side=tk.LEFT)
+        self.video_caisse_combo.pack(side=tk.LEFT, padx=(0, 5))
+        self.video_caisse_combo.bind("<<ComboboxSelected>>", lambda _: self._on_video_caisse_select())
+        ttk.Button(caisse_frame, text="+ New", command=self._create_new_video_caisse).pack(side=tk.LEFT)
 
         # Load metadata for the current video
         self._load_video_metadata()
@@ -948,13 +1213,11 @@ class MainWindow:
         metadata = self.video_metadata_map.get(path, {})
 
         est_id = metadata.get("establishment_id")
-        sec_id = metadata.get("section_id")
-        emp_id = metadata.get("employee_id")
+        caisse_id = metadata.get("caisse_id")
 
         # Refresh combobox values
         self._refresh_video_establishment_combo()
-        self._refresh_video_section_combo(est_id)
-        self._refresh_video_employee_combo(sec_id)
+        self._refresh_video_caisse_combo(est_id)
 
         # Set current selection
         if est_id:
@@ -965,21 +1228,13 @@ class MainWindow:
         else:
             self.video_establishment_var.set("")
 
-        if sec_id:
-            for item in self.video_section_combo["values"]:
-                if f"(ID: {sec_id})" in item:
-                    self.video_section_var.set(item)
+        if caisse_id:
+            for item in self.video_caisse_combo["values"]:
+                if f"(ID: {caisse_id})" in item:
+                    self.video_caisse_var.set(item)
                     break
         else:
-            self.video_section_var.set("")
-
-        if emp_id:
-            for item in self.video_employee_combo["values"]:
-                if f"(ID: {emp_id})" in item:
-                    self.video_employee_var.set(item)
-                    break
-        else:
-            self.video_employee_var.set("")
+            self.video_caisse_var.set("")
 
     def _refresh_video_establishment_combo(self):
         """Populate video establishment combobox."""
@@ -990,35 +1245,17 @@ class MainWindow:
                   for est_id in sorted(self.db_hierarchy.keys())]
         self.video_establishment_combo["values"] = values
 
-    def _refresh_video_section_combo(self, est_id: int | None = None):
-        """Populate video section combobox for the selected establishment."""
+    def _refresh_video_caisse_combo(self, est_id: int | None = None):
+        """Populate video caisse combobox for the selected establishment."""
         if est_id is None:
             est_id = self._get_video_establishment_id()
         if not est_id or est_id not in self.db_hierarchy:
-            self.video_section_combo["values"] = []
+            self.video_caisse_combo["values"] = []
             return
-        sections = self.db_hierarchy[est_id]['sections']
-        values = [f"{sections[sec_id]['name']} (ID: {sec_id})"
-                  for sec_id in sorted(sections.keys())]
-        self.video_section_combo["values"] = values
-
-    def _refresh_video_employee_combo(self, sec_id: int | None = None):
-        """Populate video employee combobox for the selected section."""
-        if sec_id is None:
-            sec_id = self._get_video_section_id()
-        if not sec_id:
-            self.video_employee_combo["values"] = []
-            return
-        # Find the section in the hierarchy
-        for est_id in self.db_hierarchy:
-            sections = self.db_hierarchy[est_id]['sections']
-            if sec_id in sections:
-                employees = sections[sec_id]['employees']
-                values = [f"{employees[emp_id]} (ID: {emp_id})"
-                          for emp_id in sorted(employees.keys())]
-                self.video_employee_combo["values"] = values
-                return
-        self.video_employee_combo["values"] = []
+        caisses = self.db_hierarchy[est_id]['caisses']
+        values = [f"{caisses[caisse_id]['name']} (ID: {caisse_id})"
+                  for caisse_id in sorted(caisses.keys())]
+        self.video_caisse_combo["values"] = values
 
     def _get_video_establishment_id(self) -> int | None:
         """Extract establishment ID from current combobox selection."""
@@ -1030,19 +1267,9 @@ class MainWindow:
         except (ValueError, IndexError):
             return None
 
-    def _get_video_section_id(self) -> int | None:
-        """Extract section ID from current combobox selection."""
-        text = self.video_section_var.get()
-        if not text or "(ID: " not in text:
-            return None
-        try:
-            return int(text.split("(ID: ")[1].rstrip(")"))
-        except (ValueError, IndexError):
-            return None
-
-    def _get_video_employee_id(self) -> int | None:
-        """Extract employee ID from current combobox selection."""
-        text = self.video_employee_var.get()
+    def _get_video_caisse_id(self) -> int | None:
+        """Extract caisse ID from current combobox selection."""
+        text = self.video_caisse_var.get()
         if not text or "(ID: " not in text:
             return None
         try:
@@ -1054,19 +1281,11 @@ class MainWindow:
         """Handle video establishment selection."""
         self._save_current_video_metadata()
         est_id = self._get_video_establishment_id()
-        self._refresh_video_section_combo(est_id)
-        self.video_section_var.set("")
-        self.video_employee_var.set("")
+        self._refresh_video_caisse_combo(est_id)
+        self.video_caisse_var.set("")
 
-    def _on_video_section_select(self):
-        """Handle video section selection."""
-        self._save_current_video_metadata()
-        sec_id = self._get_video_section_id()
-        self._refresh_video_employee_combo(sec_id)
-        self.video_employee_var.set("")
-
-    def _on_video_employee_select(self):
-        """Handle video employee selection."""
+    def _on_video_caisse_select(self):
+        """Handle video caisse selection."""
         self._save_current_video_metadata()
 
     def _save_current_video_metadata(self):
@@ -1076,8 +1295,7 @@ class MainWindow:
         path = self.video_paths[self.current_video_index]
         self.video_metadata_map[path] = {
             "establishment_id": self._get_video_establishment_id(),
-            "section_id": self._get_video_section_id(),
-            "employee_id": self._get_video_employee_id(),
+            "caisse_id": self._get_video_caisse_id(),
         }
 
     # ══════════════════════════════════════════════════════════
@@ -1149,33 +1367,22 @@ class MainWindow:
             # Per-video job information
             metadata = self.video_metadata_map.get(path, {})
             est_id = metadata.get("establishment_id")
-            sec_id = metadata.get("section_id")
-            emp_id = metadata.get("employee_id")
+            caisse_id = metadata.get("caisse_id")
 
-            if est_id or sec_id or emp_id:
+            if est_id or caisse_id:
                 if est_id:
                     est_name = self.db_hierarchy.get(est_id, {}).get('name', f"Unknown (ID: {est_id})")
                     ttk.Label(summary_frame, text=f"Establishment: {est_name}",
                               font=("Arial", 8), foreground="darkblue").pack(
                         anchor=tk.W, padx=40, pady=(0, 2))
-                if sec_id:
-                    sec_info = None
+                if caisse_id:
+                    caisse_info = None
                     for est in self.db_hierarchy.values():
-                        if sec_id in est['sections']:
-                            sec_info = est['sections'][sec_id]
+                        if caisse_id in est['caisses']:
+                            caisse_info = est['caisses'][caisse_id]
                             break
-                    sec_name = sec_info.get('name', f"Unknown (ID: {sec_id})") if sec_info else f"Unknown (ID: {sec_id})"
-                    ttk.Label(summary_frame, text=f"Section/Zone: {sec_name}",
-                              font=("Arial", 8), foreground="darkblue").pack(
-                        anchor=tk.W, padx=40, pady=(0, 2))
-                if emp_id:
-                    emp_name = "Unknown"
-                    for est in self.db_hierarchy.values():
-                        for sec in est['sections'].values():
-                            if emp_id in sec['employees']:
-                                emp_name = sec['employees'][emp_id]
-                                break
-                    ttk.Label(summary_frame, text=f"Cashier/Employee: {emp_name}",
+                    caisse_name = caisse_info.get('name', f"Unknown (ID: {caisse_id})") if caisse_info else f"Unknown (ID: {caisse_id})"
+                    ttk.Label(summary_frame, text=f"Caisse: {caisse_name}",
                               font=("Arial", 8), foreground="darkblue").pack(
                         anchor=tk.W, padx=40, pady=(0, 5))
 
@@ -1192,6 +1399,17 @@ class MainWindow:
             anchor=tk.W, pady=(5, 2))
         ttk.Label(summary_frame, text=self.log_level.get(),
                   font=("Arial", 9), foreground="darkgreen").pack(
+            anchor=tk.W, padx=20, pady=(0, 10))
+
+        ttk.Label(summary_frame, text="Webhook:", font=("Arial", 10, "bold")).pack(
+            anchor=tk.W, pady=(5, 2))
+        webhook_summary = (
+            "Enabled: http://localhost:5678/webhook/queue-metrics"
+            if self.webhook_enabled.get()
+            else "Disabled"
+        )
+        ttk.Label(summary_frame, text=webhook_summary,
+                  font=("Arial", 9), foreground="darkgreen" if self.webhook_enabled.get() else "gray").pack(
             anchor=tk.W, padx=20, pady=(0, 10))
 
         # ── Nav buttons ───────────────────────────────────────
@@ -1239,14 +1457,13 @@ class MainWindow:
             # Per-video metadata arguments (optional)
             metadata = self.video_metadata_map.get(path, {})
             est_id = metadata.get("establishment_id")
-            sec_id = metadata.get("section_id")
-            emp_id = metadata.get("employee_id")
+            caisse_id = metadata.get("caisse_id")
             if est_id is not None:
                 cmd.extend(["--establishment-id", str(est_id)])
-            if sec_id is not None:
-                cmd.extend(["--section-id", str(sec_id)])
-            if emp_id is not None:
-                cmd.extend(["--employee-id", str(emp_id)])
+            if caisse_id is not None:
+                cmd.extend(["--caisse-id", str(caisse_id)])
+            if not self.webhook_enabled.get():
+                cmd.append("--disable-webhook")
             commands.append(cmd)
         return commands
 
