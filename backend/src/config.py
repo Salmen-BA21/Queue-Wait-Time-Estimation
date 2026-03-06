@@ -94,8 +94,8 @@ class AppConfig:
     rtsp_transport: str = RTSP_TRANSPORT
     # Metadata tracking (database IDs)
     establishment_id: Optional[int] = None
-    section_id: Optional[int] = None
-    employee_id: Optional[int] = None
+    caisse_id: Optional[int] = None
+    webhook_enabled: bool = WEBHOOK_ENABLED
 
     @property
     def model_path(self) -> str:

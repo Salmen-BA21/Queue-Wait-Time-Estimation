@@ -250,7 +250,7 @@ class MainWindow:
         self.video_paths: list[str] = []
         self.current_video_index: int = 0
         self.zone_points_map: dict[str, list[list[int]]] = {}
-        # Per-video job information: maps video path -> {"establishment_id", "section_id", "employee_id"}
+        # Per-video job information: maps video path -> {"establishment_id", "caisse_id"}
         self.video_metadata_map: dict[str, dict[str, int | None]] = {}
 
         # tk helpers
@@ -262,12 +262,12 @@ class MainWindow:
 
         # Per-video job info UI variables (used in Step 2)
         self.video_establishment_var = tk.StringVar(value="")
-        self.video_section_var = tk.StringVar(value="")
-        self.video_employee_var = tk.StringVar(value="")
+        self.video_caisse_var = tk.StringVar(value="")
 
         # config state
         self.model_size = tk.StringVar(value="n")
         self.log_level = tk.StringVar(value="INFO")
+        self.webhook_enabled = tk.BooleanVar(value=True)
 
         # RTSP credentials store: maps source url -> {"username", "password", "transport"}
         self.rtsp_credentials: dict[str, dict] = {}
@@ -971,84 +971,44 @@ class MainWindow:
         ttk.Button(dialog, text="Create", command=save_establishment).pack(side=tk.LEFT, padx=10)
         ttk.Button(dialog, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=10)
 
-    def _create_new_video_section(self):
-        """Dialog to create a new section (for Step 2)."""
+    def _create_new_video_caisse(self):
+        """Dialog to create a new caisse (for Step 2)."""
         est_id = self._get_video_establishment_id()
         if est_id is None:
             messagebox.showwarning("Required", "Please select an establishment first.")
             return
 
         dialog = tk.Toplevel(self.root)
-        dialog.title("New Section")
+        dialog.title("New Caisse")
         dialog.geometry("400x150")
         dialog.transient(self.root)
         dialog.grab_set()
 
-        ttk.Label(dialog, text="Section/Zone Name:", font=("Arial", 10)).pack(pady=10, padx=20)
+        ttk.Label(dialog, text="Caisse Number/Name:", font=("Arial", 10)).pack(pady=10, padx=20)
         name_entry = ttk.Entry(dialog, font=("Arial", 10), width=35)
         name_entry.pack(pady=(0, 20), padx=20)
         name_entry.focus()
 
-        def save_section():
+        def save_caisse():
             name = name_entry.get().strip()
             if not name:
-                messagebox.showwarning("Required", "Please enter a section name.")
+                messagebox.showwarning("Required", "Please enter a caisse number or name.")
                 return
             try:
-                from src.database import create_section, get_full_hierarchy
-                sec_id = create_section(name, est_id)
+                from src.database import create_caisse, get_full_hierarchy
+                caisse_id = create_caisse(name, est_id)
                 # Reload hierarchy
                 self.db_hierarchy = get_full_hierarchy()
-                self._refresh_video_section_combo(est_id)
-                # Select the newly created section
-                self.video_section_var.set(f"{name} (ID: {sec_id})")
-                self._on_video_section_select()
+                self._refresh_video_caisse_combo(est_id)
+                # Select the newly created caisse
+                self.video_caisse_var.set(f"{name} (ID: {caisse_id})")
+                self._on_video_caisse_select()
                 dialog.destroy()
-                messagebox.showinfo("Success", f"Created section: {name}")
+                messagebox.showinfo("Success", f"Created caisse: {name}")
             except Exception as e:
-                messagebox.showerror("Error", f"Could not create section:\n{e}")
+                messagebox.showerror("Error", f"Could not create caisse:\n{e}")
 
-        ttk.Button(dialog, text="Create", command=save_section).pack(side=tk.LEFT, padx=10)
-        ttk.Button(dialog, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=10)
-
-    def _create_new_video_employee(self):
-        """Dialog to create a new employee (for Step 2)."""
-        sec_id = self._get_video_section_id()
-        if sec_id is None:
-            messagebox.showwarning("Required", "Please select a section first.")
-            return
-
-        dialog = tk.Toplevel(self.root)
-        dialog.title("New Cashier/Employee")
-        dialog.geometry("400x150")
-        dialog.transient(self.root)
-        dialog.grab_set()
-
-        ttk.Label(dialog, text="Employee Name:", font=("Arial", 10)).pack(pady=10, padx=20)
-        name_entry = ttk.Entry(dialog, font=("Arial", 10), width=35)
-        name_entry.pack(pady=(0, 20), padx=20)
-        name_entry.focus()
-
-        def save_employee():
-            name = name_entry.get().strip()
-            if not name:
-                messagebox.showwarning("Required", "Please enter an employee name.")
-                return
-            try:
-                from src.database import create_employee, get_full_hierarchy
-                emp_id = create_employee(name, sec_id)
-                # Reload hierarchy
-                self.db_hierarchy = get_full_hierarchy()
-                self._refresh_video_employee_combo(sec_id)
-                # Select the newly created employee
-                self.video_employee_var.set(f"{name} (ID: {emp_id})")
-                self._on_video_employee_select()
-                dialog.destroy()
-                messagebox.showinfo("Success", f"Created employee: {name}")
-            except Exception as e:
-                messagebox.showerror("Error", f"Could not create employee:\n{e}")
-
-        ttk.Button(dialog, text="Create", command=save_employee).pack(side=tk.LEFT, padx=10)
+        ttk.Button(dialog, text="Create", command=save_caisse).pack(side=tk.LEFT, padx=10)
         ttk.Button(dialog, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=10)
 
     def _validate_and_go_step2(self):
@@ -1074,8 +1034,7 @@ class MainWindow:
             if path not in self.video_metadata_map:
                 self.video_metadata_map[path] = {
                     "establishment_id": None,
-                    "section_id": None,
-                    "employee_id": None,
+                    "caisse_id": None,
                 }
         self.show_step2()
 
@@ -1116,6 +1075,12 @@ class MainWindow:
                      values=["DEBUG", "INFO", "WARNING", "ERROR"],
                      state="readonly", width=30, font=("Arial", 10)).grid(
             row=1, column=1, sticky=tk.W, padx=5, pady=8)
+
+        ttk.Checkbutton(
+            model_frame,
+            text="Send data to webhook (http://localhost:5678/webhook/queue-metrics)",
+            variable=self.webhook_enabled,
+        ).grid(row=2, column=0, columnspan=2, sticky=tk.W, padx=5, pady=8)
 
         # ── Zone selection (per video) ────────────────────────
         zone_frame = ttk.LabelFrame(content_frame, text="Zone Selection (per video)", padding=10)
@@ -1162,29 +1127,17 @@ class MainWindow:
         self.video_establishment_combo.bind("<<ComboboxSelected>>", lambda _: self._on_video_establishment_select())
         ttk.Button(est_frame, text="+ New", command=self._create_new_video_establishment).pack(side=tk.LEFT)
 
-        # Section selector
-        sec_frame = ttk.Frame(job_frame)
-        sec_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(sec_frame, text="Section/Zone:", font=("Arial", 10)).pack(side=tk.LEFT, padx=(0, 10))
-        self.video_section_combo = ttk.Combobox(
-            sec_frame, textvariable=self.video_section_var, state="readonly",
+        # Caisse selector
+        caisse_frame = ttk.Frame(job_frame)
+        caisse_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(caisse_frame, text="Caisse:", font=("Arial", 10)).pack(side=tk.LEFT, padx=(0, 10))
+        self.video_caisse_combo = ttk.Combobox(
+            caisse_frame, textvariable=self.video_caisse_var, state="readonly",
             width=35, font=("Arial", 9)
         )
-        self.video_section_combo.pack(side=tk.LEFT, padx=(0, 5))
-        self.video_section_combo.bind("<<ComboboxSelected>>", lambda _: self._on_video_section_select())
-        ttk.Button(sec_frame, text="+ New", command=self._create_new_video_section).pack(side=tk.LEFT)
-
-        # Employee selector
-        emp_frame = ttk.Frame(job_frame)
-        emp_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(emp_frame, text="Cashier/Employee:", font=("Arial", 10)).pack(side=tk.LEFT, padx=(0, 10))
-        self.video_employee_combo = ttk.Combobox(
-            emp_frame, textvariable=self.video_employee_var, state="readonly",
-            width=35, font=("Arial", 9)
-        )
-        self.video_employee_combo.pack(side=tk.LEFT, padx=(0, 5))
-        self.video_employee_combo.bind("<<ComboboxSelected>>", lambda _: self._on_video_employee_select())
-        ttk.Button(emp_frame, text="+ New", command=self._create_new_video_employee).pack(side=tk.LEFT)
+        self.video_caisse_combo.pack(side=tk.LEFT, padx=(0, 5))
+        self.video_caisse_combo.bind("<<ComboboxSelected>>", lambda _: self._on_video_caisse_select())
+        ttk.Button(caisse_frame, text="+ New", command=self._create_new_video_caisse).pack(side=tk.LEFT)
 
         # Load metadata for the current video
         self._load_video_metadata()
@@ -1260,13 +1213,11 @@ class MainWindow:
         metadata = self.video_metadata_map.get(path, {})
 
         est_id = metadata.get("establishment_id")
-        sec_id = metadata.get("section_id")
-        emp_id = metadata.get("employee_id")
+        caisse_id = metadata.get("caisse_id")
 
         # Refresh combobox values
         self._refresh_video_establishment_combo()
-        self._refresh_video_section_combo(est_id)
-        self._refresh_video_employee_combo(sec_id)
+        self._refresh_video_caisse_combo(est_id)
 
         # Set current selection
         if est_id:
@@ -1277,21 +1228,13 @@ class MainWindow:
         else:
             self.video_establishment_var.set("")
 
-        if sec_id:
-            for item in self.video_section_combo["values"]:
-                if f"(ID: {sec_id})" in item:
-                    self.video_section_var.set(item)
+        if caisse_id:
+            for item in self.video_caisse_combo["values"]:
+                if f"(ID: {caisse_id})" in item:
+                    self.video_caisse_var.set(item)
                     break
         else:
-            self.video_section_var.set("")
-
-        if emp_id:
-            for item in self.video_employee_combo["values"]:
-                if f"(ID: {emp_id})" in item:
-                    self.video_employee_var.set(item)
-                    break
-        else:
-            self.video_employee_var.set("")
+            self.video_caisse_var.set("")
 
     def _refresh_video_establishment_combo(self):
         """Populate video establishment combobox."""
@@ -1302,35 +1245,17 @@ class MainWindow:
                   for est_id in sorted(self.db_hierarchy.keys())]
         self.video_establishment_combo["values"] = values
 
-    def _refresh_video_section_combo(self, est_id: int | None = None):
-        """Populate video section combobox for the selected establishment."""
+    def _refresh_video_caisse_combo(self, est_id: int | None = None):
+        """Populate video caisse combobox for the selected establishment."""
         if est_id is None:
             est_id = self._get_video_establishment_id()
         if not est_id or est_id not in self.db_hierarchy:
-            self.video_section_combo["values"] = []
+            self.video_caisse_combo["values"] = []
             return
-        sections = self.db_hierarchy[est_id]['sections']
-        values = [f"{sections[sec_id]['name']} (ID: {sec_id})"
-                  for sec_id in sorted(sections.keys())]
-        self.video_section_combo["values"] = values
-
-    def _refresh_video_employee_combo(self, sec_id: int | None = None):
-        """Populate video employee combobox for the selected section."""
-        if sec_id is None:
-            sec_id = self._get_video_section_id()
-        if not sec_id:
-            self.video_employee_combo["values"] = []
-            return
-        # Find the section in the hierarchy
-        for est_id in self.db_hierarchy:
-            sections = self.db_hierarchy[est_id]['sections']
-            if sec_id in sections:
-                employees = sections[sec_id]['employees']
-                values = [f"{employees[emp_id]} (ID: {emp_id})"
-                          for emp_id in sorted(employees.keys())]
-                self.video_employee_combo["values"] = values
-                return
-        self.video_employee_combo["values"] = []
+        caisses = self.db_hierarchy[est_id]['caisses']
+        values = [f"{caisses[caisse_id]['name']} (ID: {caisse_id})"
+                  for caisse_id in sorted(caisses.keys())]
+        self.video_caisse_combo["values"] = values
 
     def _get_video_establishment_id(self) -> int | None:
         """Extract establishment ID from current combobox selection."""
@@ -1342,19 +1267,9 @@ class MainWindow:
         except (ValueError, IndexError):
             return None
 
-    def _get_video_section_id(self) -> int | None:
-        """Extract section ID from current combobox selection."""
-        text = self.video_section_var.get()
-        if not text or "(ID: " not in text:
-            return None
-        try:
-            return int(text.split("(ID: ")[1].rstrip(")"))
-        except (ValueError, IndexError):
-            return None
-
-    def _get_video_employee_id(self) -> int | None:
-        """Extract employee ID from current combobox selection."""
-        text = self.video_employee_var.get()
+    def _get_video_caisse_id(self) -> int | None:
+        """Extract caisse ID from current combobox selection."""
+        text = self.video_caisse_var.get()
         if not text or "(ID: " not in text:
             return None
         try:
@@ -1366,19 +1281,11 @@ class MainWindow:
         """Handle video establishment selection."""
         self._save_current_video_metadata()
         est_id = self._get_video_establishment_id()
-        self._refresh_video_section_combo(est_id)
-        self.video_section_var.set("")
-        self.video_employee_var.set("")
+        self._refresh_video_caisse_combo(est_id)
+        self.video_caisse_var.set("")
 
-    def _on_video_section_select(self):
-        """Handle video section selection."""
-        self._save_current_video_metadata()
-        sec_id = self._get_video_section_id()
-        self._refresh_video_employee_combo(sec_id)
-        self.video_employee_var.set("")
-
-    def _on_video_employee_select(self):
-        """Handle video employee selection."""
+    def _on_video_caisse_select(self):
+        """Handle video caisse selection."""
         self._save_current_video_metadata()
 
     def _save_current_video_metadata(self):
@@ -1388,8 +1295,7 @@ class MainWindow:
         path = self.video_paths[self.current_video_index]
         self.video_metadata_map[path] = {
             "establishment_id": self._get_video_establishment_id(),
-            "section_id": self._get_video_section_id(),
-            "employee_id": self._get_video_employee_id(),
+            "caisse_id": self._get_video_caisse_id(),
         }
 
     # ══════════════════════════════════════════════════════════
@@ -1461,33 +1367,22 @@ class MainWindow:
             # Per-video job information
             metadata = self.video_metadata_map.get(path, {})
             est_id = metadata.get("establishment_id")
-            sec_id = metadata.get("section_id")
-            emp_id = metadata.get("employee_id")
+            caisse_id = metadata.get("caisse_id")
 
-            if est_id or sec_id or emp_id:
+            if est_id or caisse_id:
                 if est_id:
                     est_name = self.db_hierarchy.get(est_id, {}).get('name', f"Unknown (ID: {est_id})")
                     ttk.Label(summary_frame, text=f"Establishment: {est_name}",
                               font=("Arial", 8), foreground="darkblue").pack(
                         anchor=tk.W, padx=40, pady=(0, 2))
-                if sec_id:
-                    sec_info = None
+                if caisse_id:
+                    caisse_info = None
                     for est in self.db_hierarchy.values():
-                        if sec_id in est['sections']:
-                            sec_info = est['sections'][sec_id]
+                        if caisse_id in est['caisses']:
+                            caisse_info = est['caisses'][caisse_id]
                             break
-                    sec_name = sec_info.get('name', f"Unknown (ID: {sec_id})") if sec_info else f"Unknown (ID: {sec_id})"
-                    ttk.Label(summary_frame, text=f"Section/Zone: {sec_name}",
-                              font=("Arial", 8), foreground="darkblue").pack(
-                        anchor=tk.W, padx=40, pady=(0, 2))
-                if emp_id:
-                    emp_name = "Unknown"
-                    for est in self.db_hierarchy.values():
-                        for sec in est['sections'].values():
-                            if emp_id in sec['employees']:
-                                emp_name = sec['employees'][emp_id]
-                                break
-                    ttk.Label(summary_frame, text=f"Cashier/Employee: {emp_name}",
+                    caisse_name = caisse_info.get('name', f"Unknown (ID: {caisse_id})") if caisse_info else f"Unknown (ID: {caisse_id})"
+                    ttk.Label(summary_frame, text=f"Caisse: {caisse_name}",
                               font=("Arial", 8), foreground="darkblue").pack(
                         anchor=tk.W, padx=40, pady=(0, 5))
 
@@ -1504,6 +1399,17 @@ class MainWindow:
             anchor=tk.W, pady=(5, 2))
         ttk.Label(summary_frame, text=self.log_level.get(),
                   font=("Arial", 9), foreground="darkgreen").pack(
+            anchor=tk.W, padx=20, pady=(0, 10))
+
+        ttk.Label(summary_frame, text="Webhook:", font=("Arial", 10, "bold")).pack(
+            anchor=tk.W, pady=(5, 2))
+        webhook_summary = (
+            "Enabled: http://localhost:5678/webhook/queue-metrics"
+            if self.webhook_enabled.get()
+            else "Disabled"
+        )
+        ttk.Label(summary_frame, text=webhook_summary,
+                  font=("Arial", 9), foreground="darkgreen" if self.webhook_enabled.get() else "gray").pack(
             anchor=tk.W, padx=20, pady=(0, 10))
 
         # ── Nav buttons ───────────────────────────────────────
@@ -1551,14 +1457,13 @@ class MainWindow:
             # Per-video metadata arguments (optional)
             metadata = self.video_metadata_map.get(path, {})
             est_id = metadata.get("establishment_id")
-            sec_id = metadata.get("section_id")
-            emp_id = metadata.get("employee_id")
+            caisse_id = metadata.get("caisse_id")
             if est_id is not None:
                 cmd.extend(["--establishment-id", str(est_id)])
-            if sec_id is not None:
-                cmd.extend(["--section-id", str(sec_id)])
-            if emp_id is not None:
-                cmd.extend(["--employee-id", str(emp_id)])
+            if caisse_id is not None:
+                cmd.extend(["--caisse-id", str(caisse_id)])
+            if not self.webhook_enabled.get():
+                cmd.append("--disable-webhook")
             commands.append(cmd)
         return commands
 
