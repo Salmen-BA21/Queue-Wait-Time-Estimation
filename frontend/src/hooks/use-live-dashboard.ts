@@ -6,6 +6,10 @@ import {
   DashboardSocketEvent,
   getSystemHealth,
   listFeeds,
+  restartFeed,
+  startFeed,
+  stopFeed,
+  updateZone,
   VideoFeed,
 } from "@/lib/api";
 
@@ -76,6 +80,62 @@ export function useLiveDashboard() {
         id: `local-create-${feed.feed_id}`,
         message: `${feed.name} was added to the surveillance grid.`,
         severity: "success",
+        time: "just now",
+      });
+    },
+  });
+
+  const updateZoneMutation = useMutation({
+    mutationFn: ({ feedId, zone }: { feedId: string; zone: { points: Array<{ x: number; y: number }> } }) =>
+      updateZone(feedId, zone),
+    onSuccess: (feed) => {
+      queryClient.setQueryData<VideoFeed[]>(feedsQueryKey, (current = []) => upsertFeed(current, feed));
+      pushActivity(setActivity, {
+        id: `zone-update-${feed.feed_id}`,
+        message: `Zone updated for ${feed.name}.`,
+        severity: "info",
+        time: "just now",
+      });
+    },
+  });
+
+  const startFeedMutation = useMutation({
+    mutationFn: (feedId: string) => startFeed(feedId),
+    onSuccess: (feed) => {
+      queryClient.setQueryData<VideoFeed[]>(feedsQueryKey, (current = []) => upsertFeed(current, feed));
+      void queryClient.invalidateQueries({ queryKey: systemHealthQueryKey });
+      pushActivity(setActivity, {
+        id: `start-${feed.feed_id}-${Date.now()}`,
+        message: `${feed.name} was started.`,
+        severity: "success",
+        time: "just now",
+      });
+    },
+  });
+
+  const stopFeedMutation = useMutation({
+    mutationFn: (feedId: string) => stopFeed(feedId),
+    onSuccess: (feed) => {
+      queryClient.setQueryData<VideoFeed[]>(feedsQueryKey, (current = []) => upsertFeed(current, feed));
+      void queryClient.invalidateQueries({ queryKey: systemHealthQueryKey });
+      pushActivity(setActivity, {
+        id: `stop-${feed.feed_id}-${Date.now()}`,
+        message: `${feed.name} was stopped.`,
+        severity: "warning",
+        time: "just now",
+      });
+    },
+  });
+
+  const restartFeedMutation = useMutation({
+    mutationFn: (feedId: string) => restartFeed(feedId),
+    onSuccess: (feed) => {
+      queryClient.setQueryData<VideoFeed[]>(feedsQueryKey, (current = []) => upsertFeed(current, feed));
+      void queryClient.invalidateQueries({ queryKey: systemHealthQueryKey });
+      pushActivity(setActivity, {
+        id: `restart-${feed.feed_id}-${Date.now()}`,
+        message: `${feed.name} was restarted.`,
+        severity: "info",
         time: "just now",
       });
     },
@@ -174,6 +234,10 @@ export function useLiveDashboard() {
     feedsQuery,
     systemHealthQuery,
     createFeedMutation,
+    updateZoneMutation,
+    startFeedMutation,
+    stopFeedMutation,
+    restartFeedMutation,
     activity: activityFeed,
     derived,
   };

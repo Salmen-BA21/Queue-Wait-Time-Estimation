@@ -140,6 +140,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--register-id",
+        "--caisse-id",
         dest="caisse_id",
         type=int,
         default=None,

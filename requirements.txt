@@ -18,6 +18,8 @@ requests>=2.31.0
 fastapi>=0.116.0
 uvicorn>=0.35.0
 pydantic>=2.11.0
+python-multipart>=0.0.20
+httpx>=0.28.0
 
 # ONVIF device discovery
 lxml>=4.9.0                 # XML parsing for SOAP messages

@@ -1,4 +1,6 @@
 export type FeedStatus = "created" | "initializing" | "running" | "stopped" | "error";
+export type ModelSize = "n" | "s" | "m" | "l" | "x";
+export type RTSPTransport = "tcp" | "udp";
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -30,6 +32,8 @@ export interface VideoFeed {
   feed_id: string;
   name: string;
   source: string;
+  preview_path: string | null;
+  model_size: ModelSize;
   status: FeedStatus;
   created_at: string;
   updated_at: string;
@@ -70,14 +74,128 @@ export type DashboardSocketEvent = FeedSnapshotEvent | FeedStatusEvent;
 export interface CreateFeedInput {
   name: string;
   source: string;
+  model_size?: ModelSize;
   establishment_id?: number | null;
   caisse_id?: number | null;
+  rtsp_username?: string | null;
+  rtsp_password?: string | null;
+  rtsp_transport?: RTSPTransport | null;
+}
+
+export interface UploadVideoResponse {
+  file_name: string;
+  file_path: string;
+  preview_path: string;
+}
+
+export interface Establishment {
+  id: number;
+  name: string;
+  created_at: string;
+}
+
+export interface CreateEstablishmentInput {
+  name: string;
+}
+
+export interface Caisse {
+  id: number;
+  name: string;
+  establishment_id: number;
+  created_at: string;
+  zone: ZonePolygon | null;
+}
+
+export interface CreateCaisseInput {
+  name: string;
+  zone?: ZonePolygon | null;
+}
+
+export interface RTSPConnectionTestInput {
+  url: string;
+  username?: string | null;
+  password?: string | null;
+  transport?: RTSPTransport;
+}
+
+export interface RTSPConnectionTestResult {
+  connected: boolean;
+  transport: RTSPTransport;
+  resolution: string | null;
+  width: number | null;
+  height: number | null;
+  fps: number | null;
+  error: string | null;
+}
+
+export interface RTSPSnapshotInput {
+  url: string;
+  username?: string | null;
+  password?: string | null;
+  transport?: RTSPTransport;
+}
+
+export interface RTSPSnapshotResult {
+  captured: boolean;
+  transport: RTSPTransport;
+  resolution: string | null;
+  width: number | null;
+  height: number | null;
+  image_data_url: string | null;
+  error: string | null;
+}
+
+export interface ONVIFDevice {
+  ip: string;
+  name: string;
+  manufacturer: string;
+  model: string;
+  serial: string;
+  hardware: string;
+  location: string;
+  services: Record<string, string>;
+  xaddrs: string | null;
+}
+
+export interface ONVIFDiscoveryInput {
+  timeout_seconds?: number;
+}
+
+export interface ONVIFStream {
+  url: string;
+}
+
+export interface ONVIFStreamResolutionInput {
+  device: ONVIFDevice;
+  username?: string | null;
+  password?: string | null;
+}
+
+export interface ONVIFCameraTestInput extends ONVIFStreamResolutionInput {
+  transport?: RTSPTransport;
+}
+
+export interface ONVIFCameraTestResult {
+  connected: boolean;
+  transport: RTSPTransport;
+  stream_count: number;
+  tested_stream: ONVIFStream | null;
+  streams: ONVIFStream[];
+  resolution: string | null;
+  width: number | null;
+  height: number | null;
+  fps: number | null;
+  error: string | null;
 }
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || "http://localhost:8000";
 
 function buildUrl(path: string): string {
   return new URL(path, apiBaseUrl).toString();
+}
+
+export function resolveApiUrl(path: string): string {
+  return buildUrl(path);
 }
 
 function buildWebSocketUrl(path: string): string {
@@ -89,13 +207,16 @@ function buildWebSocketUrl(path: string): string {
 async function fetchApi<T>(path: string, init?: RequestInit): Promise<T> {
   const url = buildUrl(path);
   let response: Response;
+  const isFormData = typeof FormData !== "undefined" && init?.body instanceof FormData;
 
   try {
     response = await fetch(url, {
-      headers: {
-        "Content-Type": "application/json",
-        ...(init?.headers ?? {}),
-      },
+      headers: isFormData
+        ? init?.headers
+        : {
+            "Content-Type": "application/json",
+            ...(init?.headers ?? {}),
+          },
       ...init,
     });
   } catch (error) {
@@ -130,6 +251,124 @@ export function createFeed(input: CreateFeedInput): Promise<VideoFeed> {
   return fetchApi<VideoFeed>("/api/feeds", {
     method: "POST",
     body: JSON.stringify(input),
+  });
+}
+
+export function startFeed(feedId: string): Promise<VideoFeed> {
+  return fetchApi<VideoFeed>(`/api/feeds/${feedId}/start`, {
+    method: "POST",
+  });
+}
+
+export function stopFeed(feedId: string): Promise<VideoFeed> {
+  return fetchApi<VideoFeed>(`/api/feeds/${feedId}/stop`, {
+    method: "POST",
+  });
+}
+
+export function restartFeed(feedId: string): Promise<VideoFeed> {
+  return fetchApi<VideoFeed>(`/api/feeds/${feedId}/restart`, {
+    method: "POST",
+  });
+}
+
+export function listEstablishments(): Promise<Establishment[]> {
+  return fetchApi<Establishment[]>("/api/establishments");
+}
+
+export function createEstablishment(input: CreateEstablishmentInput): Promise<Establishment> {
+  return fetchApi<Establishment>("/api/establishments", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function listCaisses(establishmentId: number): Promise<Caisse[]> {
+  return fetchApi<Caisse[]>(`/api/establishments/${establishmentId}/caisses`);
+}
+
+export function createCaisse(establishmentId: number, input: CreateCaisseInput): Promise<Caisse> {
+  return fetchApi<Caisse>(`/api/establishments/${establishmentId}/caisses`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function testRtspConnection(input: RTSPConnectionTestInput): Promise<RTSPConnectionTestResult> {
+  return fetchApi<RTSPConnectionTestResult>("/api/sources/rtsp/test", {
+    method: "POST",
+    body: JSON.stringify({
+      ...input,
+      transport: input.transport ?? "tcp",
+    }),
+  });
+}
+
+export function captureRtspSnapshot(input: RTSPSnapshotInput): Promise<RTSPSnapshotResult> {
+  return fetchApi<RTSPSnapshotResult>("/api/sources/rtsp/snapshot", {
+    method: "POST",
+    body: JSON.stringify({
+      ...input,
+      transport: input.transport ?? "tcp",
+    }),
+  });
+}
+
+export interface FeedSnapshotResult {
+  feed_id: string;
+  source: string;
+  captured: boolean;
+  resolution: string | null;
+  width: number | null;
+  height: number | null;
+  image_data_url: string | null;
+  error: string | null;
+}
+
+export function getFeedSnapshot(feedId: string): Promise<FeedSnapshotResult> {
+  return fetchApi<FeedSnapshotResult>(`/api/feeds/${feedId}/snapshot`);
+}
+
+export function discoverOnvifDevices(input?: ONVIFDiscoveryInput): Promise<ONVIFDevice[]> {
+  return fetchApi<ONVIFDevice[]>("/api/sources/onvif/discover", {
+    method: "POST",
+    body: JSON.stringify({
+      timeout_seconds: input?.timeout_seconds ?? 5,
+    }),
+  });
+}
+
+export function resolveOnvifStreams(input: ONVIFStreamResolutionInput): Promise<ONVIFStream[]> {
+  return fetchApi<ONVIFStream[]>("/api/sources/onvif/streams", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function testOnvifCamera(input: ONVIFCameraTestInput): Promise<ONVIFCameraTestResult> {
+  return fetchApi<ONVIFCameraTestResult>("/api/sources/onvif/test", {
+    method: "POST",
+    body: JSON.stringify({
+      ...input,
+      transport: input.transport ?? "tcp",
+    }),
+  });
+}
+
+export function uploadVideo(file: File): Promise<UploadVideoResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  return fetchApi<UploadVideoResponse>("/api/uploads/video", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+export function updateZone(feedId: string, zone: ZonePolygon): Promise<VideoFeed> {
+  return fetchApi<VideoFeed>(`/api/feeds/${feedId}/zone`, {
+    method: "POST",
+    body: JSON.stringify({ zone }),
   });
 }
 

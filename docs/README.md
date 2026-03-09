@@ -21,6 +21,7 @@ Sprint-specific planning and execution documentation:
 Project progress and status tracking:
 - **PROGRESS.md** – Overall project progress report with sprint completion status
 - **STATUS_REPORT.md** – Status updates on specific issues/fixes
+- **WEB_APP_GUI_PARITY_PLAN.md** – Remaining work to bring the web app to full desktop GUI feature parity
 
 ### 🔹 `/daily-logs/`
 Daily development logs (legacy filenames may still use "Phase"):
@@ -38,6 +39,7 @@ Legacy phase documents are archived to preserve history. New updates should be w
 - **Getting Started?** → Start with `agent-guide/INDEX.md`
 - **Implementing the Web Frontend?** → See `design/README.md` then `design/DESIGN_SPEC.md`
 - **Tracking Progress?** → See `tracking/PROGRESS.md`
+- **Planning GUI-to-Web parity?** → See `tracking/WEB_APP_GUI_PARITY_PLAN.md`
 - **Understanding a Sprint?** → Check `sprints/` or `daily-logs/`
 - **Checking Recent Work?** → See `tracking/STATUS_REPORT.md` or latest in `daily-logs/`
 

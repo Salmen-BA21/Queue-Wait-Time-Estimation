@@ -879,7 +879,7 @@ class MainWindow:
             password_var = tk.StringVar()
             ttk.Entry(cred_dialog, textvariable=password_var, show="*", font=("Arial", 9)).pack(fill=tk.X, padx=20, pady=(0, 15))
 
-            credentials = {"username": None, "password": None, "rtsp_url": None}
+            credentials: dict[str, str | None] = {"username": None, "password": None, "rtsp_url": None}
 
             def add_camera():
                 try:

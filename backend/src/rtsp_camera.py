@@ -27,6 +27,7 @@ Typical usage
 
 from __future__ import annotations
 
+import base64
 import logging
 import os
 import socket
@@ -481,6 +482,64 @@ class RTSPCamera:
         logger.info(
             "RTSP test OK – %dx%d @ %.1f FPS", width, height, fps
         )
+        return True, info
+
+    @staticmethod
+    def capture_snapshot(
+        url: str,
+        username: str | None = None,
+        password: str | None = None,
+        transport: str = RTSP_TRANSPORT,
+        timeout: float = RTSP_CONNECTION_TIMEOUT_SEC,
+        jpeg_quality: int = 90,
+    ) -> tuple[bool, dict]:
+        """Capture a single JPEG snapshot from an RTSP source."""
+        _apply_rtsp_env(transport)
+        auth_url = _build_rtsp_url(url, username, password)
+        safe = _safe_url(auth_url)
+        logger.info("Capturing RTSP snapshot: %s", safe)
+
+        cap = cv2.VideoCapture(auth_url, cv2.CAP_FFMPEG)
+        cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, timeout * 1000)
+        cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, timeout * 1000)
+
+        if not cap.isOpened():
+            cap.release()
+            msg = f"Could not open stream: {safe}"
+            logger.warning(msg)
+            return False, {"error": msg, "url": url}
+
+        ok, frame = cap.read()
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        cap.release()
+
+        if not ok or frame is None:
+            msg = f"Stream opened but could not read a frame: {safe}"
+            logger.warning(msg)
+            return False, {"error": msg, "url": url}
+
+        encoded_ok, buffer = cv2.imencode(
+            ".jpg",
+            frame,
+            [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality],
+        )
+        if not encoded_ok:
+            msg = f"Could not encode snapshot frame: {safe}"
+            logger.warning(msg)
+            return False, {"error": msg, "url": url}
+
+        image_base64 = base64.b64encode(buffer.tobytes()).decode("ascii")
+        info = {
+            "url": url,
+            "width": width,
+            "height": height,
+            "resolution": f"{width}x{height}",
+            "transport": transport,
+            "image_base64": image_base64,
+            "mime_type": "image/jpeg",
+        }
+        logger.info("RTSP snapshot captured – %dx%d", width, height)
         return True, info
 
     @staticmethod
