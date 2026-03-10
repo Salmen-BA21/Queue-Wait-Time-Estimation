@@ -11,7 +11,7 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal, Protocol, TextIO, TypedDict, cast
+from typing import Any, Literal, Protocol, TextIO, TypedDict, cast
 from urllib.parse import urlparse, urlunparse
 from uuid import uuid4
 
@@ -19,10 +19,24 @@ from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 
 from src.api.models import (
+    AlertFiredEvent,
+    AlertFiredEventPayload,
+    AlertModel,
+    BatchFeedDraft,
+    BatchFeedLaunchItemResult,
+    BatchFeedLaunchResponse,
+    BatchFeedLaunchSummary,
+    BatchLaunchMode,
     FeedStatusEvent,
     FeedStatusEventPayload,
     FeedSnapshotResult,
+    LogLevel,
     ModelSize,
+    MetricsUpdateEvent,
+    MetricsUpdateEventPayload,
+    QueueMetricsModel,
+    SystemWarningEvent,
+    SystemWarningEventPayload,
     VideoFeed,
     ZonePolygon,
     coerce_zone_polygon,
@@ -134,6 +148,8 @@ class FeedPersistencePayload(TypedDict):
     source: str
     model_size: str
     status: str
+    log_level: str
+    webhook_enabled: bool
     created_at: datetime
     updated_at: datetime
     rtsp_username: str | None
@@ -288,6 +304,9 @@ class FeedWorkerHandle:
     process: subprocess.Popen | None = field(default=None, repr=False)
     log_path: Path | None = None
     log_stream: TextIO | None = field(default=None, repr=False)
+    event_path: Path | None = None
+    event_cursor: int = 0
+    event_buffer: str = ""
 
 
 class FeedWorkerRunner(Protocol):
@@ -319,9 +338,10 @@ class SubprocessFeedWorkerRunner:
     """Launches the existing CLI analysis pipeline as background subprocesses."""
 
     def start(self, record: "FeedRecord") -> FeedWorkerHandle:
-        command = self._build_command(record)
         RUNTIME_LOG_DIR.mkdir(parents=True, exist_ok=True)
         log_path = RUNTIME_LOG_DIR / f"{record.feed_id}-{utc_now().strftime('%Y%m%dT%H%M%S')}.log"
+        event_path = RUNTIME_LOG_DIR / f"{record.feed_id}-{utc_now().strftime('%Y%m%dT%H%M%S')}.events.jsonl"
+        command = self._build_command(record, event_path)
         log_stream = log_path.open("a", encoding="utf-8")
 
         creationflags = 0
@@ -349,6 +369,7 @@ class SubprocessFeedWorkerRunner:
             process=process,
             log_path=log_path,
             log_stream=log_stream,
+            event_path=event_path,
         )
 
     def stop(self, handle: FeedWorkerHandle) -> None:
@@ -382,7 +403,7 @@ class SubprocessFeedWorkerRunner:
             return f"Worker exited with code {exit_code}. Last output: {tail}"
         return f"Worker exited with code {exit_code}."
 
-    def _build_command(self, record: "FeedRecord") -> list[str]:
+    def _build_command(self, record: "FeedRecord", event_path: Path) -> list[str]:
         command = [
             sys.executable,
             "-u",
@@ -393,9 +414,11 @@ class SubprocessFeedWorkerRunner:
             "--model-size",
             record.model_size,
             "--log-level",
-            DEFAULT_LOG_LEVEL,
+            record.log_level or DEFAULT_LOG_LEVEL,
             "--resize-scale",
             str(DEFAULT_RESIZE_SCALE),
+            "--events-file",
+            str(event_path),
         ]
 
         if record.zone is not None:
@@ -415,6 +438,8 @@ class SubprocessFeedWorkerRunner:
             command.extend(["--establishment-id", str(record.establishment_id)])
         if record.caisse_id is not None:
             command.extend(["--caisse-id", str(record.caisse_id)])
+        if not record.webhook_enabled:
+            command.append("--disable-webhook")
 
         return command
 
@@ -430,6 +455,8 @@ class FeedRecord:
     status: str
     created_at: datetime
     updated_at: datetime
+    log_level: LogLevel = "INFO"
+    webhook_enabled: bool = True
     rtsp_username: str | None = None
     rtsp_password: str | None = None
     rtsp_transport: Literal["tcp", "udp"] | None = None
@@ -438,6 +465,8 @@ class FeedRecord:
     zone: ZonePolygon | None = None
     latest_metrics: dict | None = None
     last_error: str | None = None
+    last_warning: str | None = None
+    last_warning_code: str | None = None
     worker: FeedWorkerHandle | None = field(default=None, repr=False)
     session_id: int | None = None
 
@@ -502,6 +531,32 @@ class WebSocketHub:
         )
         await self.broadcast(event.model_dump(mode="json"))
 
+    async def broadcast_metrics_event(self, *, feed_id: str, metrics: QueueMetricsModel) -> None:
+        event = MetricsUpdateEvent(payload=MetricsUpdateEventPayload(feed_id=feed_id, metrics=metrics))
+        await self.broadcast(event.model_dump(mode="json"))
+
+    async def broadcast_alert_event(self, *, feed_id: str, alert: AlertModel) -> None:
+        event = AlertFiredEvent(payload=AlertFiredEventPayload(feed_id=feed_id, alert=alert))
+        await self.broadcast(event.model_dump(mode="json"))
+
+    async def broadcast_system_warning(
+        self,
+        *,
+        feed_id: str,
+        code: str,
+        message: str,
+        timestamp: datetime,
+    ) -> None:
+        event = SystemWarningEvent(
+            payload=SystemWarningEventPayload(
+                feed_id=feed_id,
+                code=code,
+                message=message,
+                timestamp=timestamp,
+            )
+        )
+        await self.broadcast(event.model_dump(mode="json"))
+
     @property
     def client_count(self) -> int:
         return len(self._clients)
@@ -533,18 +588,23 @@ class FeedRegistry:
         name: str,
         source: str,
         model_size: ModelSize = "n",
+        zone: ZonePolygon | None = None,
+        log_level: LogLevel = "INFO",
+        webhook_enabled: bool = True,
         establishment_id: int | None = None,
         caisse_id: int | None = None,
         rtsp_username: str | None = None,
         rtsp_password: str | None = None,
         rtsp_transport: Literal["tcp", "udp"] | None = None,
     ) -> VideoFeed:
-        zone = self._load_saved_zone(caisse_id)
+        resolved_zone = zone if zone is not None else self._load_saved_zone(caisse_id)
         now = utc_now()
         record = FeedRecord(
             feed_id=str(uuid4()),
             name=name.strip(),
             source=source.strip(),
+            log_level=log_level,
+            webhook_enabled=webhook_enabled,
             rtsp_username=rtsp_username.strip() or None if rtsp_username else None,
             rtsp_password=rtsp_password.strip() or None if rtsp_password else None,
             rtsp_transport=rtsp_transport,
@@ -554,9 +614,16 @@ class FeedRegistry:
             updated_at=now,
             establishment_id=establishment_id,
             caisse_id=caisse_id,
-            zone=zone,
+            zone=resolved_zone,
         )
         await self._persist_record(record)
+
+        if resolved_zone is not None and caisse_id is not None:
+            await asyncio.to_thread(
+                update_caisse_zone_points,
+                caisse_id,
+                [[point.x, point.y] for point in resolved_zone.points],
+            )
 
         async with self._lock:
             self._feeds[record.feed_id] = record
@@ -608,7 +675,13 @@ class FeedRegistry:
         await self._broadcaster.broadcast_feed_event(action="updated", feed=model)
         return model
 
-    async def start_feed(self, feed_id: str) -> VideoFeed | None:
+    async def start_feed(
+        self,
+        feed_id: str,
+        *,
+        log_level: LogLevel | None = None,
+        webhook_enabled: bool | None = None,
+    ) -> VideoFeed | None:
         async with self._lock:
             record = self._feeds.get(feed_id)
             if record is None:
@@ -622,8 +695,15 @@ class FeedRegistry:
                 record.worker = None
                 record.session_id = None
 
+            if log_level is not None:
+                record.log_level = log_level
+            if webhook_enabled is not None:
+                record.webhook_enabled = webhook_enabled
+
             record.status = "initializing"
             record.last_error = None
+            record.last_warning = None
+            record.last_warning_code = None
             record.updated_at = utc_now()
             initializing_model = record.to_model()
 
@@ -715,7 +795,13 @@ class FeedRegistry:
         await self._broadcaster.broadcast_feed_event(action="updated", feed=stopped_model)
         return stopped_model
 
-    async def restart_feed(self, feed_id: str) -> VideoFeed | None:
+    async def restart_feed(
+        self,
+        feed_id: str,
+        *,
+        log_level: LogLevel | None = None,
+        webhook_enabled: bool | None = None,
+    ) -> VideoFeed | None:
         async with self._lock:
             record = self._feeds.get(feed_id)
             if record is None:
@@ -727,7 +813,101 @@ class FeedRegistry:
         if is_running:
             await self.stop_feed(feed_id)
 
-        return await self.start_feed(feed_id)
+        return await self.start_feed(
+            feed_id,
+            log_level=log_level,
+            webhook_enabled=webhook_enabled,
+        )
+
+    async def launch_feed_batch(
+        self,
+        *,
+        feeds: list[BatchFeedDraft],
+        launch_mode: BatchLaunchMode,
+        log_level: LogLevel,
+        webhook_enabled: bool,
+    ) -> BatchFeedLaunchResponse:
+        results: list[BatchFeedLaunchItemResult] = []
+        created_count = 0
+        started_count = 0
+        failed_count = 0
+
+        for draft in feeds:
+            try:
+                created_feed = await self.create_feed(
+                    name=draft.name,
+                    source=draft.source,
+                    model_size=draft.model_size,
+                    zone=draft.zone,
+                    log_level=log_level,
+                    webhook_enabled=webhook_enabled,
+                    establishment_id=draft.establishment_id,
+                    caisse_id=draft.caisse_id,
+                    rtsp_username=draft.rtsp_username,
+                    rtsp_password=draft.rtsp_password,
+                    rtsp_transport=draft.rtsp_transport,
+                )
+                created_count += 1
+            except Exception as exc:
+                failed_count += 1
+                results.append(
+                    BatchFeedLaunchItemResult(
+                        client_id=draft.client_id,
+                        status="failed",
+                        error=f"Failed to create feed: {exc}",
+                    )
+                )
+                continue
+
+            if launch_mode == "save_only":
+                results.append(
+                    BatchFeedLaunchItemResult(
+                        client_id=draft.client_id,
+                        status="created",
+                        feed=created_feed,
+                    )
+                )
+                continue
+
+            try:
+                started_feed = await self.start_feed(created_feed.feed_id)
+                if started_feed is None:
+                    raise FeedStartError("Feed disappeared during batch start.")
+
+                started_count += 1
+                results.append(
+                    BatchFeedLaunchItemResult(
+                        client_id=draft.client_id,
+                        status="started",
+                        feed=started_feed,
+                    )
+                )
+            except (FeedStartError, FeedStateError, RuntimeError) as exc:
+                failed_count += 1
+                current_feed = await self.get_feed(created_feed.feed_id)
+                results.append(
+                    BatchFeedLaunchItemResult(
+                        client_id=draft.client_id,
+                        status="failed",
+                        feed=current_feed,
+                        error=str(exc),
+                    )
+                )
+
+        return BatchFeedLaunchResponse(
+            launch_mode=launch_mode,
+            runtime={
+                "log_level": log_level,
+                "webhook_enabled": webhook_enabled,
+            },
+            results=results,
+            summary=BatchFeedLaunchSummary(
+                total=len(feeds),
+                created=created_count,
+                started=started_count,
+                failed=failed_count,
+            ),
+        )
 
     async def capture_feed_snapshot(self, feed_id: str) -> FeedSnapshotResult | None:
         async with self._lock:
@@ -822,6 +1002,8 @@ class FeedRegistry:
             "source": record.source,
             "model_size": record.model_size,
             "status": record.status,
+            "log_level": record.log_level,
+            "webhook_enabled": record.webhook_enabled,
             "created_at": record.created_at,
             "updated_at": record.updated_at,
             "rtsp_username": record.rtsp_username,
@@ -846,11 +1028,15 @@ class FeedRegistry:
             original_status = persisted.get("status") or "created"
             status = original_status
             last_error = persisted.get("last_error")
+            last_warning: str | None = None
+            last_warning_code: str | None = None
             updated_at = coerce_datetime(persisted.get("updated_at"), fallback=recovered_at)
 
             if original_status in {"running", "initializing"}:
                 status = "stopped"
-                last_error = RECOVERED_FEED_MESSAGE
+                last_error = None
+                last_warning = RECOVERED_FEED_MESSAGE
+                last_warning_code = "recovery_required"
                 updated_at = recovered_at
 
             record = FeedRecord(
@@ -861,6 +1047,8 @@ class FeedRegistry:
                 status=str(status),
                 created_at=coerce_datetime(persisted.get("created_at"), fallback=recovered_at),
                 updated_at=updated_at,
+                log_level=cast(LogLevel, persisted.get("log_level") or "INFO"),
+                webhook_enabled=bool(persisted.get("webhook_enabled", True)),
                 rtsp_username=persisted.get("rtsp_username") if isinstance(persisted.get("rtsp_username"), str) else None,
                 rtsp_password=persisted.get("rtsp_password") if isinstance(persisted.get("rtsp_password"), str) else None,
                 rtsp_transport=persisted.get("rtsp_transport") if persisted.get("rtsp_transport") in {"tcp", "udp"} else None,
@@ -868,6 +1056,8 @@ class FeedRegistry:
                 caisse_id=int(persisted["caisse_id"]) if persisted.get("caisse_id") is not None else None,
                 zone=coerce_zone_polygon(persisted.get("zone_points")),
                 last_error=str(last_error) if last_error else None,
+                last_warning=last_warning,
+                last_warning_code=last_warning_code,
             )
             self._feeds[record.feed_id] = record
 
@@ -882,6 +1072,8 @@ class FeedRegistry:
 
             record.status = "error"
             record.last_error = message
+            record.last_warning = None
+            record.last_warning_code = None
             record.updated_at = utc_now()
             model = record.to_model()
 
@@ -890,12 +1082,126 @@ class FeedRegistry:
         await self._broadcaster.broadcast_feed_event(action="updated", feed=model)
         return model
 
+    async def _apply_metrics_update(self, feed_id: str, metrics: QueueMetricsModel) -> None:
+        async with self._lock:
+            record = self._feeds.get(feed_id)
+            if record is None:
+                return
+
+            record.latest_metrics = metrics.model_dump(mode="python")
+
+        await self._broadcaster.broadcast_metrics_event(feed_id=feed_id, metrics=metrics)
+
+    async def _apply_alert_fired(self, feed_id: str, alert: AlertModel) -> None:
+        await self._broadcaster.broadcast_alert_event(feed_id=feed_id, alert=alert)
+
+    async def _apply_system_warning(
+        self,
+        feed_id: str,
+        *,
+        code: str,
+        message: str,
+        timestamp: datetime,
+    ) -> None:
+        async with self._lock:
+            record = self._feeds.get(feed_id)
+            if record is not None and code != "queue_unstable":
+                record.last_warning = message
+                record.last_warning_code = code
+
+        await self._broadcaster.broadcast_system_warning(
+            feed_id=feed_id,
+            code=code,
+            message=message,
+            timestamp=timestamp,
+        )
+
+    async def _drain_worker_events(self, feed_id: str, handle: FeedWorkerHandle) -> None:
+        for event in self._read_worker_events(handle):
+            await self._dispatch_worker_event(feed_id, event)
+
+    def _read_worker_events(self, handle: FeedWorkerHandle) -> list[dict[str, Any]]:
+        if handle.event_path is None or not handle.event_path.exists():
+            return []
+
+        try:
+            with handle.event_path.open("r", encoding="utf-8", errors="replace") as stream:
+                stream.seek(handle.event_cursor)
+                chunk = stream.read()
+                handle.event_cursor = stream.tell()
+        except OSError:
+            return []
+
+        if not chunk:
+            return []
+
+        text = f"{handle.event_buffer}{chunk}"
+        handle.event_buffer = ""
+
+        records: list[dict[str, Any]] = []
+        for line in text.splitlines(keepends=True):
+            if not line.endswith(("\n", "\r")):
+                handle.event_buffer = line
+                continue
+
+            stripped = line.strip()
+            if not stripped:
+                continue
+
+            try:
+                parsed = json.loads(stripped)
+            except json.JSONDecodeError:
+                continue
+
+            if isinstance(parsed, dict):
+                records.append(parsed)
+
+        return records
+
+    async def _dispatch_worker_event(self, feed_id: str, event: dict[str, Any]) -> None:
+        event_type = event.get("event")
+        payload = event.get("payload")
+        if not isinstance(event_type, str) or not isinstance(payload, dict):
+            return
+
+        if event_type == "metrics_update":
+            metrics_payload = payload.get("metrics")
+            if not isinstance(metrics_payload, dict):
+                return
+            metrics = QueueMetricsModel.model_validate(metrics_payload)
+            await self._apply_metrics_update(feed_id, metrics)
+            return
+
+        if event_type == "alert_fired":
+            alert_payload = payload.get("alert")
+            if not isinstance(alert_payload, dict):
+                return
+            alert = AlertModel.model_validate(alert_payload)
+            await self._apply_alert_fired(feed_id, alert)
+            return
+
+        if event_type == "system_warning":
+            code = payload.get("code")
+            message = payload.get("message")
+            timestamp = payload.get("timestamp")
+            if not isinstance(code, str) or not isinstance(message, str):
+                return
+            await self._apply_system_warning(
+                feed_id,
+                code=code,
+                message=message,
+                timestamp=coerce_datetime(timestamp),
+            )
+
     async def _monitor_feed(self, feed_id: str, handle: FeedWorkerHandle) -> None:
         while True:
+            await self._drain_worker_events(feed_id, handle)
             exit_code = await asyncio.to_thread(self._runner.poll, handle)
             if exit_code is None:
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(0.25)
                 continue
+
+            await self._drain_worker_events(feed_id, handle)
 
             await asyncio.to_thread(self._runner.close, handle)
 

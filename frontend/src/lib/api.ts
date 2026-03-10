@@ -1,6 +1,9 @@
 export type FeedStatus = "created" | "initializing" | "running" | "stopped" | "error";
 export type ModelSize = "n" | "s" | "m" | "l" | "x";
 export type RTSPTransport = "tcp" | "udp";
+export type LogLevel = "DEBUG" | "INFO" | "WARNING" | "ERROR";
+export type BatchLaunchMode = "save_only" | "create_and_start";
+export type BatchLaunchItemStatus = "created" | "started" | "failed";
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -28,6 +31,17 @@ export interface QueueMetrics {
   queue_stable: boolean;
 }
 
+export interface QueueAlert {
+  alert_type: string;
+  severity: "info" | "warning" | "critical";
+  message: string;
+  threshold_name: string;
+  current_value: number;
+  threshold_value: number;
+  frame_id: number;
+  timestamp: string;
+}
+
 export interface VideoFeed {
   feed_id: string;
   name: string;
@@ -42,6 +56,8 @@ export interface VideoFeed {
   zone: ZonePolygon | null;
   latest_metrics: QueueMetrics | null;
   last_error: string | null;
+  last_warning: string | null;
+  last_warning_code: string | null;
 }
 
 export interface SystemHealth {
@@ -69,7 +85,33 @@ export interface FeedStatusEvent {
   };
 }
 
-export type DashboardSocketEvent = FeedSnapshotEvent | FeedStatusEvent;
+export interface MetricsUpdateEvent {
+  event: "metrics_update";
+  payload: {
+    feed_id: string;
+    metrics: QueueMetrics;
+  };
+}
+
+export interface AlertFiredEvent {
+  event: "alert_fired";
+  payload: {
+    feed_id: string;
+    alert: QueueAlert;
+  };
+}
+
+export interface SystemWarningEvent {
+  event: "system_warning";
+  payload: {
+    feed_id: string;
+    code: string;
+    message: string;
+    timestamp: string;
+  };
+}
+
+export type DashboardSocketEvent = FeedSnapshotEvent | FeedStatusEvent | MetricsUpdateEvent | AlertFiredEvent | SystemWarningEvent;
 
 export interface CreateFeedInput {
   name: string;
@@ -80,6 +122,43 @@ export interface CreateFeedInput {
   rtsp_username?: string | null;
   rtsp_password?: string | null;
   rtsp_transport?: RTSPTransport | null;
+}
+
+export interface BatchRuntimeSettings {
+  webhook_enabled?: boolean;
+  log_level?: LogLevel;
+}
+
+export interface BatchFeedDraft extends CreateFeedInput {
+  client_id: string;
+  zone?: ZonePolygon | null;
+}
+
+export interface BatchFeedLaunchInput {
+  feeds: BatchFeedDraft[];
+  launch_mode?: BatchLaunchMode;
+  runtime?: BatchRuntimeSettings;
+}
+
+export interface BatchFeedLaunchItemResult {
+  client_id: string;
+  status: BatchLaunchItemStatus;
+  feed: VideoFeed | null;
+  error: string | null;
+}
+
+export interface BatchFeedLaunchSummary {
+  total: number;
+  created: number;
+  started: number;
+  failed: number;
+}
+
+export interface BatchFeedLaunchResult {
+  launch_mode: BatchLaunchMode;
+  runtime: Required<BatchRuntimeSettings>;
+  results: BatchFeedLaunchItemResult[];
+  summary: BatchFeedLaunchSummary;
 }
 
 export interface UploadVideoResponse {
@@ -251,6 +330,20 @@ export function createFeed(input: CreateFeedInput): Promise<VideoFeed> {
   return fetchApi<VideoFeed>("/api/feeds", {
     method: "POST",
     body: JSON.stringify(input),
+  });
+}
+
+export function launchFeedBatch(input: BatchFeedLaunchInput): Promise<BatchFeedLaunchResult> {
+  return fetchApi<BatchFeedLaunchResult>("/api/feeds/batch-launch", {
+    method: "POST",
+    body: JSON.stringify({
+      launch_mode: input.launch_mode ?? "create_and_start",
+      runtime: {
+        webhook_enabled: input.runtime?.webhook_enabled ?? true,
+        log_level: input.runtime?.log_level ?? "INFO",
+      },
+      feeds: input.feeds,
+    }),
   });
 }
 

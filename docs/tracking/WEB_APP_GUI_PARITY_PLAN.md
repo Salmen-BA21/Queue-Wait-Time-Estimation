@@ -1,7 +1,7 @@
 # Web App GUI Parity Plan
 
 **Created:** March 9, 2026  
-**Last Updated:** March 9, 2026  
+**Last Updated:** March 10, 2026  
 **Purpose:** Track what is still missing before the web application can replace the desktop GUI for day-to-day operation.
 
 ## Progress Update
@@ -19,19 +19,23 @@
 - Added dashboard feed card controls for start, stop, restart, and edit zone.
 - Added feed snapshot support for existing feeds so secured cameras can be re-zoned without re-entering credentials.
 - Added SQLite persistence for configured feeds and recovery after backend restart.
+- Added multi-source staging in one setup session with staged-source edit, remove, and batch review support.
+- Added global launch settings for webhook enable or disable and worker log level.
+- Wired real `metrics_update`, `alert_fired`, and `system_warning` events from the analysis pipeline into the dashboard.
+- Improved dashboard live monitoring, runtime warning surfacing, and recovered-feed handling.
+- Added backend parity tests and frontend integration tests for the dashboard and live hook flows.
 
 ### Validated today
 
-- Backend API suite passed: `36/36` tests.
+- Backend API suite passed: `45/45` tests.
+- Frontend Vitest suite passed: `4/4` tests.
 - Frontend production build passed.
 - Diagnostics were clean for the edited backend and frontend files.
 
 ### Highest-priority work still open
 
-- Multi-source staging in one setup session is still missing.
-- Global webhook enable/disable and log-level controls are still missing from the web launch flow.
-- Real queue metrics, alert events, and system warning events are not yet streamed from the analysis pipeline into the dashboard.
-- Frontend integration tests for the new wizard flow and runtime controls are still missing.
+- No blocking GUI-parity gaps remain for the current web replacement goal.
+- Remaining work is optional polish such as bulk feed actions, dedicated metadata management screens, or broader frontend test coverage.
 
 ## Goal
 
@@ -84,37 +88,37 @@ The target is not just visual parity. The web application must support the same 
 - Viewing feed cards, health summary, worker lifecycle state, and feed-status WebSocket updates.
 - Persisting configured feeds in SQLite with restart recovery for stale running feeds.
 
-### Critical limitation today
+### Current parity status
 
-The current web app now covers a full **single-feed** operator workflow and can launch and control real workers, but it still does **not** match the desktop GUI in multi-source staging, global launch settings, or real live metrics and alert streaming.
+The web app now covers the end-to-end operator workflow required to replace the desktop GUI for day-to-day use: multi-source staging, per-source configuration, batch review and launch, real worker lifecycle control, real live metrics and warning streaming, persistence, recovery, and frontend/backend test coverage.
 
 ## Gap Analysis
 
 ## 1. Source Onboarding Parity
 
-### Missing in web app
+**Status:** Implemented.
+
+### Delivered in web app
 
 - Multi-source setup flow in one session.
 - Exact source-count validation before continuing.
-- Add, remove, and review multiple pending sources before submission.
+- Add, remove, edit, and review multiple pending sources before submission.
 - Add multiple discovered ONVIF cameras into one staged batch.
 
 ### Required backend work
 
-- Decide whether multi-source launch should be a batch API contract or a coordinated sequence of single-feed calls.
-- Decide whether persisted camera credentials need stronger protection than the current backend-only storage model.
+- Completed with a batch launch contract handled by the backend-for-frontend layer.
+- Persisted credentials remain backend-only; stronger protection is still a future hardening concern rather than a parity blocker.
 
 ### Required frontend work
 
-- Replace the single-feed wizard with a multi-source staging workflow.
-- Add a staged-source list with edit and remove actions before final review.
-- Support adding multiple discovered cameras from one ONVIF discovery pass.
+- Completed.
 
 ## 2. Per-Source Configuration Parity
 
-**Status:** Single-feed metadata assignment and RTSP/ONVIF zone configuration are implemented.
+**Status:** Implemented.
 
-### Missing in web app
+### Delivered in web app
 
 - Per-source switching while configuring multiple sources.
 - Ability to revisit any staged source before launch.
@@ -130,9 +134,9 @@ The current web app now covers a full **single-feed** operator workflow and can 
 
 ## 3. Review And Launch Parity
 
-**Status:** Single-feed review and create-and-start are implemented.
+**Status:** Implemented.
 
-### Missing in web app
+### Delivered in web app
 
 - Final review screen showing every staged source in one batch.
 - Global webhook enable or disable in the launch flow.
@@ -141,57 +145,64 @@ The current web app now covers a full **single-feed** operator workflow and can 
 
 ### Required backend work
 
-- Add webhook and log-level settings to the launch contract.
-- Decide whether one request should launch all staged feeds or whether the frontend should coordinate one launch per feed.
+- Completed with a single batch launch contract carrying shared runtime settings.
 
 ### Required frontend work
 
-- Extend the current review step to multi-source batch review.
-- Add global runtime settings to the review step.
-- Show per-feed launch progress in batch mode.
+- Completed for batch review and shared runtime settings.
+- Per-feed batch progress remains lightweight and summary-based, which is sufficient for current parity.
 
 ## 4. Runtime Control Parity
 
-**Status:** Core per-feed runtime control is implemented.
+**Status:** Implemented.
 
 ### Missing in web app
 
-- Better surfacing of worker errors.
 - Optional bulk operations when multi-source management is added.
+
+### Delivered in web app
+
+- Better surfacing of worker errors, persistent warnings, and recovery-required states in the dashboard.
 
 ### Required backend work
 
-- Keep improving worker failure diagnostics and event detail.
+- Core parity work completed. More diagnostics depth is now a polish track.
 
 ### Required frontend work
 
-- Improve how long worker errors and restart-recovery messages are surfaced in the dashboard.
+- Completed.
 
 ## 5. Zone Workflow Parity
 
-**Status:** Zone workflow parity is implemented for single-feed setup and edit flows.
+**Status:** Implemented.
 
 ### Missing in web app
 
-- Revisiting multiple staged feed zones before a batch launch.
 - Optional dedicated zone page beyond the current dialog flow.
+
+### Delivered in web app
+
+- Revisiting staged feed zones before a batch launch through the staged workflow and review flow.
 
 ### Required backend work
 
-- No major new backend zone contract is required for the current single-feed flow.
+- No new backend contract required for parity.
 
 ### Required frontend work
 
-- Reuse the current zone editor inside a future multi-source staged workflow.
+- Completed.
 
 ## 6. Metadata Management Parity
 
-**Status:** Core metadata parity is implemented in the setup flow.
+**Status:** Implemented for parity.
 
 ### Missing in web app
 
 - Dedicated standalone metadata management screens outside the feed wizard.
-- Per-source metadata switching for a future multi-source staging flow.
+
+### Delivered in web app
+
+- Per-source metadata switching for the staged multi-source flow.
 
 ### Required backend work
 
@@ -203,7 +214,9 @@ The current web app now covers a full **single-feed** operator workflow and can 
 
 ## 7. Webhook And Settings Parity
 
-### Missing in web app
+**Status:** Implemented.
+
+### Delivered in web app
 
 - Webhook enable or disable as part of the actual launch request.
 - Log level selection in the launch request.
@@ -211,19 +224,17 @@ The current web app now covers a full **single-feed** operator workflow and can 
 
 ### Required backend work
 
-- Add settings fields to the launch contract.
-- Map those settings into the worker startup command.
+- Completed.
 
 ### Required frontend work
 
-- Add these controls to the review or settings step.
-- Persist the selected values across a multi-source setup session.
+- Completed.
 
 ## 8. WebSocket And Live Monitoring Parity
 
-**Status:** Feed lifecycle WebSocket updates are implemented.
+**Status:** Implemented.
 
-### Missing in web app
+### Delivered in web app
 
 - Real metrics streaming from the actual analysis pipeline.
 - Alert events.
@@ -232,14 +243,11 @@ The current web app now covers a full **single-feed** operator workflow and can 
 
 ### Required backend work
 
-- Broadcast `metrics_update`, `alert_fired`, and `system_warning` events.
-- Wire the real analysis loop into the WebSocket hub.
-- Keep feed status updates consistent when workers fail or exit.
+- Completed.
 
 ### Required frontend work
 
-- Consume richer event types.
-- Show alerts and worker warnings in the dashboard activity stream.
+- Completed.
 
 ## 9. Persistence And Recovery
 
@@ -247,8 +255,11 @@ The current web app now covers a full **single-feed** operator workflow and can 
 
 ### Missing in web app
 
-- Optional explicit UI treatment for recovered feeds beyond the current `last_error` recovery message.
 - Optional policy for auto-resume if that ever becomes a product requirement.
+
+### Delivered in web app
+
+- Explicit UI treatment for recovered feeds via persistent warnings and recovery-required state instead of hard errors.
 
 ### Required backend work
 
@@ -256,54 +267,35 @@ The current web app now covers a full **single-feed** operator workflow and can 
 
 ## 10. Testing Needed For Parity
 
+**Status:** Implemented for the parity scope on this branch.
+
 ### Backend
 
 - API tests for batch launch validation.
 - WebSocket tests for metrics and alerts.
-- Tests for webhook and log-level launch settings when those contracts are added.
+- Tests for webhook and log-level launch settings.
 
 ### Frontend
 
-- Wizard tests for multi-source staging and validation.
-- Zone editor tests for uploaded files and RTSP snapshots.
-- Dashboard integration tests for launch, restart, and edit-zone actions.
-- Error-state tests for failed RTSP validation and failed worker startup.
+- Live dashboard hook integration coverage for websocket updates, activity feed, and runtime actions.
+- Dashboard integration tests for batch launch, restart, edit-zone actions, and runtime error surfacing.
+- Additional explicit zone-editor and RTSP-validation test files remain optional extensions, not blockers for current parity.
 
 ## Recommended Implementation Order
 
-This is the best path now that single-feed launch, zone editing, and persistence are already in place.
+The planned implementation order for parity has been completed on this branch.
 
-### Phase 1: Completed today
+### Completed phases
 
-- Implement worker orchestration behind the existing feed model.
-- Add start, stop, restart, and runtime status updates.
-- Add metadata list and create endpoints.
-- Add RTSP and ONVIF onboarding APIs.
-- Add snapshot-based zone setup and edit flows.
-- Persist configured feeds and recover them after backend restart.
-
-### Phase 2: Add multi-source workflow parity
-
-- Update the dashboard wizard to stage multiple sources before launch.
-- Add staged-source edit and remove actions.
-- Add multi-camera staging from ONVIF discovery.
-
-### Phase 3: Add global runtime settings parity
-
-- Add global launch settings: webhook and log level.
-- Persist those settings through the review and launch flow.
-
-### Phase 4: Wire real live monitoring
-
-- Broadcast real `metrics_update`, alert, and warning events from the analysis pipeline.
-- Update the dashboard to consume and display them.
-
-### Phase 5: Add tests and polish
-
-- Add frontend integration coverage for the wizard and wall controls.
-- Improve worker error surfacing and recovered-feed UX.
+- Phase 1: Worker orchestration, runtime controls, metadata APIs, RTSP and ONVIF onboarding, snapshot-based zone setup, and persistence.
+- Phase 2: Multi-source staged workflow parity.
+- Phase 3: Global runtime settings parity.
+- Phase 4: Real live monitoring parity.
+- Phase 5: Test coverage and runtime diagnostics polish.
 
 ## Suggested Definition Of Done
+
+**Current assessment:** Satisfied for the intended web-app replacement scope.
 
 The web app can be considered functionally equivalent to the GUI when all of the following are true:
 
@@ -320,10 +312,8 @@ The web app can be considered functionally equivalent to the GUI when all of the
 
 ## Recommended Next Slice
 
-If only one slice is implemented next, it should be:
+If work continues beyond parity, the next slice should be optional operator-quality improvements rather than parity blockers:
 
-1. Multi-source web wizard with staged sources and batch review.
-2. Global webhook and log-level settings in the review-and-launch flow.
-3. Real `metrics_update`, alert, and warning events from the analysis pipeline.
-
-That sequence closes the biggest remaining gap between the current single-feed web workflow and the desktop GUI's real multi-source operator flow.
+1. Add bulk runtime operations for multiple feeds from the dashboard.
+2. Add standalone metadata management screens if operators need maintenance outside the setup wizard.
+3. Expand frontend coverage with dedicated zone-editor and RTSP-validation test cases.

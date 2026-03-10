@@ -77,6 +77,8 @@ def _create_current_schema(cursor: sqlite3.Cursor) -> None:
             source TEXT NOT NULL,
             model_size TEXT NOT NULL DEFAULT 'n',
             status TEXT NOT NULL DEFAULT 'created',
+            log_level TEXT NOT NULL DEFAULT 'INFO',
+            webhook_enabled INTEGER NOT NULL DEFAULT 1,
             rtsp_username TEXT,
             rtsp_password TEXT,
             rtsp_transport TEXT,
@@ -90,6 +92,22 @@ def _create_current_schema(cursor: sqlite3.Cursor) -> None:
             FOREIGN KEY (caisse_id) REFERENCES caisses (id) ON DELETE SET NULL
         )
     """)
+
+
+def _migrate_feed_configs_schema(cursor: sqlite3.Cursor) -> None:
+    """Add newly required feed config columns for existing databases."""
+    if not _table_exists(cursor, "feed_configs"):
+        return
+
+    columns = _get_table_columns(cursor, "feed_configs")
+    if "log_level" not in columns:
+        cursor.execute(
+            "ALTER TABLE feed_configs ADD COLUMN log_level TEXT NOT NULL DEFAULT 'INFO'"
+        )
+    if "webhook_enabled" not in columns:
+        cursor.execute(
+            "ALTER TABLE feed_configs ADD COLUMN webhook_enabled INTEGER NOT NULL DEFAULT 1"
+        )
 
 
 def _migrate_legacy_sections_to_caisses(cursor: sqlite3.Cursor) -> None:
@@ -153,6 +171,7 @@ def init_db() -> None:
 
     cursor.execute("PRAGMA foreign_keys = OFF")
     _create_current_schema(cursor)
+    _migrate_feed_configs_schema(cursor)
     _migrate_legacy_sections_to_caisses(cursor)
     _migrate_legacy_video_sessions(cursor)
     cursor.execute("PRAGMA foreign_keys = ON")
@@ -413,6 +432,8 @@ def upsert_feed_config(
     source: str,
     model_size: str,
     status: str,
+    log_level: str = "INFO",
+    webhook_enabled: bool = True,
     created_at: datetime,
     updated_at: datetime,
     rtsp_username: Optional[str] = None,
@@ -436,6 +457,8 @@ def upsert_feed_config(
                 source,
                 model_size,
                 status,
+                log_level,
+                webhook_enabled,
                 rtsp_username,
                 rtsp_password,
                 rtsp_transport,
@@ -445,12 +468,14 @@ def upsert_feed_config(
                 last_error,
                 created_at,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(feed_id) DO UPDATE SET
                 name = excluded.name,
                 source = excluded.source,
                 model_size = excluded.model_size,
                 status = excluded.status,
+                log_level = excluded.log_level,
+                webhook_enabled = excluded.webhook_enabled,
                 rtsp_username = excluded.rtsp_username,
                 rtsp_password = excluded.rtsp_password,
                 rtsp_transport = excluded.rtsp_transport,
@@ -466,6 +491,8 @@ def upsert_feed_config(
                 source,
                 model_size,
                 status,
+                log_level,
+                int(webhook_enabled),
                 rtsp_username,
                 rtsp_password,
                 rtsp_transport,
@@ -495,6 +522,8 @@ def get_feed_configs() -> List[Dict[str, Any]]:
                 source,
                 model_size,
                 status,
+                log_level,
+                webhook_enabled,
                 rtsp_username,
                 rtsp_password,
                 rtsp_transport,

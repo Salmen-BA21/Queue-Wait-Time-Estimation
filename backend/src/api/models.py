@@ -9,9 +9,13 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 FeedStatus = Literal["created", "initializing", "running", "stopped", "error"]
-EventType = Literal["snapshot", "feed_status", "metrics_update", "system_warning"]
+EventType = Literal["snapshot", "feed_status", "metrics_update", "alert_fired", "system_warning"]
 ModelSize = Literal["n", "s", "m", "l", "x"]
 RTSPTransport = Literal["tcp", "udp"]
+LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
+BatchLaunchMode = Literal["save_only", "create_and_start"]
+BatchLaunchItemStatus = Literal["created", "started", "failed"]
+AlertSeverity = Literal["info", "warning", "critical"]
 
 T = TypeVar("T")
 
@@ -112,6 +116,19 @@ class QueueMetricsModel(BaseModel):
     queue_stable: bool
 
 
+class AlertModel(BaseModel):
+    """Frontend-facing alert payload broadcast from the analysis pipeline."""
+
+    alert_type: str
+    severity: AlertSeverity
+    message: str
+    threshold_name: str
+    current_value: float
+    threshold_value: float
+    frame_id: int = Field(ge=0)
+    timestamp: datetime
+
+
 class VideoFeed(BaseModel):
     """Configured feed plus its latest runtime state."""
 
@@ -128,6 +145,8 @@ class VideoFeed(BaseModel):
     zone: ZonePolygon | None = None
     latest_metrics: QueueMetricsModel | None = None
     last_error: str | None = None
+    last_warning: str | None = None
+    last_warning_code: str | None = None
 
 
 class CreateFeedRequest(BaseModel):
@@ -152,6 +171,63 @@ class CreateFeedRequest(BaseModel):
         if self.rtsp_password and not self.rtsp_username:
             raise ValueError("RTSP username is required when RTSP password is provided.")
         return self
+
+
+class BatchRuntimeSettings(BaseModel):
+    """Shared runtime options applied to every launched feed in a staged batch."""
+
+    webhook_enabled: bool = True
+    log_level: LogLevel = "INFO"
+
+
+class BatchFeedDraft(CreateFeedRequest):
+    """Single staged feed payload used by the future multi-source review flow."""
+
+    client_id: str = Field(min_length=1, max_length=120)
+    zone: ZonePolygon | None = None
+
+    @field_validator("client_id")
+    @classmethod
+    def validate_client_id(cls, value: str) -> str:
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("Client id must not be blank.")
+        return trimmed
+
+
+class BatchFeedLaunchRequest(BaseModel):
+    """Contract for creating and optionally starting multiple staged feeds at once."""
+
+    feeds: list[BatchFeedDraft] = Field(min_length=1, max_length=25)
+    launch_mode: BatchLaunchMode = "create_and_start"
+    runtime: BatchRuntimeSettings = Field(default_factory=BatchRuntimeSettings)
+
+
+class BatchFeedLaunchItemResult(BaseModel):
+    """Per-feed result returned from a batch launch attempt."""
+
+    client_id: str = Field(min_length=1, max_length=120)
+    status: BatchLaunchItemStatus
+    feed: VideoFeed | None = None
+    error: str | None = None
+
+
+class BatchFeedLaunchSummary(BaseModel):
+    """Aggregated counters for a batch launch response."""
+
+    total: int = Field(ge=0)
+    created: int = Field(ge=0)
+    started: int = Field(ge=0)
+    failed: int = Field(ge=0)
+
+
+class BatchFeedLaunchResponse(BaseModel):
+    """Response payload for the planned multi-source launch endpoint."""
+
+    launch_mode: BatchLaunchMode
+    runtime: BatchRuntimeSettings
+    results: list[BatchFeedLaunchItemResult] = Field(default_factory=list)
+    summary: BatchFeedLaunchSummary
 
 
 class Establishment(BaseModel):
@@ -352,3 +428,47 @@ class FeedStatusEvent(BaseModel):
 
     event: Literal["feed_status"] = "feed_status"
     payload: FeedStatusEventPayload
+
+
+class MetricsUpdateEventPayload(BaseModel):
+    """Latest metrics snapshot for a running feed."""
+
+    feed_id: str
+    metrics: QueueMetricsModel
+
+
+class MetricsUpdateEvent(BaseModel):
+    """WebSocket event carrying queue metrics updates."""
+
+    event: Literal["metrics_update"] = "metrics_update"
+    payload: MetricsUpdateEventPayload
+
+
+class AlertFiredEventPayload(BaseModel):
+    """Alert raised by the queue analysis pipeline."""
+
+    feed_id: str
+    alert: AlertModel
+
+
+class AlertFiredEvent(BaseModel):
+    """WebSocket event carrying threshold alerts."""
+
+    event: Literal["alert_fired"] = "alert_fired"
+    payload: AlertFiredEventPayload
+
+
+class SystemWarningEventPayload(BaseModel):
+    """Non-fatal warning emitted by the worker pipeline."""
+
+    feed_id: str
+    code: str
+    message: str
+    timestamp: datetime
+
+
+class SystemWarningEvent(BaseModel):
+    """WebSocket event carrying worker warnings."""
+
+    event: Literal["system_warning"] = "system_warning"
+    payload: SystemWarningEventPayload

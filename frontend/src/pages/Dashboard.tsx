@@ -33,7 +33,7 @@ import {
 import { toast } from "sonner";
 
 import { ModelSelectionDialog } from "@/components/dashboard/ModelSelectionDialog";
-import { ReviewLaunchDialog } from "@/components/dashboard/ReviewLaunchDialog";
+import { ReviewLaunchDialog, type ReviewLaunchItem } from "@/components/dashboard/ReviewLaunchDialog";
 import { ZoneSelectionDialog } from "@/components/dashboard/ZoneSelectionDialog";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -54,8 +54,10 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLiveDashboard } from "@/hooks/use-live-dashboard";
 import type {
+  BatchFeedDraft,
   Caisse,
   Establishment,
+  LogLevel,
   ModelSize,
   ONVIFCameraTestResult,
   ONVIFDevice,
@@ -72,6 +74,7 @@ import {
   createEstablishment,
   discoverOnvifDevices,
   getFeedSnapshot,
+  launchFeedBatch,
   listCaisses,
   listEstablishments,
   resolveApiUrl,
@@ -84,6 +87,33 @@ import {
 type SetupStep = "source" | "zone" | "model" | "review" | null;
 type SourceMode = "rtsp" | "file" | "onvif";
 type FeedAction = "start" | "stop" | "restart";
+
+interface StagedFeedDraft {
+  clientId: string;
+  feedName: string;
+  sourceMode: SourceMode;
+  source: string;
+  uploadedFile: File | null;
+  zonePoints: ZonePoint[];
+  modelSize: ModelSize;
+  establishmentId: number | null;
+  establishmentName: string | null;
+  caisseId: number | null;
+  caisseName: string | null;
+  hasSavedCaisseZone: boolean;
+  rtspUsername: string;
+  rtspPassword: string;
+  rtspTransport: RTSPTransport;
+  rtspTestResult: RTSPConnectionTestResult | null;
+  onvifTimeout: string;
+  onvifUsername: string;
+  onvifPassword: string;
+  onvifTransport: RTSPTransport;
+  onvifDevices: ONVIFDevice[];
+  selectedOnvifDeviceKey: string;
+  onvifStreams: ONVIFStream[];
+  onvifTestResult: ONVIFCameraTestResult | null;
+}
 
 const DEFAULT_ONVIF_TIMEOUT = "5";
 const UNASSIGNED_SELECT_VALUE = "__unassigned__";
@@ -105,12 +135,81 @@ function formatWaitTime(waitTimeSeconds: number): string {
   return `${(waitTimeSeconds / 60).toFixed(1)}m`;
 }
 
+function formatRatePerMinute(rate: number): string {
+  const perMinute = rate * 60;
+  return `${perMinute >= 10 ? perMinute.toFixed(1) : perMinute.toFixed(2)}/min`;
+}
+
+function getUncertaintyTone(level: string): "default" | "secondary" | "destructive" {
+  if (level === "High") {
+    return "destructive";
+  }
+  if (level === "Medium") {
+    return "secondary";
+  }
+  return "default";
+}
+
+function getActivityCardClassName(severity: "info" | "warning" | "success" | "critical"): string {
+  if (severity === "critical") {
+    return "border-destructive/40 bg-destructive/10";
+  }
+  if (severity === "warning") {
+    return "border-amber-500/40 bg-amber-500/10";
+  }
+  if (severity === "success") {
+    return "border-emerald-500/30 bg-emerald-500/10";
+  }
+  return "border-border bg-card";
+}
+
+function getActivityTextClassName(severity: "info" | "warning" | "success" | "critical"): string {
+  if (severity === "critical") {
+    return "text-destructive";
+  }
+  if (severity === "warning") {
+    return "text-amber-100";
+  }
+  if (severity === "success") {
+    return "text-emerald-100";
+  }
+  return "text-foreground";
+}
+
+function isRecoveryWarning(feed: VideoFeed): boolean {
+  return feed.last_warning_code === "recovery_required";
+}
+
 function getFileLabel(file: File | null): string {
   if (!file) {
     return "No video selected yet";
   }
   const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
   return `${file.name} (${sizeMb} MB)`;
+}
+
+function getSuggestedFeedNameFromFile(file: File): string {
+  return file.name.replace(/\.[^.]+$/, "") || file.name;
+}
+
+function getLocalFileKey(file: File): string {
+  return `${file.name}:${file.size}:${file.lastModified}`;
+}
+
+function dedupeLocalFiles(files: File[], excludedKeys: string[] = []): File[] {
+  const seen = new Set(excludedKeys);
+  const deduped: File[] = [];
+
+  for (const file of files) {
+    const key = getLocalFileKey(file);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    deduped.push(file);
+  }
+
+  return deduped;
 }
 
 function formatResolution(result: {
@@ -143,6 +242,64 @@ function suggestFeedNameFromRtspUrl(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+function createDraftId(): string {
+  return `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getDraftSelectedOnvifDevice(draft: StagedFeedDraft): ONVIFDevice | null {
+  return draft.onvifDevices.find((device) => getOnvifDeviceKey(device) === draft.selectedOnvifDeviceKey) ?? null;
+}
+
+function getDraftSourceLabel(draft: StagedFeedDraft): string {
+  if (draft.sourceMode === "file") {
+    return draft.uploadedFile ? draft.uploadedFile.name : "No video selected";
+  }
+
+  if (draft.sourceMode === "onvif") {
+    const device = getDraftSelectedOnvifDevice(draft);
+    return device ? `${device.name} (${device.ip})` : draft.source || "No ONVIF camera selected";
+  }
+
+  return draft.source.trim() || "No RTSP URL provided";
+}
+
+function getDraftSourceDetail(draft: StagedFeedDraft): string {
+  if (draft.sourceMode === "file") {
+    return draft.uploadedFile
+      ? `The file will be uploaded to the backend and the ${draft.zonePoints.length}-point queue zone will be saved before launch.`
+      : "Choose a local video file before reviewing the configuration.";
+  }
+
+  if (draft.sourceMode === "rtsp") {
+    if (draft.rtspTestResult?.connected) {
+      return `${formatResolution(draft.rtspTestResult)} at ${(draft.rtspTestResult.fps ?? 0).toFixed(1)} FPS via ${draft.rtspTransport.toUpperCase()}.`;
+    }
+    return `Manual RTSP source using ${draft.rtspTransport.toUpperCase()} transport.`;
+  }
+
+  if (draft.onvifTestResult?.connected) {
+    return `${draft.source || "Resolved stream"} · ${formatResolution(draft.onvifTestResult)} at ${(draft.onvifTestResult.fps ?? 0).toFixed(1)} FPS via ${draft.onvifTransport.toUpperCase()}.`;
+  }
+
+  return draft.source.trim() || "Resolve a stream from the selected ONVIF camera before launching.";
+}
+
+function toReviewLaunchItem(draft: StagedFeedDraft, isCurrentDraft = false): ReviewLaunchItem {
+  return {
+    clientId: draft.clientId,
+    feedName: draft.feedName,
+    sourceMode: draft.sourceMode,
+    sourceLabel: getDraftSourceLabel(draft),
+    sourceDetail: getDraftSourceDetail(draft),
+    modelSize: draft.modelSize,
+    zonePointCount: draft.zonePoints.length,
+    establishmentName: draft.establishmentName,
+    caisseName: draft.caisseName,
+    hasSavedCaisseZone: draft.hasSavedCaisseZone,
+    isCurrentDraft,
+  };
 }
 
 function FeedTransportSurface({
@@ -217,10 +374,14 @@ function FeedTransportSurface({
 
 export default function Dashboard() {
   const [setupStep, setSetupStep] = useState<SetupStep>(null);
+  const [targetSourceCount, setTargetSourceCount] = useState("1");
+  const [stagedFeeds, setStagedFeeds] = useState<StagedFeedDraft[]>([]);
+  const [currentDraftId, setCurrentDraftId] = useState(() => createDraftId());
   const [feedName, setFeedName] = useState("");
   const [feedSource, setFeedSource] = useState("");
   const [sourceMode, setSourceMode] = useState<SourceMode>("file");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [queuedLocalFiles, setQueuedLocalFiles] = useState<File[]>([]);
   const [zonePoints, setZonePoints] = useState<ZonePoint[]>([]);
   const [editingFeedZone, setEditingFeedZone] = useState<VideoFeed | null>(null);
   const [editingZonePoints, setEditingZonePoints] = useState<ZonePoint[]>([]);
@@ -234,6 +395,8 @@ export default function Dashboard() {
   const [isCreateCaisseDialogOpen, setIsCreateCaisseDialogOpen] = useState(false);
   const [newEstablishmentName, setNewEstablishmentName] = useState("");
   const [newCaisseName, setNewCaisseName] = useState("");
+  const [batchLogLevel, setBatchLogLevel] = useState<LogLevel>("INFO");
+  const [batchWebhookEnabled, setBatchWebhookEnabled] = useState(true);
   const [rtspUsername, setRtspUsername] = useState("");
   const [rtspPassword, setRtspPassword] = useState("");
   const [rtspTransport, setRtspTransport] = useState<RTSPTransport>("tcp");
@@ -256,7 +419,6 @@ export default function Dashboard() {
     feeds,
     feedsQuery,
     systemHealthQuery,
-    createFeedMutation,
     updateZoneMutation,
     startFeedMutation,
     stopFeedMutation,
@@ -264,6 +426,13 @@ export default function Dashboard() {
     activity,
     derived,
   } = useLiveDashboard();
+  const batchLaunchMutation = useMutation({
+    mutationFn: launchFeedBatch,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["feeds"] });
+      await queryClient.invalidateQueries({ queryKey: ["system-health"] });
+    },
+  });
   const establishmentsQuery = useQuery({
     queryKey: ["establishments"],
     queryFn: listEstablishments,
@@ -298,8 +467,8 @@ export default function Dashboard() {
   });
 
   const systemHealth = systemHealthQuery.data;
-  const establishments = establishmentsQuery.data ?? [];
-  const caisses = caissesQuery.data ?? [];
+  const establishments = useMemo(() => establishmentsQuery.data ?? [], [establishmentsQuery.data]);
+  const caisses = useMemo(() => caissesQuery.data ?? [], [caissesQuery.data]);
   const emptyState = useMemo(
     () => !feedsQuery.isLoading && feeds.length === 0,
     [feeds.length, feedsQuery.isLoading],
@@ -317,10 +486,73 @@ export default function Dashboard() {
     [caisses, selectedCaisseId],
   );
 
-  const isSavingSetup = isFinalizingSetup || createFeedMutation.isPending || updateZoneMutation.isPending;
-  const isReviewSubmitting = isSavingSetup || startFeedMutation.isPending;
+  const isSavingSetup = isFinalizingSetup || batchLaunchMutation.isPending || updateZoneMutation.isPending;
+  const isReviewSubmitting = isSavingSetup;
   const isTestingCameraSource = isTestingRtsp || isDiscoveringOnvif || isResolvingOnvifStreams || isTestingOnvif;
   const isSavingMetadata = createEstablishmentMutation.isPending || createCaisseMutation.isPending;
+  const liveAttentionItems = useMemo(() => {
+    const items: Array<{
+      id: string;
+      title: string;
+      detail: string;
+      tone: "critical" | "warning";
+    }> = [];
+    const seenFeedIds = new Set<string>();
+
+    for (const feed of derived.liveMonitoring.feedsWithRuntimeErrors) {
+      if (seenFeedIds.has(feed.feed_id)) {
+        continue;
+      }
+      seenFeedIds.add(feed.feed_id);
+      items.push({
+        id: `runtime-${feed.feed_id}`,
+        title: feed.name,
+        detail: feed.last_error ?? "Worker reported an error and needs operator attention.",
+        tone: "critical",
+      });
+    }
+
+    for (const feed of derived.liveMonitoring.feedsWithRuntimeWarnings) {
+      if (seenFeedIds.has(feed.feed_id) || !feed.last_warning) {
+        continue;
+      }
+      seenFeedIds.add(feed.feed_id);
+      items.push({
+        id: `warning-${feed.feed_id}`,
+        title: feed.name,
+        detail: feed.last_warning,
+        tone: "warning",
+      });
+    }
+
+    for (const feed of derived.liveMonitoring.unstableFeeds) {
+      if (seenFeedIds.has(feed.feed_id) || !feed.latest_metrics) {
+        continue;
+      }
+      seenFeedIds.add(feed.feed_id);
+      items.push({
+        id: `unstable-${feed.feed_id}`,
+        title: feed.name,
+        detail: `Queue is unstable. Arrival ${formatRatePerMinute(feed.latest_metrics.arrival_rate)} exceeds service ${formatRatePerMinute(feed.latest_metrics.service_rate)}.`,
+        tone: "warning",
+      });
+    }
+
+    for (const feed of derived.liveMonitoring.highUncertaintyFeeds) {
+      if (seenFeedIds.has(feed.feed_id) || !feed.latest_metrics) {
+        continue;
+      }
+      seenFeedIds.add(feed.feed_id);
+      items.push({
+        id: `uncertainty-${feed.feed_id}`,
+        title: feed.name,
+        detail: `High uncertainty on live estimates. Queue size ${feed.latest_metrics.people_in_zone}, wait ${feed.latest_metrics.wait_time_seconds === null ? "pending" : formatWaitTime(feed.latest_metrics.wait_time_seconds)}.`,
+        tone: "warning",
+      });
+    }
+
+    return items.slice(0, 6);
+  }, [derived.liveMonitoring]);
 
   useEffect(() => {
     if (setupStep === null || zonePoints.length > 0 || !selectedCaisse?.zone?.points?.length) {
@@ -363,6 +595,102 @@ export default function Dashboard() {
     return feedSource.trim() || "Resolve a stream from the selected ONVIF camera before launching.";
   }, [feedSource, onvifTestResult, onvifTransport, rtspTestResult, rtspTransport, sourceMode, uploadedFile, zonePoints.length]);
 
+  const parsedTargetSourceCount = useMemo(() => {
+    const parsed = Number.parseInt(targetSourceCount, 10);
+    if (Number.isNaN(parsed) || parsed < 1) {
+      return 1;
+    }
+    return parsed;
+  }, [targetSourceCount]);
+
+  const buildCurrentDraft = useCallback((): StagedFeedDraft | null => {
+    if (!feedName.trim()) {
+      return null;
+    }
+
+    if (sourceMode === "file" && !uploadedFile) {
+      return null;
+    }
+
+    if (sourceMode === "rtsp" && (!feedSource.trim() || !rtspTestResult?.connected)) {
+      return null;
+    }
+
+    if (sourceMode === "onvif" && (!feedSource.trim() || !selectedOnvifDevice || !onvifTestResult?.connected)) {
+      return null;
+    }
+
+    return {
+      clientId: currentDraftId,
+      feedName: feedName.trim(),
+      sourceMode,
+      source: feedSource.trim(),
+      uploadedFile,
+      zonePoints,
+      modelSize: selectedModel,
+      establishmentId: selectedEstablishmentId,
+      establishmentName: selectedEstablishment?.name ?? null,
+      caisseId: selectedCaisseId,
+      caisseName: selectedCaisse?.name ?? null,
+      hasSavedCaisseZone: Boolean(selectedCaisse?.zone),
+      rtspUsername,
+      rtspPassword,
+      rtspTransport,
+      rtspTestResult,
+      onvifTimeout,
+      onvifUsername,
+      onvifPassword,
+      onvifTransport,
+      onvifDevices,
+      selectedOnvifDeviceKey,
+      onvifStreams,
+      onvifTestResult,
+    };
+  }, [
+    currentDraftId,
+    feedName,
+    feedSource,
+    onvifDevices,
+    onvifPassword,
+    onvifStreams,
+    onvifTestResult,
+    onvifTimeout,
+    onvifTransport,
+    onvifUsername,
+    rtspPassword,
+    rtspTestResult,
+    rtspTransport,
+    rtspUsername,
+    selectedCaisse?.name,
+    selectedCaisse?.zone,
+    selectedCaisseId,
+    selectedEstablishment?.name,
+    selectedEstablishmentId,
+    selectedModel,
+    selectedOnvifDevice,
+    selectedOnvifDeviceKey,
+    sourceMode,
+    uploadedFile,
+    zonePoints,
+  ]);
+
+  const currentReviewDraft = useMemo(
+    () => (setupStep === "review" ? buildCurrentDraft() : null),
+    [buildCurrentDraft, setupStep],
+  );
+
+  const reviewItems = useMemo(
+    () => [
+      ...stagedFeeds.map((draft) => toReviewLaunchItem(draft)),
+      ...(currentReviewDraft ? [toReviewLaunchItem(currentReviewDraft, true)] : []),
+    ],
+    [currentReviewDraft, stagedFeeds],
+  );
+
+  const stagedSourceCount = stagedFeeds.length + (currentReviewDraft ? 1 : 0);
+  const remainingSourceCount = Math.max(parsedTargetSourceCount - stagedFeeds.length, 0);
+  const canSubmitBatch = stagedSourceCount === parsedTargetSourceCount;
+
   const canContinueSourceStep = useMemo(() => {
     if (!feedName.trim()) {
       return false;
@@ -379,15 +707,15 @@ export default function Dashboard() {
     return Boolean(selectedOnvifDevice && feedSource.trim() && onvifTestResult?.connected);
   }, [feedName, feedSource, onvifTestResult, rtspTestResult, selectedOnvifDevice, sourceMode, uploadedFile]);
 
-  const resetRtspState = () => {
+  const resetRtspState = useCallback(() => {
     setRtspUsername("");
     setRtspPassword("");
     setRtspTransport("tcp");
     setRtspTestResult(null);
     setIsTestingRtsp(false);
-  };
+  }, []);
 
-  const resetOnvifState = () => {
+  const resetOnvifState = useCallback(() => {
     setOnvifTimeout(DEFAULT_ONVIF_TIMEOUT);
     setOnvifUsername("");
     setOnvifPassword("");
@@ -399,28 +727,66 @@ export default function Dashboard() {
     setIsDiscoveringOnvif(false);
     setIsResolvingOnvifStreams(false);
     setIsTestingOnvif(false);
-  };
+  }, []);
+
+  const resetCurrentDraft = useCallback(({
+    preserveSourceMode = false,
+    preserveOnvifDiscovery = false,
+    nextUploadedFile = null,
+    nextQueuedLocalFiles,
+  }: {
+    preserveSourceMode?: boolean;
+    preserveOnvifDiscovery?: boolean;
+    nextUploadedFile?: File | null;
+    nextQueuedLocalFiles?: File[];
+  } = {}) => {
+    const nextSourceMode = preserveSourceMode ? sourceMode : "file";
+    setFeedName("");
+    setFeedSource("");
+    setSourceMode(nextSourceMode);
+    setUploadedFile(nextSourceMode === "file" ? nextUploadedFile : null);
+    setQueuedLocalFiles(nextSourceMode === "file" ? nextQueuedLocalFiles ?? [] : []);
+    setZonePoints([]);
+    setSelectedModel("n");
+    setSelectedEstablishmentId(null);
+    setSelectedCaisseId(null);
+    if (nextSourceMode === "file" && nextUploadedFile) {
+      setFeedName(getSuggestedFeedNameFromFile(nextUploadedFile));
+    }
+    if (preserveSourceMode && sourceMode === "rtsp") {
+      setRtspTestResult(null);
+      setIsTestingRtsp(false);
+    } else {
+      resetRtspState();
+    }
+    if (preserveOnvifDiscovery) {
+      setSelectedOnvifDeviceKey("");
+      setOnvifStreams([]);
+      setOnvifTestResult(null);
+      setIsDiscoveringOnvif(false);
+      setIsResolvingOnvifStreams(false);
+      setIsTestingOnvif(false);
+    } else {
+      resetOnvifState();
+    }
+    setCurrentDraftId(createDraftId());
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, [resetOnvifState, resetRtspState, sourceMode]);
 
   const resetSetupFlow = () => {
     setSetupStep(null);
-    setFeedName("");
-    setFeedSource("");
-    setSourceMode("file");
-    setUploadedFile(null);
-    setZonePoints([]);
-    setSelectedModel("n");
+    setTargetSourceCount("1");
+    setStagedFeeds([]);
     setIsFinalizingSetup(false);
-    setSelectedEstablishmentId(null);
-    setSelectedCaisseId(null);
+    setBatchLogLevel("INFO");
+    setBatchWebhookEnabled(true);
     setIsCreateEstablishmentDialogOpen(false);
     setIsCreateCaisseDialogOpen(false);
     setNewEstablishmentName("");
     setNewCaisseName("");
-    resetRtspState();
-    resetOnvifState();
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    resetCurrentDraft();
   };
 
   const closeFeedZoneEditor = useCallback(() => {
@@ -452,11 +818,60 @@ export default function Dashboard() {
     }
   };
 
+  const loadDraftIntoEditor = useCallback((draft: StagedFeedDraft) => {
+    setCurrentDraftId(draft.clientId);
+    setFeedName(draft.feedName);
+    setSourceMode(draft.sourceMode);
+    setFeedSource(draft.source);
+    setUploadedFile(draft.uploadedFile);
+    setQueuedLocalFiles((current) => {
+      if (draft.sourceMode !== "file") {
+        return current;
+      }
+
+      const preservedCurrentFile = sourceMode === "file" && uploadedFile ? [uploadedFile, ...current] : current;
+      const excludedKeys = draft.uploadedFile ? [getLocalFileKey(draft.uploadedFile)] : [];
+      return dedupeLocalFiles(preservedCurrentFile, excludedKeys);
+    });
+    setZonePoints(draft.zonePoints);
+    setSelectedModel(draft.modelSize);
+    setSelectedEstablishmentId(draft.establishmentId);
+    setSelectedCaisseId(draft.caisseId);
+    setRtspUsername(draft.rtspUsername);
+    setRtspPassword(draft.rtspPassword);
+    setRtspTransport(draft.rtspTransport);
+    setRtspTestResult(draft.rtspTestResult);
+    setOnvifTimeout(draft.onvifTimeout);
+    setOnvifUsername(draft.onvifUsername);
+    setOnvifPassword(draft.onvifPassword);
+    setOnvifTransport(draft.onvifTransport);
+    setOnvifDevices(draft.onvifDevices);
+    setSelectedOnvifDeviceKey(draft.selectedOnvifDeviceKey);
+    setOnvifStreams(draft.onvifStreams);
+    setOnvifTestResult(draft.onvifTestResult);
+    setSetupStep("source");
+  }, [sourceMode, uploadedFile]);
+
+  const handleEditStagedFeed = useCallback((clientId: string) => {
+    const draft = stagedFeeds.find((item) => item.clientId === clientId);
+    if (!draft) {
+      return;
+    }
+
+    setStagedFeeds((current) => current.filter((item) => item.clientId !== clientId));
+    loadDraftIntoEditor(draft);
+  }, [loadDraftIntoEditor, stagedFeeds]);
+
+  const handleRemoveStagedFeed = useCallback((clientId: string) => {
+    setStagedFeeds((current) => current.filter((item) => item.clientId !== clientId));
+  }, []);
+
   const handleSourceModeChange = (mode: SourceMode) => {
     setSourceMode(mode);
     setFeedSource("");
     if (mode !== "file") {
       setUploadedFile(null);
+      setQueuedLocalFiles([]);
       setZonePoints([]);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -537,18 +952,74 @@ export default function Dashboard() {
     }
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null;
-    setUploadedFile(file);
-    setZonePoints([]);
+  const handleRemoveQueuedLocalFile = useCallback((fileKey: string) => {
+    setQueuedLocalFiles((current) => current.filter((file) => getLocalFileKey(file) !== fileKey));
+  }, []);
 
-    if (file && !feedName.trim()) {
-      setFeedName(file.name.replace(/\.[^.]+$/, ""));
+  const handleActivateQueuedLocalFile = useCallback((fileKey: string) => {
+    setQueuedLocalFiles((current) => {
+      const nextFile = current.find((file) => getLocalFileKey(file) === fileKey) ?? null;
+      if (!nextFile) {
+        return current;
+      }
+
+      const remainingFiles = current.filter((file) => getLocalFileKey(file) !== fileKey);
+      const nextQueue = uploadedFile ? dedupeLocalFiles([uploadedFile, ...remainingFiles], [getLocalFileKey(nextFile)]) : remainingFiles;
+
+      setUploadedFile(nextFile);
+      setFeedName(getSuggestedFeedNameFromFile(nextFile));
+      setZonePoints([]);
+      setSelectedModel("n");
+      setCurrentDraftId(createDraftId());
+
+      return nextQueue;
+    });
+  }, [uploadedFile]);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(event.target.files ?? []);
+    if (selectedFiles.length === 0) {
+      return;
+    }
+
+    const nextUploadedFile = uploadedFile ?? selectedFiles[0] ?? null;
+    const filesToQueue = uploadedFile ? selectedFiles : selectedFiles.slice(1);
+    const nextQueuedLocalFiles = dedupeLocalFiles([
+      ...queuedLocalFiles,
+      ...filesToQueue,
+    ], nextUploadedFile ? [getLocalFileKey(nextUploadedFile)] : []);
+
+    if (!uploadedFile) {
+      setUploadedFile(nextUploadedFile);
+      setZonePoints([]);
+      if (nextUploadedFile && !feedName.trim()) {
+        setFeedName(getSuggestedFeedNameFromFile(nextUploadedFile));
+      }
+    }
+
+    setQueuedLocalFiles(nextQueuedLocalFiles);
+
+    const preparedSourceCount = stagedFeeds.length + (nextUploadedFile ? 1 : 0) + nextQueuedLocalFiles.length;
+    if (preparedSourceCount > parsedTargetSourceCount) {
+      setTargetSourceCount(String(preparedSourceCount));
+    }
+
+    if (filesToQueue.length > 0) {
+      toast.success(`${filesToQueue.length + (uploadedFile ? 0 : 1)} local video${filesToQueue.length + (uploadedFile ? 0 : 1) === 1 ? "" : "s"} selected. Configure the current file, then the queue will advance automatically.`);
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
   const handleSourceStepSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (stagedFeeds.length >= parsedTargetSourceCount) {
+      toast.error("The batch already contains the target number of sources. Review or edit the staged feeds before adding more.");
+      return;
+    }
 
     if (!feedName.trim()) {
       toast.error("Feed name is required.");
@@ -601,6 +1072,43 @@ export default function Dashboard() {
 
     setSetupStep("zone");
   };
+
+  const handleStageCurrentDraft = useCallback(() => {
+    const draft = buildCurrentDraft();
+    if (!draft) {
+      toast.error("Finish the current source configuration before staging it.");
+      return;
+    }
+
+    const nextCount = stagedFeeds.length + 1;
+    if (nextCount > parsedTargetSourceCount) {
+      toast.error(`This batch is configured for ${parsedTargetSourceCount} source${parsedTargetSourceCount === 1 ? "" : "s"}. Remove a staged item or increase the target count first.`);
+      return;
+    }
+
+    setStagedFeeds((current) => [...current, draft]);
+    const preserveOnvifDiscovery = draft.sourceMode === "onvif";
+    const nextUploadedFile = draft.sourceMode === "file" ? queuedLocalFiles[0] ?? null : null;
+    const nextQueuedLocalFiles = draft.sourceMode === "file" ? queuedLocalFiles.slice(1) : [];
+    resetCurrentDraft({
+      preserveSourceMode: true,
+      preserveOnvifDiscovery,
+      nextUploadedFile,
+      nextQueuedLocalFiles,
+    });
+    setSetupStep(nextCount >= parsedTargetSourceCount ? "review" : "source");
+    toast.success(`${draft.feedName} added to the staged batch.`);
+  }, [buildCurrentDraft, parsedTargetSourceCount, queuedLocalFiles, resetCurrentDraft, stagedFeeds.length]);
+
+  const handleOpenBatchReview = useCallback(() => {
+    if (stagedFeeds.length === 0) {
+      toast.error("Stage at least one source before opening the batch review.");
+      return;
+    }
+
+    resetCurrentDraft({ preserveSourceMode: true, preserveOnvifDiscovery: sourceMode === "onvif" });
+    setSetupStep("review");
+  }, [resetCurrentDraft, sourceMode, stagedFeeds.length]);
 
   const buildSnapshotLoader = useCallback(async (): Promise<{
     frameSrc: string;
@@ -839,83 +1347,96 @@ export default function Dashboard() {
     }
   };
 
-  const handleFinalizeFeed = async (launchAfterCreate: boolean) => {
+  const handleFinalizeBatch = async (launchAfterCreate: boolean) => {
+    const currentDraft = currentReviewDraft;
+    const drafts = [...stagedFeeds, ...(currentDraft ? [currentDraft] : [])];
+
+    if (drafts.length === 0) {
+      toast.error("Stage at least one source before submitting the batch.");
+      return;
+    }
+
+    if (drafts.length !== parsedTargetSourceCount) {
+      toast.error(`This batch expects exactly ${parsedTargetSourceCount} source${parsedTargetSourceCount === 1 ? "" : "s"}.`);
+      return;
+    }
+
     setIsFinalizingSetup(true);
 
-    let createdFeed: VideoFeed | null = null;
-
     try {
-      let source = feedSource.trim();
+      const preparedFeeds: BatchFeedDraft[] = [];
 
-      const createFeedInput: Parameters<typeof createFeedMutation.mutateAsync>[0] = {
-        name: feedName.trim(),
-        source,
-        model_size: selectedModel,
-        establishment_id: selectedEstablishmentId,
-        caisse_id: selectedCaisseId,
-      };
+      for (const draft of drafts) {
+        let source = draft.source.trim();
 
-      if (sourceMode === "file") {
-        if (!uploadedFile) {
-          throw new Error("Choose a video file before creating the feed.");
+        if (draft.sourceMode === "file") {
+          if (!draft.uploadedFile) {
+            throw new Error(`Choose a video file for ${draft.feedName} before submitting the batch.`);
+          }
+
+          const upload = await uploadVideo(draft.uploadedFile);
+          source = upload.file_path;
         }
 
-        const upload = await uploadVideo(uploadedFile);
-        source = upload.file_path;
-        createFeedInput.source = source;
-      } else if (sourceMode === "rtsp") {
-        createFeedInput.source = feedSource.trim();
-        createFeedInput.rtsp_username = rtspUsername.trim() || null;
-        createFeedInput.rtsp_password = rtspPassword.trim() || null;
-        createFeedInput.rtsp_transport = rtspTransport;
-      } else {
-        createFeedInput.source = feedSource.trim();
-        createFeedInput.rtsp_username = onvifUsername.trim() || null;
-        createFeedInput.rtsp_password = onvifPassword.trim() || null;
-        createFeedInput.rtsp_transport = onvifTransport;
-      }
-
-      const feed = await createFeedMutation.mutateAsync(createFeedInput);
-      createdFeed = feed;
-
-      if (zonePoints.length >= 3) {
-        await updateZoneMutation.mutateAsync({
-          feedId: feed.feed_id,
-          zone: { points: zonePoints },
+        preparedFeeds.push({
+          client_id: draft.clientId,
+          name: draft.feedName,
+          source,
+          model_size: draft.modelSize,
+          establishment_id: draft.establishmentId,
+          caisse_id: draft.caisseId,
+          zone: draft.zonePoints.length >= 3 ? { points: draft.zonePoints } : null,
+          rtsp_username:
+            draft.sourceMode === "rtsp"
+              ? draft.rtspUsername.trim() || null
+              : draft.sourceMode === "onvif"
+                ? draft.onvifUsername.trim() || null
+                : null,
+          rtsp_password:
+            draft.sourceMode === "rtsp"
+              ? draft.rtspPassword.trim() || null
+              : draft.sourceMode === "onvif"
+                ? draft.onvifPassword.trim() || null
+                : null,
+          rtsp_transport:
+            draft.sourceMode === "rtsp"
+              ? draft.rtspTransport
+              : draft.sourceMode === "onvif"
+                ? draft.onvifTransport
+                : null,
         });
       }
 
-      if (launchAfterCreate) {
-        await startFeedMutation.mutateAsync(feed.feed_id);
+      const result = await batchLaunchMutation.mutateAsync({
+        launch_mode: launchAfterCreate ? "create_and_start" : "save_only",
+        runtime: {
+          log_level: batchLogLevel,
+          webhook_enabled: batchWebhookEnabled,
+        },
+        feeds: preparedFeeds,
+      });
+
+      const failedIds = new Set(result.results.filter((item) => item.status === "failed").map((item) => item.client_id));
+      if (failedIds.size > 0) {
+        setStagedFeeds(drafts.filter((draft) => failedIds.has(draft.clientId)));
+        resetCurrentDraft({ preserveSourceMode: true, preserveOnvifDiscovery: sourceMode === "onvif" });
+        setSetupStep("review");
+        toast.error(
+          launchAfterCreate
+            ? `${result.summary.started} source${result.summary.started === 1 ? "" : "s"} started, ${result.summary.failed} failed. Failed drafts remain staged for correction.`
+            : `${result.summary.created} source${result.summary.created === 1 ? "" : "s"} saved, ${result.summary.failed} failed. Failed drafts remain staged for correction.`,
+        );
+        return;
       }
 
       toast.success(
         launchAfterCreate
-          ? sourceMode === "file"
-            ? "Feed created, zone saved, and worker started."
-            : sourceMode === "onvif"
-              ? "ONVIF feed created and started from the review step."
-              : "RTSP feed created and started from the review step."
-          : sourceMode === "file"
-            ? "Feed created with its uploaded video, queue zone, and selected model."
-            : sourceMode === "onvif"
-              ? "Feed created from the discovered ONVIF camera and selected model."
-              : "Feed created with the tested RTSP camera and selected model.",
+          ? `Batch launched successfully: ${result.summary.started} source${result.summary.started === 1 ? "" : "s"} started.`
+          : `Batch saved successfully: ${result.summary.created} source${result.summary.created === 1 ? "" : "s"} created.`,
       );
       resetSetupFlow();
     } catch (error) {
-      const reason = error instanceof Error ? error.message : "Failed to complete the feed workflow.";
-
-      if (createdFeed) {
-        toast.error(
-          launchAfterCreate
-            ? `Feed was created, but the automatic launch failed: ${reason}`
-            : `Feed was created, but follow-up setup failed: ${reason}`,
-        );
-        resetSetupFlow();
-      } else {
-        toast.error(reason);
-      }
+      toast.error(error instanceof Error ? error.message : "Failed to submit the staged batch.");
     } finally {
       setIsFinalizingSetup(false);
     }
@@ -983,7 +1504,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <Button size="sm" onClick={() => setSetupStep("source")}>
               <Plus className="mr-1 h-4 w-4" />
-              Add Feed
+              Setup Batch
             </Button>
           </div>
         </div>
@@ -998,10 +1519,10 @@ export default function Dashboard() {
           <KpiCard title="Running Feeds" value={derived.onlineFeeds} icon={Radio} subtitle="Use the wall controls to start, stop, and restart workers" />
           <KpiCard title="People In Queue" value={derived.peopleTotal} icon={Users} />
           <KpiCard
-            title="Average Wait"
-            value={formatWaitTime(derived.averageWaitTime)}
-            icon={Clock}
-            subtitle={systemHealth ? `API ${systemHealth.status}` : "No API heartbeat yet"}
+            title="Live Attention"
+            value={derived.liveMonitoring.attentionFeedCount}
+            icon={AlertTriangle}
+            subtitle={systemHealth ? `API ${systemHealth.status} · ${activity.length} recent events` : "No API heartbeat yet"}
           />
         </div>
 
@@ -1048,10 +1569,24 @@ export default function Dashboard() {
                           </div>
                           <div className="text-right text-xs text-muted-foreground">
                             <p>{feed.zone?.points.length ?? 0} zone points</p>
-                            <p className="max-w-[12rem] truncate">{feed.last_error ?? "No runtime error"}</p>
+                            <p>{feed.status === "error" ? "Worker failed" : feed.last_warning ? "Warning active" : "Runtime nominal"}</p>
                           </div>
                         </div>
                         <div className="mt-3 flex flex-wrap items-center gap-2">
+                          {feed.last_error && <Badge variant="destructive">Runtime failure</Badge>}
+                          {feed.last_warning && (
+                            <Badge variant="secondary">{isRecoveryWarning(feed) ? "Recovery notice" : "Worker warning"}</Badge>
+                          )}
+                          {feed.latest_metrics && (
+                            <>
+                              <Badge variant={feed.latest_metrics.queue_stable ? "outline" : "destructive"}>
+                                {feed.latest_metrics.queue_stable ? "Stable queue" : "Unstable queue"}
+                              </Badge>
+                              <Badge variant={getUncertaintyTone(feed.latest_metrics.uncertainty_level)}>
+                                {feed.latest_metrics.uncertainty_level} uncertainty
+                              </Badge>
+                            </>
+                          )}
                           <Button onClick={() => openFeedZoneEditor(feed)} size="sm" type="button" variant="outline">
                             Edit Zone
                           </Button>
@@ -1087,6 +1622,64 @@ export default function Dashboard() {
                           </Button>
                           {feed.status === "initializing" && (
                             <span className="text-xs text-muted-foreground">Worker is initializing...</span>
+                          )}
+                        </div>
+                        {(feed.last_error || feed.last_warning) && (
+                          <div className="mt-3 space-y-2">
+                            {feed.last_error && (
+                              <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3">
+                                <div className="flex items-start gap-2">
+                                  <AlertTriangle className="mt-0.5 h-4 w-4 text-destructive" />
+                                  <div>
+                                    <p className="text-xs font-semibold text-destructive">Runtime failure</p>
+                                    <p className="mt-1 text-xs leading-relaxed text-destructive/90">{feed.last_error}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            {feed.last_warning && (
+                              <div className={`rounded-lg border p-3 ${isRecoveryWarning(feed) ? "border-amber-500/40 bg-amber-500/10" : "border-border bg-background/50"}`}>
+                                <div className="flex items-start gap-2">
+                                  <AlertTriangle className={`mt-0.5 h-4 w-4 ${isRecoveryWarning(feed) ? "text-amber-300" : "text-primary"}`} />
+                                  <div>
+                                    <p className={`text-xs font-semibold ${isRecoveryWarning(feed) ? "text-amber-100" : "text-foreground"}`}>
+                                      {isRecoveryWarning(feed) ? "Recovery required" : "Worker warning"}
+                                    </p>
+                                    <p className={`mt-1 text-xs leading-relaxed ${isRecoveryWarning(feed) ? "text-amber-50" : "text-muted-foreground"}`}>{feed.last_warning}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        <div className="mt-3 rounded-lg border border-border bg-background/40 p-3">
+                          {feed.latest_metrics ? (
+                            <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground xl:grid-cols-4">
+                              <div>
+                                <p className="uppercase tracking-[0.2em] text-muted-foreground/70">Queue</p>
+                                <p className="mt-1 text-sm font-medium text-foreground">{feed.latest_metrics.people_in_zone} people</p>
+                              </div>
+                              <div>
+                                <p className="uppercase tracking-[0.2em] text-muted-foreground/70">Arrival</p>
+                                <p className="mt-1 text-sm font-medium text-foreground">{formatRatePerMinute(feed.latest_metrics.arrival_rate)}</p>
+                              </div>
+                              <div>
+                                <p className="uppercase tracking-[0.2em] text-muted-foreground/70">Service</p>
+                                <p className="mt-1 text-sm font-medium text-foreground">{formatRatePerMinute(feed.latest_metrics.service_rate)}</p>
+                              </div>
+                              <div>
+                                <p className="uppercase tracking-[0.2em] text-muted-foreground/70">Wait</p>
+                                <p className="mt-1 text-sm font-medium text-foreground">
+                                  {feed.latest_metrics.wait_time_seconds === null ? "Pending" : formatWaitTime(feed.latest_metrics.wait_time_seconds)}
+                                </p>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              {feed.status === "running"
+                                ? "Worker is running. Waiting for the first live metrics update."
+                                : "No live metrics yet for this feed."}
+                            </p>
                           )}
                         </div>
                       </div>
@@ -1140,7 +1733,38 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-4">
+            <div>
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <AlertTriangle className="h-4 w-4 text-primary" />
+                Attention Required
+              </h2>
+              <div className="mt-2 space-y-2">
+                {liveAttentionItems.length === 0 ? (
+                  <div className="rounded-lg border border-border bg-card p-3 text-sm">
+                    <p className="text-xs leading-relaxed text-foreground">No feeds currently require immediate operator action.</p>
+                    <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">Stable queue metrics and worker states across the wall</p>
+                  </div>
+                ) : (
+                  liveAttentionItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`rounded-lg border p-3 text-sm ${item.tone === "critical" ? "border-destructive/40 bg-destructive/10" : "border-amber-500/40 bg-amber-500/10"}`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className={`mt-0.5 h-4 w-4 ${item.tone === "critical" ? "text-destructive" : "text-amber-300"}`} />
+                        <div className="space-y-1">
+                          <p className={`text-xs font-semibold ${item.tone === "critical" ? "text-destructive" : "text-amber-100"}`}>{item.title}</p>
+                          <p className={`text-xs leading-relaxed ${item.tone === "critical" ? "text-destructive/90" : "text-amber-50"}`}>{item.detail}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div>
             <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <Activity className="h-4 w-4 text-primary" />
               Recent Activity
@@ -1155,26 +1779,110 @@ export default function Dashboard() {
               {activity.map((alert) => (
                 <div
                   key={alert.id}
-                  className="rounded-lg border border-border bg-card p-3 text-sm transition-all hover:bg-accent/50"
+                  className={`rounded-lg border p-3 text-sm transition-all hover:bg-accent/50 ${getActivityCardClassName(alert.severity)}`}
                 >
-                  <p className="text-xs leading-relaxed text-foreground">{alert.message}</p>
-                  <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">{alert.time}</p>
+                  <div className="flex items-start gap-2">
+                    {alert.severity === "critical" ? (
+                      <AlertTriangle className="mt-0.5 h-4 w-4 text-destructive" />
+                    ) : alert.severity === "warning" ? (
+                      <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-300" />
+                    ) : alert.severity === "success" ? (
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-300" />
+                    ) : (
+                      <Activity className="mt-0.5 h-4 w-4 text-primary" />
+                    )}
+                    <div>
+                      <p className={`text-xs leading-relaxed ${getActivityTextClassName(alert.severity)}`}>{alert.message}</p>
+                      <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">{alert.time}</p>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
+          </div>
           </div>
         </div>
 
         <Dialog open={setupStep === "source"} onOpenChange={handleDialogOpenChange}>
           <DialogContent className="max-h-[92vh] overflow-y-auto border-border bg-card sm:max-w-3xl">
             <DialogHeader>
-              <DialogTitle className="text-foreground">Add Feed</DialogTitle>
+              <DialogTitle className="text-foreground">Stage Sources</DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                Start with the source. The dashboard now supports the GUI-style camera preflight flow for manual RTSP and ONVIF discovery, while uploaded videos still go through zone selection before model choice.
+                Configure one source at a time, stage it into the batch, then repeat until the full operator session is ready for review and launch.
               </DialogDescription>
             </DialogHeader>
 
             <form className="space-y-4" onSubmit={handleSourceStepSubmit}>
+              <div className="grid gap-4 rounded-xl border border-border bg-background/40 p-4 md:grid-cols-[180px_minmax(0,1fr)] md:items-end">
+                <div className="space-y-2">
+                  <Label className="text-foreground" htmlFor="target-source-count">
+                    Source count target
+                  </Label>
+                  <Input
+                    id="target-source-count"
+                    inputMode="numeric"
+                    min="1"
+                    onChange={(event) => setTargetSourceCount(event.target.value)}
+                    value={targetSourceCount}
+                  />
+                </div>
+                <div className="rounded-lg border border-border bg-background/50 p-3 text-xs text-muted-foreground">
+                  {stagedFeeds.length} staged so far. This session must contain exactly {parsedTargetSourceCount} source{parsedTargetSourceCount === 1 ? "" : "s"} before the batch can be saved or launched.
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded-xl border border-border bg-background/40 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Batch source queue</p>
+                    <p className="text-xs text-muted-foreground">
+                      Add one video or camera at a time. Every staged source stays listed here while you configure the next one.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">{stagedFeeds.length} staged</Badge>
+                    <Badge variant="outline">{remainingSourceCount} remaining</Badge>
+                  </div>
+                </div>
+
+                {stagedFeeds.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border bg-background/50 p-4 text-sm text-muted-foreground">
+                    No staged sources yet. Finish the current source, then click Add Current Source in the review step to keep building the batch.
+                  </div>
+                ) : (
+                  <div className="grid gap-2">
+                    {stagedFeeds.map((draft, index) => {
+                      const item = toReviewLaunchItem(draft);
+                      return (
+                        <div key={draft.clientId} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-border bg-background/50 p-3">
+                          <div className="min-w-0 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant="outline">Source {index + 1}</Badge>
+                              <p className="text-sm font-medium text-foreground">{item.feedName}</p>
+                              <Badge variant="outline">{item.sourceMode === "file" ? "Video" : item.sourceMode === "onvif" ? "ONVIF" : "RTSP"}</Badge>
+                              <Badge variant="outline">YOLO {item.modelSize.toUpperCase()}</Badge>
+                            </div>
+                            <p className="truncate text-xs text-muted-foreground">{item.sourceLabel}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {item.zonePointCount > 0 ? `${item.zonePointCount} zone points ready` : "Zone optional"}
+                              {item.caisseName ? ` · ${item.caisseName}` : ""}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button onClick={() => handleEditStagedFeed(draft.clientId)} size="sm" type="button" variant="outline">
+                              Edit
+                            </Button>
+                            <Button onClick={() => handleRemoveStagedFeed(draft.clientId)} size="sm" type="button" variant="outline">
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-2">
                 <Label className="text-foreground" htmlFor="feed-name">
                   Feed name
@@ -1221,6 +1929,7 @@ export default function Dashboard() {
                     <input
                       accept=".mp4,.avi,.mov,.mkv,video/*"
                       className="hidden"
+                      multiple
                       onChange={handleFileChange}
                       ref={fileInputRef}
                       type="file"
@@ -1229,10 +1938,61 @@ export default function Dashboard() {
                     <div className="flex flex-wrap items-center gap-3">
                       <Button onClick={() => fileInputRef.current?.click()} type="button" variant="outline">
                         <Upload className="mr-2 h-4 w-4" />
-                        Choose Video
+                        Choose Video Files
                       </Button>
                       <span className="text-sm text-muted-foreground">{getFileLabel(uploadedFile)}</span>
                     </div>
+
+                    <p className="text-xs text-muted-foreground">
+                      Local videos are configured one source at a time so each feed can keep its own queue zone and model. You can now select several videos in one click, then the queue will advance after each source is staged.
+                    </p>
+
+                    <p className="text-xs text-muted-foreground">
+                      Before opening zone selection, use the queue below to choose which video is active. The active video is the one whose frame will be used for tracing.
+                    </p>
+
+                    {(uploadedFile || queuedLocalFiles.length > 0) && (
+                      <div className="space-y-3 rounded-lg border border-border bg-background/50 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">Selected local videos</p>
+                            <p className="text-xs text-muted-foreground">Current file is configured now. Remaining files stay queued for the next passes.</p>
+                          </div>
+                          <Badge variant="outline">{(uploadedFile ? 1 : 0) + queuedLocalFiles.length} selected</Badge>
+                        </div>
+
+                        {uploadedFile && (
+                          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant="outline">Now configuring</Badge>
+                              <p className="text-sm font-medium text-foreground">{uploadedFile.name}</p>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">{getFileLabel(uploadedFile)}</p>
+                          </div>
+                        )}
+
+                        {queuedLocalFiles.length > 0 && (
+                          <div className="grid gap-2">
+                            {queuedLocalFiles.map((file, index) => (
+                              <div key={getLocalFileKey(file)} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/60 p-3">
+                                <div>
+                                  <p className="text-sm font-medium text-foreground">Up next {index + 1}: {file.name}</p>
+                                  <p className="text-xs text-muted-foreground">{getFileLabel(file)}</p>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Button onClick={() => handleActivateQueuedLocalFile(getLocalFileKey(file))} size="sm" type="button" variant="outline">
+                                    Use This Video Now
+                                  </Button>
+                                  <Button onClick={() => handleRemoveQueuedLocalFile(getLocalFileKey(file))} size="sm" type="button" variant="outline">
+                                    Remove
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </TabsContent>
 
@@ -1674,8 +2434,11 @@ export default function Dashboard() {
                 <Button onClick={resetSetupFlow} type="button" variant="outline">
                   Cancel
                 </Button>
+                <Button onClick={handleOpenBatchReview} type="button" variant="outline" disabled={stagedFeeds.length === 0}>
+                  Review Staged Batch
+                </Button>
                 <Button disabled={!canContinueSourceStep || isTestingCameraSource} type="submit">
-                          Continue to Zone
+                  Continue to Zone
                 </Button>
               </DialogFooter>
             </form>
@@ -1742,21 +2505,23 @@ export default function Dashboard() {
         />
 
         <ReviewLaunchDialog
-          caisseName={selectedCaisse?.name ?? null}
-          establishmentName={selectedEstablishment?.name ?? null}
-          feedName={feedName}
-          hasSavedCaisseZone={Boolean(selectedCaisse?.zone)}
+          canSubmitBatch={canSubmitBatch}
           isSubmitting={isReviewSubmitting}
-          modelSize={selectedModel}
-          onBack={() => setSetupStep("model")}
-          onLaunch={() => void handleFinalizeFeed(true)}
+          items={reviewItems}
+          logLevel={batchLogLevel}
+          onBack={() => setSetupStep(currentReviewDraft ? "model" : "source")}
+          onEditItem={handleEditStagedFeed}
+          onLaunch={() => void handleFinalizeBatch(true)}
+          onLogLevelChange={setBatchLogLevel}
           onOpenChange={handleDialogOpenChange}
-          onSave={() => void handleFinalizeFeed(false)}
+          onRemoveItem={handleRemoveStagedFeed}
+          onSave={() => void handleFinalizeBatch(false)}
+          onStageCurrent={() => void handleStageCurrentDraft()}
+          onWebhookEnabledChange={setBatchWebhookEnabled}
           open={setupStep === "review"}
-          sourceDetail={reviewSourceDetail}
-          sourceLabel={reviewSourceLabel}
-          sourceMode={sourceMode}
-          zonePointCount={zonePoints.length}
+          stageButtonLabel="Add Current Source"
+          targetSourceCount={parsedTargetSourceCount}
+          webhookEnabled={batchWebhookEnabled}
         />
 
         <Dialog open={isCreateEstablishmentDialogOpen} onOpenChange={setIsCreateEstablishmentDialogOpen}>

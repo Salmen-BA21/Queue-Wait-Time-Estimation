@@ -18,6 +18,8 @@ from fastapi.responses import FileResponse
 from src import __version__
 from src.api.models import (
     ApiResponse,
+    BatchFeedLaunchRequest,
+    BatchFeedLaunchResponse,
     Caisse,
     CreateFeedRequest,
     CreateCaisseRequest,
@@ -581,6 +583,17 @@ async def create_feed(request: CreateFeedRequest) -> ApiResponse[VideoFeed]:
         rtsp_transport=request.rtsp_transport,
     )
     return ApiResponse(data=feed, message="Feed registered successfully.")
+
+
+@app.post("/api/feeds/batch-launch", response_model=ApiResponse[BatchFeedLaunchResponse])
+async def batch_launch_feeds(request: BatchFeedLaunchRequest) -> ApiResponse[BatchFeedLaunchResponse]:
+    result = await get_registry().launch_feed_batch(
+        feeds=request.feeds,
+        launch_mode=request.launch_mode,
+        log_level=request.runtime.log_level,
+        webhook_enabled=request.runtime.webhook_enabled,
+    )
+    return ApiResponse(data=result, message="Batch feed launch processed.")
 
 
 @app.get("/api/feeds/{feed_id}/status", response_model=ApiResponse[VideoFeed])

@@ -2,36 +2,56 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import tempfile
 import unittest
-from unittest.mock import patch
+from datetime import datetime
 from pathlib import Path
+from typing import Any, cast
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from backend.app import app
 from src import database
-from src.api.runtime import RECOVERED_FEED_MESSAGE, FeedRegistry, FeedWorkerHandle, WebSocketHub
+from src.api.models import AlertModel, BatchFeedDraft, BatchFeedLaunchRequest, QueueMetricsModel, ZonePolygon
+from src.api.runtime import RECOVERED_FEED_MESSAGE, FeedRegistry, FeedStartError, FeedWorkerHandle, WebSocketHub
 
 
 class FakeWorkerRunner:
     """In-memory runner so feed control can be tested without launching OpenCV workers."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, fail_sources: set[str] | None = None) -> None:
         self.started: list[str] = []
-        self.started_config: dict[str, dict[str, str | None]] = {}
+        self.started_config: dict[str, dict[str, object | None]] = {}
         self.stopped: list[str] = []
         self._running: dict[str, bool] = {}
+        self.handles: dict[str, FeedWorkerHandle] = {}
+        self.fail_sources = fail_sources or set()
 
     def start(self, record) -> FeedWorkerHandle:  # noqa: ANN001
-        handle = FeedWorkerHandle(feed_id=record.feed_id, command=["fake-worker", record.source])
+        if record.source in self.fail_sources:
+            raise FeedStartError(f"Worker start rejected for source {record.source}")
+
+        event_file = tempfile.NamedTemporaryFile(mode="a", suffix=".events.jsonl", delete=False)
+        event_file.close()
+        handle = FeedWorkerHandle(
+            feed_id=record.feed_id,
+            command=["fake-worker", record.source],
+            event_path=Path(event_file.name),
+        )
         self._running[record.feed_id] = True
         self.started.append(record.feed_id)
+        self.handles[record.feed_id] = handle
         self.started_config[record.feed_id] = {
             "source": record.source,
             "rtsp_username": record.rtsp_username,
             "rtsp_password": record.rtsp_password,
             "rtsp_transport": record.rtsp_transport,
+            "log_level": record.log_level,
+            "webhook_enabled": record.webhook_enabled,
         }
         return handle
 
@@ -49,6 +69,24 @@ class FakeWorkerRunner:
 
     def exit_details(self, handle: FeedWorkerHandle, exit_code: int) -> str | None:
         return None
+
+    def write_event(self, feed_id: str, event: str, payload: dict[str, object]) -> None:
+        handle = self.handles[feed_id]
+        if handle.event_path is None:
+            raise AssertionError("Fake runner handle is missing an event path.")
+
+        with handle.event_path.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps({"event": event, "payload": payload}) + "\n")
+
+
+class CapturingWebSocket:
+    """Minimal websocket stub for direct broadcast contract checks."""
+
+    def __init__(self) -> None:
+        self.payloads: list[dict[str, Any]] = []
+
+    async def send_json(self, payload: dict[str, Any]) -> None:
+        self.payloads.append(payload)
 
 
 class TestQueueVisionApi(unittest.TestCase):
@@ -84,6 +122,9 @@ class TestQueueVisionApi(unittest.TestCase):
         broadcaster = WebSocketHub()
         app.state.broadcaster = broadcaster
         app.state.registry = FeedRegistry(broadcaster=broadcaster, runner=self.runner)
+
+    def dispatch_worker_event(self, feed_id: str, event: str, payload: dict[str, object]) -> None:
+        asyncio.run(app.state.registry._dispatch_worker_event(feed_id, {"event": event, "payload": payload}))
 
     def test_create_and_list_establishments(self) -> None:
         create_response = self.client.post(
@@ -200,6 +241,164 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
         feed = response.json()["data"]
         self.assertEqual(feed["source"], "rtsp://192.168.1.90/live/main")
+
+    def test_batch_launch_request_supports_shared_runtime_settings(self) -> None:
+        request = BatchFeedLaunchRequest.model_validate(
+            {
+                "launch_mode": "create_and_start",
+                "runtime": {
+                    "webhook_enabled": False,
+                    "log_level": "DEBUG",
+                },
+                "feeds": [
+                    {
+                        "client_id": "draft-1",
+                        "name": "Front Door Camera",
+                        "source": "rtsp://camera-front-door",
+                        "model_size": "m",
+                        "zone": {
+                            "points": [
+                                {"x": 0.1, "y": 0.2},
+                                {"x": 0.8, "y": 0.2},
+                                {"x": 0.8, "y": 0.9},
+                            ]
+                        },
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(request.launch_mode, "create_and_start")
+        self.assertFalse(request.runtime.webhook_enabled)
+        self.assertEqual(request.runtime.log_level, "DEBUG")
+        self.assertEqual(len(request.feeds), 1)
+        feed_draft = cast(BatchFeedDraft, request.feeds[0])
+        self.assertEqual(feed_draft.client_id, "draft-1")
+        zone = cast(ZonePolygon, feed_draft.zone)
+        self.assertEqual(len(zone.points), 3)
+
+    def test_batch_launch_request_requires_at_least_one_feed(self) -> None:
+        with self.assertRaises(ValidationError):
+            BatchFeedLaunchRequest.model_validate(
+                {
+                    "launch_mode": "save_only",
+                    "feeds": [],
+                }
+            )
+
+    def test_batch_launch_save_only_creates_multiple_feeds(self) -> None:
+        response = self.client.post(
+            "/api/feeds/batch-launch",
+            json={
+                "launch_mode": "save_only",
+                "runtime": {
+                    "webhook_enabled": True,
+                    "log_level": "INFO",
+                },
+                "feeds": [
+                    {
+                        "client_id": "draft-file",
+                        "name": "Uploaded Queue",
+                        "source": "C:/videos/queue.mp4",
+                        "model_size": "n",
+                        "zone": {
+                            "points": [
+                                {"x": 0.1, "y": 0.2},
+                                {"x": 0.7, "y": 0.2},
+                                {"x": 0.7, "y": 0.8},
+                            ]
+                        },
+                    },
+                    {
+                        "client_id": "draft-rtsp",
+                        "name": "Back Register",
+                        "source": "rtsp://192.168.1.120/live/main",
+                        "model_size": "m",
+                    },
+                ],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+        self.assertEqual(payload["summary"], {"total": 2, "created": 2, "started": 0, "failed": 0})
+        self.assertEqual([item["status"] for item in payload["results"]], ["created", "created"])
+        self.assertEqual(len(self.runner.started), 0)
+        self.assertEqual(len(payload["results"][0]["feed"]["zone"]["points"]), 3)
+
+    def test_batch_launch_create_and_start_uses_shared_runtime_settings(self) -> None:
+        response = self.client.post(
+            "/api/feeds/batch-launch",
+            json={
+                "launch_mode": "create_and_start",
+                "runtime": {
+                    "webhook_enabled": False,
+                    "log_level": "ERROR",
+                },
+                "feeds": [
+                    {
+                        "client_id": "draft-1",
+                        "name": "Register One",
+                        "source": "rtsp://192.168.1.121/live/main",
+                        "model_size": "s",
+                    },
+                    {
+                        "client_id": "draft-2",
+                        "name": "Register Two",
+                        "source": "rtsp://192.168.1.122/live/main",
+                        "model_size": "l",
+                    },
+                ],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+        self.assertEqual(payload["summary"], {"total": 2, "created": 2, "started": 2, "failed": 0})
+        self.assertEqual([item["status"] for item in payload["results"]], ["started", "started"])
+        self.assertEqual(len(self.runner.started), 2)
+        for feed_id in self.runner.started:
+            self.assertEqual(self.runner.started_config[feed_id]["log_level"], "ERROR")
+            self.assertFalse(self.runner.started_config[feed_id]["webhook_enabled"])
+
+    def test_batch_launch_returns_partial_failure_without_rollback(self) -> None:
+        self.runner = FakeWorkerRunner(fail_sources={"rtsp://192.168.1.124/live/main"})
+        broadcaster = WebSocketHub()
+        app.state.broadcaster = broadcaster
+        app.state.registry = FeedRegistry(broadcaster=broadcaster, runner=self.runner)
+
+        response = self.client.post(
+            "/api/feeds/batch-launch",
+            json={
+                "launch_mode": "create_and_start",
+                "feeds": [
+                    {
+                        "client_id": "ok-feed",
+                        "name": "Healthy Feed",
+                        "source": "rtsp://192.168.1.123/live/main",
+                    },
+                    {
+                        "client_id": "bad-feed",
+                        "name": "Broken Feed",
+                        "source": "rtsp://192.168.1.124/live/main",
+                    },
+                ],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+        self.assertEqual(payload["summary"], {"total": 2, "created": 2, "started": 1, "failed": 1})
+
+        results = {item["client_id"]: item for item in payload["results"]}
+        self.assertEqual(results["ok-feed"]["status"], "started")
+        self.assertEqual(results["bad-feed"]["status"], "failed")
+        self.assertIn("Worker start rejected", results["bad-feed"]["error"])
+        self.assertEqual(results["bad-feed"]["feed"]["status"], "error")
+
+        list_response = self.client.get("/api/feeds")
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(len(list_response.json()["data"]), 2)
 
     def test_start_feed_preserves_rtsp_runtime_options(self) -> None:
         response = self.client.post(
@@ -340,7 +539,9 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertEqual(restored_response.status_code, 200)
         restored = restored_response.json()["data"]
         self.assertEqual(restored["status"], "stopped")
-        self.assertEqual(restored["last_error"], RECOVERED_FEED_MESSAGE)
+        self.assertIsNone(restored["last_error"])
+        self.assertEqual(restored["last_warning"], RECOVERED_FEED_MESSAGE)
+        self.assertEqual(restored["last_warning_code"], "recovery_required")
 
         conn = database.get_connection()
         try:
@@ -354,7 +555,11 @@ class TestQueueVisionApi(unittest.TestCase):
 
         restarted_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
         self.assertEqual(restarted_response.status_code, 200)
-        self.assertEqual(restarted_response.json()["data"]["status"], "running")
+        restarted = restarted_response.json()["data"]
+        self.assertEqual(restarted["status"], "running")
+        self.assertIsNone(restarted["last_error"])
+        self.assertIsNone(restarted["last_warning"])
+        self.assertIsNone(restarted["last_warning_code"])
 
     def test_rtsp_connection_test_success(self) -> None:
         with patch(
@@ -956,6 +1161,143 @@ class TestQueueVisionApi(unittest.TestCase):
             self.assertEqual(stopped_event["event"], "feed_status")
             self.assertEqual(stopped_event["payload"]["action"], "updated")
             self.assertEqual(stopped_event["payload"]["feed"]["status"], "stopped")
+
+    def test_websocket_hub_broadcasts_metrics_alert_and_warning_events(self) -> None:
+        hub = WebSocketHub()
+        websocket = CapturingWebSocket()
+
+        metrics = QueueMetricsModel(
+            timestamp=1710000000.0,
+            people_in_zone=4,
+            arrival_rate=0.2,
+            service_rate=0.4,
+            wait_time_seconds=5.0,
+            wait_time_ci=[3.5, 6.5],
+            uncertainty_level="Low",
+            queue_stable=True,
+        )
+        alert = AlertModel(
+            alert_type="queue_backlog",
+            severity="warning",
+            message="High queue length: 4 people",
+            threshold_name="queue_length_warning",
+            current_value=4.0,
+            threshold_value=3.0,
+            frame_id=12,
+            timestamp=datetime.fromisoformat("2026-03-10T12:00:00+00:00"),
+        )
+
+        async def exercise() -> None:
+            hub._clients.add(cast(Any, websocket))
+            await hub.broadcast_metrics_event(feed_id="feed-live", metrics=metrics)
+            await hub.broadcast_alert_event(feed_id="feed-live", alert=alert)
+            await hub.broadcast_system_warning(
+                feed_id="feed-live",
+                code="queue_unstable",
+                message="Queue entered an unstable state.",
+                timestamp=datetime.fromisoformat("2026-03-10T12:00:01+00:00"),
+            )
+
+        asyncio.run(exercise())
+
+        self.assertEqual(
+            [payload["event"] for payload in websocket.payloads],
+            ["metrics_update", "alert_fired", "system_warning"],
+        )
+        self.assertEqual(websocket.payloads[0]["payload"]["feed_id"], "feed-live")
+        self.assertEqual(websocket.payloads[0]["payload"]["metrics"]["people_in_zone"], 4)
+        self.assertEqual(websocket.payloads[1]["payload"]["alert"]["alert_type"], "queue_backlog")
+        self.assertEqual(websocket.payloads[2]["payload"]["code"], "queue_unstable")
+
+    def test_websocket_warning_persists_on_feed_status(self) -> None:
+        feed = self.client.post(
+            "/api/feeds",
+            json={"name": "Checkout Warning", "source": "rtsp://camera-warning"},
+        ).json()["data"]
+
+        start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
+        self.assertEqual(start_response.status_code, 200)
+
+        self.dispatch_worker_event(
+            feed["feed_id"],
+            "system_warning",
+            {
+                "code": "webhook_delivery_failed",
+                "message": "Webhook delivery failed: timeout.",
+                "timestamp": "2026-03-10T12:00:05+00:00",
+            },
+        )
+
+        feed_status = self.client.get(f"/api/feeds/{feed['feed_id']}/status")
+        self.assertEqual(feed_status.status_code, 200)
+        self.assertEqual(feed_status.json()["data"]["last_warning"], "Webhook delivery failed: timeout.")
+        self.assertEqual(feed_status.json()["data"]["last_warning_code"], "webhook_delivery_failed")
+
+    def test_websocket_snapshot_includes_latest_metrics_and_warning_state(self) -> None:
+        feed = self.client.post(
+            "/api/feeds",
+            json={"name": "Checkout Reconnect", "source": "rtsp://camera-reconnect"},
+        ).json()["data"]
+
+        start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
+        self.assertEqual(start_response.status_code, 200)
+
+        self.dispatch_worker_event(
+            feed["feed_id"],
+            "metrics_update",
+            {
+                "metrics": {
+                    "timestamp": 1710000100.0,
+                    "people_in_zone": 6,
+                    "arrival_rate": 0.3,
+                    "service_rate": 0.5,
+                    "wait_time_seconds": 9.0,
+                    "wait_time_ci": [7.0, 11.0],
+                    "uncertainty_level": "Medium",
+                    "queue_stable": True,
+                }
+            },
+        )
+        self.dispatch_worker_event(
+            feed["feed_id"],
+            "system_warning",
+            {
+                "code": "webhook_delivery_failed",
+                "message": "Webhook delivery failed: timeout.",
+                "timestamp": "2026-03-10T12:05:00+00:00",
+            },
+        )
+
+        with self.client.websocket_connect("/ws/metrics") as reconnect_socket:
+            reconnect_snapshot = reconnect_socket.receive_json()
+            self.assertEqual(reconnect_snapshot["event"], "snapshot")
+
+        feeds = reconnect_snapshot["payload"]["feeds"]
+        reconnect_feed = next(item for item in feeds if item["feed_id"] == feed["feed_id"])
+        self.assertEqual(reconnect_feed["latest_metrics"]["people_in_zone"], 6)
+        self.assertEqual(reconnect_feed["last_warning"], "Webhook delivery failed: timeout.")
+        self.assertEqual(reconnect_feed["last_warning_code"], "webhook_delivery_failed")
+
+    def test_recovered_feed_surfaces_warning_instead_of_error(self) -> None:
+        created_feed = self.client.post(
+            "/api/feeds",
+            json={"name": "Recovered Feed", "source": "rtsp://camera-recovery"},
+        ).json()["data"]
+
+        start_response = self.client.post(f"/api/feeds/{created_feed['feed_id']}/start")
+        self.assertEqual(start_response.status_code, 200)
+
+        broadcaster = WebSocketHub()
+        app.state.broadcaster = broadcaster
+        app.state.registry = FeedRegistry(broadcaster=broadcaster, runner=self.runner)
+
+        recovered_feed = self.client.get(f"/api/feeds/{created_feed['feed_id']}/status")
+        self.assertEqual(recovered_feed.status_code, 200)
+        payload = recovered_feed.json()["data"]
+        self.assertEqual(payload["status"], "stopped")
+        self.assertIsNone(payload["last_error"])
+        self.assertEqual(payload["last_warning"], RECOVERED_FEED_MESSAGE)
+        self.assertEqual(payload["last_warning_code"], "recovery_required")
 
 
 if __name__ == "__main__":

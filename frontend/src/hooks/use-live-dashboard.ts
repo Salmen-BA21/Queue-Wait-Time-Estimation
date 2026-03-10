@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  AlertFiredEvent,
   connectDashboardSocket,
   createFeed,
   DashboardSocketEvent,
   getSystemHealth,
   listFeeds,
+  MetricsUpdateEvent,
   restartFeed,
   startFeed,
   stopFeed,
+  SystemWarningEvent,
   updateZone,
   VideoFeed,
 } from "@/lib/api";
@@ -19,7 +22,7 @@ const systemHealthQueryKey = ["system-health"] as const;
 export interface ActivityItem {
   id: string;
   message: string;
-  severity: "info" | "warning" | "success";
+  severity: "info" | "warning" | "success" | "critical";
   time: string;
 }
 
@@ -34,6 +37,10 @@ function upsertFeed(existing: VideoFeed[], incoming: VideoFeed): VideoFeed[] {
 
 function removeFeed(existing: VideoFeed[], feedId: string): VideoFeed[] {
   return existing.filter((feed) => feed.feed_id !== feedId);
+}
+
+function updateFeedMetrics(existing: VideoFeed[], feedId: string, latestMetrics: VideoFeed["latest_metrics"]): VideoFeed[] {
+  return existing.map((feed) => (feed.feed_id === feedId ? { ...feed, latest_metrics: latestMetrics } : feed));
 }
 
 function toRelativeTime(isoTimestamp: string): string {
@@ -54,6 +61,40 @@ function pushActivity(
   item: ActivityItem,
 ): void {
   setActivity((current) => [item, ...current].slice(0, 8));
+}
+
+function handleMetricsUpdate(
+  event: MetricsUpdateEvent,
+  queryClient: ReturnType<typeof useQueryClient>,
+): void {
+  queryClient.setQueryData<VideoFeed[]>(feedsQueryKey, (current = []) =>
+    updateFeedMetrics(current, event.payload.feed_id, event.payload.metrics),
+  );
+}
+
+function handleAlertFired(
+  event: AlertFiredEvent,
+  setActivity: React.Dispatch<React.SetStateAction<ActivityItem[]>>,
+): void {
+  const { alert, feed_id: feedId } = event.payload;
+  pushActivity(setActivity, {
+    id: `alert-${feedId}-${alert.alert_type}-${alert.frame_id}`,
+    message: alert.message,
+    severity: alert.severity,
+    time: alert.timestamp,
+  });
+}
+
+function handleSystemWarning(
+  event: SystemWarningEvent,
+  setActivity: React.Dispatch<React.SetStateAction<ActivityItem[]>>,
+): void {
+  pushActivity(setActivity, {
+    id: `warning-${event.payload.feed_id}-${event.payload.code}-${event.payload.timestamp}`,
+    message: event.payload.message,
+    severity: "warning",
+    time: event.payload.timestamp,
+  });
 }
 
 export function useLiveDashboard() {
@@ -178,6 +219,21 @@ export function useLiveDashboard() {
         }
 
         void queryClient.invalidateQueries({ queryKey: systemHealthQueryKey });
+        return;
+      }
+
+      if (event.event === "metrics_update") {
+        handleMetricsUpdate(event, queryClient);
+        return;
+      }
+
+      if (event.event === "alert_fired") {
+        handleAlertFired(event, setActivity);
+        return;
+      }
+
+      if (event.event === "system_warning") {
+        handleSystemWarning(event, setActivity);
       }
     };
 
@@ -213,6 +269,20 @@ export function useLiveDashboard() {
       onlineFeeds,
       peopleTotal,
       averageWaitTime,
+      liveMonitoring: {
+        attentionFeedCount: feeds.filter(
+          (feed) =>
+            feed.status === "error"
+            || Boolean(feed.last_error)
+            || Boolean(feed.last_warning)
+            || feed.latest_metrics?.queue_stable === false
+            || feed.latest_metrics?.uncertainty_level === "High",
+        ).length,
+        feedsWithRuntimeErrors: feeds.filter((feed) => feed.status === "error" || Boolean(feed.last_error)),
+        feedsWithRuntimeWarnings: feeds.filter((feed) => Boolean(feed.last_warning)),
+        unstableFeeds: feeds.filter((feed) => feed.latest_metrics?.queue_stable === false),
+        highUncertaintyFeeds: feeds.filter((feed) => feed.latest_metrics?.uncertainty_level === "High"),
+      },
       waitChartData: feeds.map((feed) => ({
         name: feed.name,
         value: feed.latest_metrics?.wait_time_seconds ?? 0,
