@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ModelSize } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -21,9 +22,15 @@ interface ModelSelectionDialogProps {
   caisseName?: string | null;
   selectedModel: ModelSize;
   isSubmitting: boolean;
+  sourceOptions?: Array<{
+    key: string;
+    label: string;
+  }>;
+  selectedSourceKey?: string;
   onBack: () => void;
   onConfirm: () => void;
   onModelChange: (model: ModelSize) => void;
+  onSelectedSourceChange?: (sourceKey: string) => void;
   onOpenChange: (open: boolean) => void;
 }
 
@@ -80,9 +87,12 @@ export function ModelSelectionDialog({
   caisseName,
   selectedModel,
   isSubmitting,
+  sourceOptions = [],
+  selectedSourceKey,
   onBack,
   onConfirm,
   onModelChange,
+  onSelectedSourceChange,
   onOpenChange,
 }: ModelSelectionDialogProps) {
   return (
@@ -96,6 +106,25 @@ export function ModelSelectionDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {sourceOptions.length > 1 && onSelectedSourceChange && selectedSourceKey ? (
+            <div className="grid gap-2 rounded-xl border border-border bg-background/40 p-4 sm:max-w-sm">
+              <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground/70">Selected sources</span>
+              <Select onValueChange={onSelectedSourceChange} value={selectedSourceKey}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a source" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sourceOptions.map((option) => (
+                    <SelectItem key={option.key} value={option.key}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Switch sources here to assign a different YOLO model to each selected video or stream.</p>
+            </div>
+          ) : null}
+
           <div className="grid gap-3 rounded-xl border border-border bg-background/40 p-4 text-sm text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground/70">Source Type</p>

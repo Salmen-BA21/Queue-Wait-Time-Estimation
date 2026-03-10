@@ -365,6 +365,12 @@ export function restartFeed(feedId: string): Promise<VideoFeed> {
   });
 }
 
+export function deleteFeed(feedId: string): Promise<{ feed_id: string }> {
+  return fetchApi<{ feed_id: string }>(`/api/feeds/${feedId}`, {
+    method: "DELETE",
+  });
+}
+
 export function listEstablishments(): Promise<Establishment[]> {
   return fetchApi<Establishment[]>("/api/establishments");
 }

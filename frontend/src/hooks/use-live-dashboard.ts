@@ -5,6 +5,7 @@ import {
   connectDashboardSocket,
   createFeed,
   DashboardSocketEvent,
+  deleteFeed,
   getSystemHealth,
   listFeeds,
   MetricsUpdateEvent,
@@ -182,6 +183,20 @@ export function useLiveDashboard() {
     },
   });
 
+  const deleteFeedMutation = useMutation({
+    mutationFn: (feedId: string) => deleteFeed(feedId),
+    onSuccess: ({ feed_id: feedId }) => {
+      queryClient.setQueryData<VideoFeed[]>(feedsQueryKey, (current = []) => removeFeed(current, feedId));
+      void queryClient.invalidateQueries({ queryKey: systemHealthQueryKey });
+      pushActivity(setActivity, {
+        id: `delete-${feedId}-${Date.now()}`,
+        message: "A feed was removed from the surveillance wall.",
+        severity: "warning",
+        time: "just now",
+      });
+    },
+  });
+
   useEffect(() => {
     const socket = connectDashboardSocket();
 
@@ -308,6 +323,7 @@ export function useLiveDashboard() {
     startFeedMutation,
     stopFeedMutation,
     restartFeedMutation,
+    deleteFeedMutation,
     activity: activityFeed,
     derived,
   };

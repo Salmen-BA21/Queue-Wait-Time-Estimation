@@ -168,6 +168,7 @@ function createUseLiveDashboardValue(feeds: VideoFeed[] = []) {
     startFeedMutation: { mutateAsync: vi.fn() },
     stopFeedMutation: { mutateAsync: vi.fn() },
     restartFeedMutation: { mutateAsync: vi.fn() },
+    deleteFeedMutation: { mutateAsync: vi.fn() },
     activity: [],
     derived: {
       registeredFeeds: feeds.length,
@@ -301,7 +302,7 @@ describe("Dashboard integration", () => {
     fireEvent.change(fileInput, { target: { files: [fileA, fileB] } });
 
     expect(await screen.findByText("Selected local videos")).toBeInTheDocument();
-    expect(screen.getByText("checkout-a.mp4")).toBeInTheDocument();
+    expect(screen.getAllByText("checkout-a.mp4").length).toBeGreaterThan(0);
     expect(screen.getByText(/Up next 1: checkout-b.mp4/)).toBeInTheDocument();
     expect(screen.getByDisplayValue("checkout-a")).toBeInTheDocument();
     expect(screen.getByDisplayValue("2")).toBeInTheDocument();
@@ -309,18 +310,12 @@ describe("Dashboard integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue to Zone" }));
     fireEvent.click(await screen.findByRole("button", { name: "Continue to Model" }));
     fireEvent.click(await screen.findByRole("button", { name: "Confirm Model" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Add Current Source" }));
 
-    expect(await screen.findByText("Batch source queue")).toBeInTheDocument();
+    expect(await screen.findByText("Review and Launch")).toBeInTheDocument();
     expect(screen.getByText("checkout-a")).toBeInTheDocument();
     expect(screen.getByText("checkout-a.mp4")).toBeInTheDocument();
-    expect(screen.getByText("1 remaining")).toBeInTheDocument();
-    expect(
-      screen.getByText(/You can now select several videos in one click, then the queue will advance after each source is staged/i),
-    ).toBeInTheDocument();
-    expect(screen.getByDisplayValue("checkout-b")).toBeInTheDocument();
-    expect(screen.getByText(/Now configuring/)).toBeInTheDocument();
     expect(screen.getByText("checkout-b.mp4")).toBeInTheDocument();
+    expect(screen.getByText("Ready for batch submit")).toBeInTheDocument();
   });
 
   it("lets the operator choose which queued local video becomes active before tracing the zone", async () => {
@@ -344,14 +339,14 @@ describe("Dashboard integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Use This Video Now" }));
 
     expect(screen.getByDisplayValue("checkout-b")).toBeInTheDocument();
-    expect(screen.getByText("checkout-b.mp4")).toBeInTheDocument();
+    expect(screen.getAllByText("checkout-b.mp4").length).toBeGreaterThan(0);
     expect(screen.getByText(/Up next 1: checkout-a.mp4/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Continue to Zone" }));
     expect(await screen.findByTestId("mock-zone-dialog")).toBeInTheDocument();
   });
 
-  it("routes edit-zone and restart actions through the live dashboard mutations", async () => {
+  it("routes edit-zone, remove, and restart actions through the live dashboard mutations", async () => {
     const dashboardState = createUseLiveDashboardValue([createFeedRecord()]);
     vi.mocked(useLiveDashboard).mockReturnValue(dashboardState as unknown as ReturnType<typeof useLiveDashboard>);
 
@@ -378,6 +373,11 @@ describe("Dashboard integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Restart" }));
 
     await waitFor(() => expect(dashboardState.restartFeedMutation.mutateAsync).toHaveBeenCalledWith("feed-1"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove Feed" }));
+
+    await waitFor(() => expect(dashboardState.deleteFeedMutation.mutateAsync).toHaveBeenCalledWith("feed-1"));
   });
 
   it("shows a worker action error when restart fails", async () => {

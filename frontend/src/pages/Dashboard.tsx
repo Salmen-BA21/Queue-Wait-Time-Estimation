@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Search,
   Square,
+  Trash2,
   Upload,
   Video,
   Wifi,
@@ -36,6 +37,16 @@ import { ModelSelectionDialog } from "@/components/dashboard/ModelSelectionDialo
 import { ReviewLaunchDialog, type ReviewLaunchItem } from "@/components/dashboard/ReviewLaunchDialog";
 import { ZoneSelectionDialog } from "@/components/dashboard/ZoneSelectionDialog";
 import { AppLayout } from "@/components/layout/AppLayout";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -86,7 +97,7 @@ import {
 
 type SetupStep = "source" | "zone" | "model" | "review" | null;
 type SourceMode = "rtsp" | "file" | "onvif";
-type FeedAction = "start" | "stop" | "restart";
+type FeedAction = "start" | "stop" | "restart" | "delete";
 
 interface StagedFeedDraft {
   clientId: string;
@@ -210,6 +221,24 @@ function dedupeLocalFiles(files: File[], excludedKeys: string[] = []): File[] {
   }
 
   return deduped;
+}
+
+function areZonePointsEqual(left: ZonePoint[], right: ZonePoint[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((point, index) => point.x === right[index]?.x && point.y === right[index]?.y);
+}
+
+const LOCAL_FILE_DRAFT_PREFIX = "local-file-draft:";
+
+function createLocalFileDraftId(file: File): string {
+  return `${LOCAL_FILE_DRAFT_PREFIX}${getLocalFileKey(file)}`;
+}
+
+function isLocalFileDraftId(clientId: string): boolean {
+  return clientId.startsWith(LOCAL_FILE_DRAFT_PREFIX);
 }
 
 function formatResolution(result: {
@@ -382,10 +411,16 @@ export default function Dashboard() {
   const [sourceMode, setSourceMode] = useState<SourceMode>("file");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [queuedLocalFiles, setQueuedLocalFiles] = useState<File[]>([]);
+  const [localFileFeedNames, setLocalFileFeedNames] = useState<Record<string, string>>({});
+  const [localFileModelSelections, setLocalFileModelSelections] = useState<Record<string, ModelSize>>({});
+  const [localFileEstablishmentSelections, setLocalFileEstablishmentSelections] = useState<Record<string, number | null>>({});
+  const [localFileCaisseSelections, setLocalFileCaisseSelections] = useState<Record<string, number | null>>({});
+  const [localFileZonePoints, setLocalFileZonePoints] = useState<Record<string, ZonePoint[]>>({});
   const [zonePoints, setZonePoints] = useState<ZonePoint[]>([]);
   const [editingFeedZone, setEditingFeedZone] = useState<VideoFeed | null>(null);
   const [editingZonePoints, setEditingZonePoints] = useState<ZonePoint[]>([]);
   const [isSavingEditedZone, setIsSavingEditedZone] = useState(false);
+  const [feedPendingDeletion, setFeedPendingDeletion] = useState<VideoFeed | null>(null);
   const [selectedModel, setSelectedModel] = useState<ModelSize>("n");
   const [isFinalizingSetup, setIsFinalizingSetup] = useState(false);
   const [activeFeedAction, setActiveFeedAction] = useState<{ feedId: string; action: FeedAction } | null>(null);
@@ -423,6 +458,7 @@ export default function Dashboard() {
     startFeedMutation,
     stopFeedMutation,
     restartFeedMutation,
+    deleteFeedMutation,
     activity,
     derived,
   } = useLiveDashboard();
@@ -562,6 +598,97 @@ export default function Dashboard() {
     setZonePoints(selectedCaisse.zone.points);
   }, [selectedCaisse, setupStep, zonePoints.length]);
 
+  useEffect(() => {
+    if (sourceMode !== "file" || !uploadedFile) {
+      return;
+    }
+
+    const fileKey = getLocalFileKey(uploadedFile);
+    setLocalFileZonePoints((current) => {
+      const existing = current[fileKey] ?? [];
+      if (areZonePointsEqual(existing, zonePoints)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [fileKey]: zonePoints,
+      };
+    });
+  }, [sourceMode, uploadedFile, zonePoints]);
+
+  useEffect(() => {
+    if (sourceMode !== "file" || !uploadedFile) {
+      return;
+    }
+
+    const fileKey = getLocalFileKey(uploadedFile);
+    setLocalFileFeedNames((current) => {
+      if (current[fileKey] === feedName) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [fileKey]: feedName,
+      };
+    });
+  }, [feedName, sourceMode, uploadedFile]);
+
+  useEffect(() => {
+    if (sourceMode !== "file" || !uploadedFile) {
+      return;
+    }
+
+    const fileKey = getLocalFileKey(uploadedFile);
+    setLocalFileModelSelections((current) => {
+      if (current[fileKey] === selectedModel) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [fileKey]: selectedModel,
+      };
+    });
+  }, [selectedModel, sourceMode, uploadedFile]);
+
+  useEffect(() => {
+    if (sourceMode !== "file" || !uploadedFile) {
+      return;
+    }
+
+    const fileKey = getLocalFileKey(uploadedFile);
+    setLocalFileEstablishmentSelections((current) => {
+      if (current[fileKey] === selectedEstablishmentId) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [fileKey]: selectedEstablishmentId,
+      };
+    });
+  }, [selectedEstablishmentId, sourceMode, uploadedFile]);
+
+  useEffect(() => {
+    if (sourceMode !== "file" || !uploadedFile) {
+      return;
+    }
+
+    const fileKey = getLocalFileKey(uploadedFile);
+    setLocalFileCaisseSelections((current) => {
+      if (current[fileKey] === selectedCaisseId) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [fileKey]: selectedCaisseId,
+      };
+    });
+  }, [selectedCaisseId, sourceMode, uploadedFile]);
+
   const reviewSourceLabel = useMemo(() => {
     if (sourceMode === "file") {
       return uploadedFile ? uploadedFile.name : "No video selected";
@@ -674,21 +801,83 @@ export default function Dashboard() {
     zonePoints,
   ]);
 
+  const localZoneVideoOptions = useMemo(
+    () =>
+      sourceMode === "file"
+        ? [uploadedFile, ...queuedLocalFiles]
+            .filter((file): file is File => file !== null)
+            .map((file) => ({ key: getLocalFileKey(file), label: file.name }))
+        : [],
+    [queuedLocalFiles, sourceMode, uploadedFile],
+  );
+  const selectedLocalZoneVideoKey = uploadedFile ? getLocalFileKey(uploadedFile) : "";
+  const allSelectedLocalFiles = useMemo(
+    () => [uploadedFile, ...queuedLocalFiles].filter((file): file is File => file !== null),
+    [queuedLocalFiles, uploadedFile],
+  );
+  const preparedLocalFileDrafts = useMemo(
+    () =>
+      sourceMode === "file"
+        ? allSelectedLocalFiles.map((file) => {
+            const fileKey = getLocalFileKey(file);
+            return {
+              clientId: createLocalFileDraftId(file),
+              feedName: localFileFeedNames[fileKey]?.trim() || getSuggestedFeedNameFromFile(file),
+              sourceMode: "file" as const,
+              source: "",
+              uploadedFile: file,
+              zonePoints: localFileZonePoints[fileKey] ?? [],
+              modelSize: localFileModelSelections[fileKey] ?? "n",
+              establishmentId: localFileEstablishmentSelections[fileKey] ?? null,
+              establishmentName:
+                establishments.find((establishment) => establishment.id === (localFileEstablishmentSelections[fileKey] ?? null))?.name ?? null,
+              caisseId: localFileCaisseSelections[fileKey] ?? null,
+              caisseName: caisses.find((caisse) => caisse.id === (localFileCaisseSelections[fileKey] ?? null))?.name ?? null,
+              hasSavedCaisseZone: Boolean(caisses.find((caisse) => caisse.id === (localFileCaisseSelections[fileKey] ?? null))?.zone),
+              rtspUsername: "",
+              rtspPassword: "",
+              rtspTransport: "tcp",
+              rtspTestResult: null,
+              onvifTimeout: DEFAULT_ONVIF_TIMEOUT,
+              onvifUsername: "",
+              onvifPassword: "",
+              onvifTransport: "tcp",
+              onvifDevices: [],
+              selectedOnvifDeviceKey: "",
+              onvifStreams: [],
+              onvifTestResult: null,
+            };
+          })
+        : [],
+    [
+      allSelectedLocalFiles,
+      caisses,
+      establishments,
+      localFileCaisseSelections,
+      localFileEstablishmentSelections,
+      localFileFeedNames,
+      localFileModelSelections,
+      localFileZonePoints,
+      sourceMode,
+    ],
+  );
+
   const currentReviewDraft = useMemo(
-    () => (setupStep === "review" ? buildCurrentDraft() : null),
-    [buildCurrentDraft, setupStep],
+    () => (setupStep === "review" && sourceMode !== "file" ? buildCurrentDraft() : null),
+    [buildCurrentDraft, setupStep, sourceMode],
   );
 
   const reviewItems = useMemo(
     () => [
       ...stagedFeeds.map((draft) => toReviewLaunchItem(draft)),
+      ...(setupStep === "review" ? preparedLocalFileDrafts.map((draft) => toReviewLaunchItem(draft)) : []),
       ...(currentReviewDraft ? [toReviewLaunchItem(currentReviewDraft, true)] : []),
     ],
-    [currentReviewDraft, stagedFeeds],
+    [currentReviewDraft, preparedLocalFileDrafts, setupStep, stagedFeeds],
   );
 
-  const stagedSourceCount = stagedFeeds.length + (currentReviewDraft ? 1 : 0);
-  const remainingSourceCount = Math.max(parsedTargetSourceCount - stagedFeeds.length, 0);
+  const stagedSourceCount = stagedFeeds.length + preparedLocalFileDrafts.length + (currentReviewDraft ? 1 : 0);
+  const remainingSourceCount = Math.max(parsedTargetSourceCount - stagedSourceCount, 0);
   const canSubmitBatch = stagedSourceCount === parsedTargetSourceCount;
 
   const canContinueSourceStep = useMemo(() => {
@@ -746,12 +935,13 @@ export default function Dashboard() {
     setSourceMode(nextSourceMode);
     setUploadedFile(nextSourceMode === "file" ? nextUploadedFile : null);
     setQueuedLocalFiles(nextSourceMode === "file" ? nextQueuedLocalFiles ?? [] : []);
-    setZonePoints([]);
-    setSelectedModel("n");
-    setSelectedEstablishmentId(null);
-    setSelectedCaisseId(null);
+    setZonePoints(nextSourceMode === "file" && nextUploadedFile ? localFileZonePoints[getLocalFileKey(nextUploadedFile)] ?? [] : []);
+    setSelectedModel(nextSourceMode === "file" && nextUploadedFile ? localFileModelSelections[getLocalFileKey(nextUploadedFile)] ?? "n" : "n");
+    setSelectedEstablishmentId(nextSourceMode === "file" && nextUploadedFile ? localFileEstablishmentSelections[getLocalFileKey(nextUploadedFile)] ?? null : null);
+    setSelectedCaisseId(nextSourceMode === "file" && nextUploadedFile ? localFileCaisseSelections[getLocalFileKey(nextUploadedFile)] ?? null : null);
     if (nextSourceMode === "file" && nextUploadedFile) {
-      setFeedName(getSuggestedFeedNameFromFile(nextUploadedFile));
+      const fileKey = getLocalFileKey(nextUploadedFile);
+      setFeedName(localFileFeedNames[fileKey] ?? getSuggestedFeedNameFromFile(nextUploadedFile));
     }
     if (preserveSourceMode && sourceMode === "rtsp") {
       setRtspTestResult(null);
@@ -773,7 +963,7 @@ export default function Dashboard() {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, [resetOnvifState, resetRtspState, sourceMode]);
+  }, [localFileCaisseSelections, localFileEstablishmentSelections, localFileFeedNames, localFileModelSelections, localFileZonePoints, resetOnvifState, resetRtspState, sourceMode]);
 
   const resetSetupFlow = () => {
     setSetupStep(null);
@@ -786,6 +976,11 @@ export default function Dashboard() {
     setIsCreateCaisseDialogOpen(false);
     setNewEstablishmentName("");
     setNewCaisseName("");
+    setLocalFileEstablishmentSelections({});
+    setLocalFileCaisseSelections({});
+    setLocalFileFeedNames({});
+    setLocalFileModelSelections({});
+    setLocalFileZonePoints({});
     resetCurrentDraft();
   };
 
@@ -824,6 +1019,56 @@ export default function Dashboard() {
     setSourceMode(draft.sourceMode);
     setFeedSource(draft.source);
     setUploadedFile(draft.uploadedFile);
+    setLocalFileEstablishmentSelections((current) => {
+      if (draft.sourceMode !== "file" || !draft.uploadedFile) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [getLocalFileKey(draft.uploadedFile)]: draft.establishmentId,
+      };
+    });
+    setLocalFileCaisseSelections((current) => {
+      if (draft.sourceMode !== "file" || !draft.uploadedFile) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [getLocalFileKey(draft.uploadedFile)]: draft.caisseId,
+      };
+    });
+    setLocalFileFeedNames((current) => {
+      if (draft.sourceMode !== "file" || !draft.uploadedFile) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [getLocalFileKey(draft.uploadedFile)]: draft.feedName,
+      };
+    });
+    setLocalFileModelSelections((current) => {
+      if (draft.sourceMode !== "file" || !draft.uploadedFile) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [getLocalFileKey(draft.uploadedFile)]: draft.modelSize,
+      };
+    });
+    setLocalFileZonePoints((current) => {
+      if (draft.sourceMode !== "file" || !draft.uploadedFile) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [getLocalFileKey(draft.uploadedFile)]: draft.zonePoints,
+      };
+    });
     setQueuedLocalFiles((current) => {
       if (draft.sourceMode !== "file") {
         return current;
@@ -853,6 +1098,26 @@ export default function Dashboard() {
   }, [sourceMode, uploadedFile]);
 
   const handleEditStagedFeed = useCallback((clientId: string) => {
+    if (isLocalFileDraftId(clientId)) {
+      const draftFile = allSelectedLocalFiles.find((file) => createLocalFileDraftId(file) === clientId);
+      if (!draftFile) {
+        return;
+      }
+
+      const remainingFiles = allSelectedLocalFiles.filter((file) => createLocalFileDraftId(file) !== clientId);
+      setUploadedFile(draftFile);
+      setQueuedLocalFiles(remainingFiles);
+      setFeedName(localFileFeedNames[getLocalFileKey(draftFile)] ?? getSuggestedFeedNameFromFile(draftFile));
+      setZonePoints(localFileZonePoints[getLocalFileKey(draftFile)] ?? []);
+      setSelectedModel(localFileModelSelections[getLocalFileKey(draftFile)] ?? "n");
+      setSelectedEstablishmentId(localFileEstablishmentSelections[getLocalFileKey(draftFile)] ?? null);
+      setSelectedCaisseId(localFileCaisseSelections[getLocalFileKey(draftFile)] ?? null);
+      setCurrentDraftId(createDraftId());
+      setSourceMode("file");
+      setSetupStep("source");
+      return;
+    }
+
     const draft = stagedFeeds.find((item) => item.clientId === clientId);
     if (!draft) {
       return;
@@ -860,11 +1125,30 @@ export default function Dashboard() {
 
     setStagedFeeds((current) => current.filter((item) => item.clientId !== clientId));
     loadDraftIntoEditor(draft);
-  }, [loadDraftIntoEditor, stagedFeeds]);
+  }, [allSelectedLocalFiles, loadDraftIntoEditor, localFileCaisseSelections, localFileEstablishmentSelections, localFileFeedNames, localFileModelSelections, localFileZonePoints, stagedFeeds]);
 
   const handleRemoveStagedFeed = useCallback((clientId: string) => {
+    if (isLocalFileDraftId(clientId)) {
+      const remainingFiles = allSelectedLocalFiles.filter((file) => createLocalFileDraftId(file) !== clientId);
+      const nextActiveFile = uploadedFile && createLocalFileDraftId(uploadedFile) !== clientId
+        ? uploadedFile
+        : remainingFiles[0] ?? null;
+      const nextQueuedFiles = nextActiveFile
+        ? remainingFiles.filter((file) => getLocalFileKey(file) !== getLocalFileKey(nextActiveFile))
+        : [];
+
+      setUploadedFile(nextActiveFile);
+      setQueuedLocalFiles(nextQueuedFiles);
+      setFeedName(nextActiveFile ? localFileFeedNames[getLocalFileKey(nextActiveFile)] ?? getSuggestedFeedNameFromFile(nextActiveFile) : "");
+      setZonePoints(nextActiveFile ? localFileZonePoints[getLocalFileKey(nextActiveFile)] ?? [] : []);
+      setSelectedModel(nextActiveFile ? localFileModelSelections[getLocalFileKey(nextActiveFile)] ?? "n" : "n");
+      setSelectedEstablishmentId(nextActiveFile ? localFileEstablishmentSelections[getLocalFileKey(nextActiveFile)] ?? null : null);
+      setSelectedCaisseId(nextActiveFile ? localFileCaisseSelections[getLocalFileKey(nextActiveFile)] ?? null : null);
+      return;
+    }
+
     setStagedFeeds((current) => current.filter((item) => item.clientId !== clientId));
-  }, []);
+  }, [allSelectedLocalFiles, localFileCaisseSelections, localFileEstablishmentSelections, localFileFeedNames, localFileModelSelections, localFileZonePoints, uploadedFile]);
 
   const handleSourceModeChange = (mode: SourceMode) => {
     setSourceMode(mode);
@@ -954,6 +1238,15 @@ export default function Dashboard() {
 
   const handleRemoveQueuedLocalFile = useCallback((fileKey: string) => {
     setQueuedLocalFiles((current) => current.filter((file) => getLocalFileKey(file) !== fileKey));
+    setLocalFileZonePoints((current) => {
+      if (!(fileKey in current)) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[fileKey];
+      return next;
+    });
   }, []);
 
   const handleActivateQueuedLocalFile = useCallback((fileKey: string) => {
@@ -967,14 +1260,16 @@ export default function Dashboard() {
       const nextQueue = uploadedFile ? dedupeLocalFiles([uploadedFile, ...remainingFiles], [getLocalFileKey(nextFile)]) : remainingFiles;
 
       setUploadedFile(nextFile);
-      setFeedName(getSuggestedFeedNameFromFile(nextFile));
-      setZonePoints([]);
-      setSelectedModel("n");
+      setFeedName(localFileFeedNames[getLocalFileKey(nextFile)] ?? getSuggestedFeedNameFromFile(nextFile));
+      setZonePoints(localFileZonePoints[getLocalFileKey(nextFile)] ?? []);
+      setSelectedModel(localFileModelSelections[getLocalFileKey(nextFile)] ?? "n");
+      setSelectedEstablishmentId(localFileEstablishmentSelections[getLocalFileKey(nextFile)] ?? null);
+      setSelectedCaisseId(localFileCaisseSelections[getLocalFileKey(nextFile)] ?? null);
       setCurrentDraftId(createDraftId());
 
       return nextQueue;
     });
-  }, [uploadedFile]);
+  }, [localFileCaisseSelections, localFileEstablishmentSelections, localFileFeedNames, localFileModelSelections, localFileZonePoints, uploadedFile]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(event.target.files ?? []);
@@ -991,9 +1286,12 @@ export default function Dashboard() {
 
     if (!uploadedFile) {
       setUploadedFile(nextUploadedFile);
-      setZonePoints([]);
+      setZonePoints(nextUploadedFile ? localFileZonePoints[getLocalFileKey(nextUploadedFile)] ?? [] : []);
+      setSelectedModel(nextUploadedFile ? localFileModelSelections[getLocalFileKey(nextUploadedFile)] ?? "n" : "n");
+      setSelectedEstablishmentId(nextUploadedFile ? localFileEstablishmentSelections[getLocalFileKey(nextUploadedFile)] ?? null : null);
+      setSelectedCaisseId(nextUploadedFile ? localFileCaisseSelections[getLocalFileKey(nextUploadedFile)] ?? null : null);
       if (nextUploadedFile && !feedName.trim()) {
-        setFeedName(getSuggestedFeedNameFromFile(nextUploadedFile));
+        setFeedName(localFileFeedNames[getLocalFileKey(nextUploadedFile)] ?? getSuggestedFeedNameFromFile(nextUploadedFile));
       }
     }
 
@@ -1012,6 +1310,14 @@ export default function Dashboard() {
       fileInputRef.current.value = "";
     }
   };
+
+  const handleSelectZoneVideo = useCallback((fileKey: string) => {
+    if (!uploadedFile || fileKey === getLocalFileKey(uploadedFile)) {
+      return;
+    }
+
+    handleActivateQueuedLocalFile(fileKey);
+  }, [handleActivateQueuedLocalFile, uploadedFile]);
 
   const handleSourceStepSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1349,7 +1655,7 @@ export default function Dashboard() {
 
   const handleFinalizeBatch = async (launchAfterCreate: boolean) => {
     const currentDraft = currentReviewDraft;
-    const drafts = [...stagedFeeds, ...(currentDraft ? [currentDraft] : [])];
+    const drafts = [...stagedFeeds, ...preparedLocalFileDrafts, ...(currentDraft ? [currentDraft] : [])];
 
     if (drafts.length === 0) {
       toast.error("Stage at least one source before submitting the batch.");
@@ -1418,8 +1724,19 @@ export default function Dashboard() {
 
       const failedIds = new Set(result.results.filter((item) => item.status === "failed").map((item) => item.client_id));
       if (failedIds.size > 0) {
-        setStagedFeeds(drafts.filter((draft) => failedIds.has(draft.clientId)));
-        resetCurrentDraft({ preserveSourceMode: true, preserveOnvifDiscovery: sourceMode === "onvif" });
+        const failedCameraDrafts = drafts.filter((draft) => failedIds.has(draft.clientId) && !isLocalFileDraftId(draft.clientId));
+        const failedLocalFiles = allSelectedLocalFiles.filter((file) => failedIds.has(createLocalFileDraftId(file)));
+        const nextActiveLocalFile = failedLocalFiles[0] ?? null;
+
+        setStagedFeeds(failedCameraDrafts);
+        setUploadedFile(nextActiveLocalFile);
+        setQueuedLocalFiles(nextActiveLocalFile ? failedLocalFiles.slice(1) : []);
+        setFeedName(nextActiveLocalFile ? localFileFeedNames[getLocalFileKey(nextActiveLocalFile)] ?? getSuggestedFeedNameFromFile(nextActiveLocalFile) : "");
+        setZonePoints(nextActiveLocalFile ? localFileZonePoints[getLocalFileKey(nextActiveLocalFile)] ?? [] : []);
+        setSelectedModel(nextActiveLocalFile ? localFileModelSelections[getLocalFileKey(nextActiveLocalFile)] ?? "n" : "n");
+        setSelectedEstablishmentId(nextActiveLocalFile ? localFileEstablishmentSelections[getLocalFileKey(nextActiveLocalFile)] ?? null : null);
+        setSelectedCaisseId(nextActiveLocalFile ? localFileCaisseSelections[getLocalFileKey(nextActiveLocalFile)] ?? null : null);
+        setCurrentDraftId(createDraftId());
         setSetupStep("review");
         toast.error(
           launchAfterCreate
@@ -1442,7 +1759,31 @@ export default function Dashboard() {
     }
   };
 
+  const handleConfirmDeleteFeed = async () => {
+    if (!feedPendingDeletion) {
+      return;
+    }
+
+    const feed = feedPendingDeletion;
+    setActiveFeedAction({ feedId: feed.feed_id, action: "delete" });
+
+    try {
+      await deleteFeedMutation.mutateAsync(feed.feed_id);
+      toast.success(`${feed.name} removed.`);
+      setFeedPendingDeletion(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete the feed.");
+    } finally {
+      setActiveFeedAction(null);
+    }
+  };
+
   const handleFeedAction = async (feed: VideoFeed, action: FeedAction) => {
+    if (action === "delete") {
+      setFeedPendingDeletion(feed);
+      return;
+    }
+
     setActiveFeedAction({ feedId: feed.feed_id, action });
 
     try {
@@ -1549,6 +1890,7 @@ export default function Dashboard() {
                   const canStart = feed.status === "created" || feed.status === "stopped" || feed.status === "error";
                   const canStop = feed.status === "running";
                   const canRestart = feed.status !== "created" && feed.status !== "initializing";
+                  const canDelete = feed.status !== "initializing";
 
                   return (
                     <div
@@ -1619,6 +1961,20 @@ export default function Dashboard() {
                               <RotateCcw className="mr-2 h-4 w-4" />
                             )}
                             Restart
+                          </Button>
+                          <Button
+                            onClick={() => handleFeedAction(feed, "delete")}
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                            disabled={isFeedActionPending || !canDelete}
+                          >
+                            {currentAction === "delete" ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="mr-2 h-4 w-4" />
+                            )}
+                            Remove
                           </Button>
                           {feed.status === "initializing" && (
                             <span className="text-xs text-muted-foreground">Worker is initializing...</span>
@@ -1808,7 +2164,7 @@ export default function Dashboard() {
             <DialogHeader>
               <DialogTitle className="text-foreground">Stage Sources</DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                Configure one source at a time, stage it into the batch, then repeat until the full operator session is ready for review and launch.
+                Enter the feed information, select the required videos or camera sources, optionally attach metadata, then continue through zone tracing, model selection, and review.
               </DialogDescription>
             </DialogHeader>
 
@@ -1827,60 +2183,8 @@ export default function Dashboard() {
                   />
                 </div>
                 <div className="rounded-lg border border-border bg-background/50 p-3 text-xs text-muted-foreground">
-                  {stagedFeeds.length} staged so far. This session must contain exactly {parsedTargetSourceCount} source{parsedTargetSourceCount === 1 ? "" : "s"} before the batch can be saved or launched.
+                  {stagedSourceCount} prepared so far. This session must contain exactly {parsedTargetSourceCount} source{parsedTargetSourceCount === 1 ? "" : "s"} before review and launch.
                 </div>
-              </div>
-
-              <div className="space-y-3 rounded-xl border border-border bg-background/40 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Batch source queue</p>
-                    <p className="text-xs text-muted-foreground">
-                      Add one video or camera at a time. Every staged source stays listed here while you configure the next one.
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">{stagedFeeds.length} staged</Badge>
-                    <Badge variant="outline">{remainingSourceCount} remaining</Badge>
-                  </div>
-                </div>
-
-                {stagedFeeds.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border bg-background/50 p-4 text-sm text-muted-foreground">
-                    No staged sources yet. Finish the current source, then click Add Current Source in the review step to keep building the batch.
-                  </div>
-                ) : (
-                  <div className="grid gap-2">
-                    {stagedFeeds.map((draft, index) => {
-                      const item = toReviewLaunchItem(draft);
-                      return (
-                        <div key={draft.clientId} className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-border bg-background/50 p-3">
-                          <div className="min-w-0 space-y-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge variant="outline">Source {index + 1}</Badge>
-                              <p className="text-sm font-medium text-foreground">{item.feedName}</p>
-                              <Badge variant="outline">{item.sourceMode === "file" ? "Video" : item.sourceMode === "onvif" ? "ONVIF" : "RTSP"}</Badge>
-                              <Badge variant="outline">YOLO {item.modelSize.toUpperCase()}</Badge>
-                            </div>
-                            <p className="truncate text-xs text-muted-foreground">{item.sourceLabel}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {item.zonePointCount > 0 ? `${item.zonePointCount} zone points ready` : "Zone optional"}
-                              {item.caisseName ? ` · ${item.caisseName}` : ""}
-                            </p>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Button onClick={() => handleEditStagedFeed(draft.clientId)} size="sm" type="button" variant="outline">
-                              Edit
-                            </Button>
-                            <Button onClick={() => handleRemoveStagedFeed(draft.clientId)} size="sm" type="button" variant="outline">
-                              Remove
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
 
               <div className="space-y-2">
@@ -2326,102 +2630,6 @@ export default function Dashboard() {
                 </TabsContent>
               </Tabs>
 
-              <div className="space-y-4 rounded-xl border border-border bg-background/40 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Store metadata</p>
-                    <p className="text-xs text-muted-foreground">
-                      Assign an establishment and caisse now so the feed is linked to the same hierarchy used in the desktop workflow.
-                    </p>
-                  </div>
-                  {selectedCaisse?.zone && <Badge variant="outline">Saved caisse zone available</Badge>}
-                </div>
-
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <Label className="text-foreground">Establishment</Label>
-                      <Button onClick={() => setIsCreateEstablishmentDialogOpen(true)} size="sm" type="button" variant="outline">
-                        <Plus className="mr-1 h-3.5 w-3.5" />
-                        New
-                      </Button>
-                    </div>
-                    <Select
-                      onValueChange={handleEstablishmentChange}
-                      value={selectedEstablishmentId !== null ? String(selectedEstablishmentId) : UNASSIGNED_SELECT_VALUE}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={establishmentsQuery.isLoading ? "Loading establishments..." : "Select an establishment"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={UNASSIGNED_SELECT_VALUE}>No establishment</SelectItem>
-                        {establishments.map((establishment) => (
-                          <SelectItem key={establishment.id} value={String(establishment.id)}>
-                            {establishment.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {establishmentsQuery.isError && (
-                      <p className="text-xs text-destructive">Failed to load establishments.</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <Label className="text-foreground">Caisse</Label>
-                      <Button
-                        onClick={() => setIsCreateCaisseDialogOpen(true)}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                        disabled={selectedEstablishmentId === null}
-                      >
-                        <Plus className="mr-1 h-3.5 w-3.5" />
-                        New
-                      </Button>
-                    </div>
-                    <Select
-                      onValueChange={handleCaisseChange}
-                      value={selectedCaisseId !== null ? String(selectedCaisseId) : UNASSIGNED_SELECT_VALUE}
-                      disabled={selectedEstablishmentId === null || caissesQuery.isLoading}
-                    >
-                      <SelectTrigger>
-                        <SelectValue
-                          placeholder={
-                            selectedEstablishmentId === null
-                              ? "Select an establishment first"
-                              : caissesQuery.isLoading
-                                ? "Loading caisses..."
-                                : "Select a caisse"
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={UNASSIGNED_SELECT_VALUE}>No caisse</SelectItem>
-                        {caisses.map((caisse) => (
-                          <SelectItem key={caisse.id} value={String(caisse.id)}>
-                            {caisse.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {selectedEstablishmentId !== null && !caissesQuery.isLoading && caisses.length === 0 && (
-                      <p className="text-xs text-muted-foreground">No caisses yet for this establishment.</p>
-                    )}
-                    {caissesQuery.isError && (
-                      <p className="text-xs text-destructive">Failed to load caisses for the selected establishment.</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-border bg-background/50 p-3 text-xs text-muted-foreground">
-                  {selectedCaisse?.zone
-                    ? "This caisse already has a saved zone. Camera feeds created with this selection will automatically reuse it until you edit the zone later."
-                    : "Metadata is optional, but selecting it now links the feed to the SQLite hierarchy and lets saved caisse zones be reused when they exist."}
-                </div>
-              </div>
-
               <div className="rounded-lg border border-border bg-background/50 p-3 text-xs text-muted-foreground">
                 {sourceMode === "file"
                   ? "Step 1 uploads the source file into the backend workflow. Step 2 lets you draw the queue polygon on the video frame. Step 3 selects the model size."
@@ -2430,12 +2638,48 @@ export default function Dashboard() {
                     : "ONVIF onboarding now covers device discovery, stream resolution, backend camera testing, and snapshot-based zone selection before model choice."}
               </div>
 
+              {(stagedFeeds.length > 0 || allSelectedLocalFiles.length > 0) && (
+                <div className="space-y-3 rounded-xl border border-border bg-background/40 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Configured sources</p>
+                      <p className="text-xs text-muted-foreground">These are the sources currently prepared for zone tracing, model assignment, and review.</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">{stagedSourceCount} prepared</Badge>
+                      <Badge variant="outline">{remainingSourceCount} remaining</Badge>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    {stagedFeeds.map((draft) => {
+                      const item = toReviewLaunchItem(draft);
+                      return (
+                        <div key={draft.clientId} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 p-3">
+                          <div className="min-w-0 space-y-1">
+                            <p className="text-sm font-medium text-foreground">{item.feedName}</p>
+                            <p className="truncate text-xs text-muted-foreground">{item.sourceLabel}</p>
+                          </div>
+                          <Badge variant="outline">{item.sourceMode === "file" ? "Video" : item.sourceMode === "onvif" ? "ONVIF" : "RTSP"}</Badge>
+                        </div>
+                      );
+                    })}
+                    {preparedLocalFileDrafts.map((draft) => (
+                      <div key={draft.clientId} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 p-3">
+                        <div className="min-w-0 space-y-1">
+                          <p className="text-sm font-medium text-foreground">{draft.feedName}</p>
+                          <p className="truncate text-xs text-muted-foreground">{draft.uploadedFile?.name ?? "Selected local video"}</p>
+                        </div>
+                        <Badge variant="outline">YOLO {draft.modelSize.toUpperCase()}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <DialogFooter>
                 <Button onClick={resetSetupFlow} type="button" variant="outline">
                   Cancel
-                </Button>
-                <Button onClick={handleOpenBatchReview} type="button" variant="outline" disabled={stagedFeeds.length === 0}>
-                  Review Staged Batch
                 </Button>
                 <Button disabled={!canContinueSourceStep || isTestingCameraSource} type="submit">
                   Continue to Zone
@@ -2448,13 +2692,109 @@ export default function Dashboard() {
         <ZoneSelectionDialog
           feedName={feedName}
           file={uploadedFile}
+          fileOptions={localZoneVideoOptions}
           loadPreviewFrame={sourceMode === "file" ? null : buildSnapshotLoader}
           onBack={() => setSetupStep("source")}
           onContinue={() => setSetupStep("model")}
           onOpenChange={handleDialogOpenChange}
           onPointsChange={setZonePoints}
+          onSelectedFileChange={handleSelectZoneVideo}
           open={setupStep === "zone"}
           points={zonePoints}
+          selectedFileKey={selectedLocalZoneVideoKey}
+          metadataContent={
+            <div className="space-y-4 rounded-xl border border-border bg-background/40 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Store metadata</p>
+                  <p className="text-xs text-muted-foreground">
+                    Metadata is saved per selected source. Switching videos or streams restores that source's establishment and caisse.
+                  </p>
+                </div>
+                {selectedCaisse?.zone && <Badge variant="outline">Saved caisse zone available</Badge>}
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-foreground">Establishment</Label>
+                    <Button onClick={() => setIsCreateEstablishmentDialogOpen(true)} size="sm" type="button" variant="outline">
+                      <Plus className="mr-1 h-3.5 w-3.5" />
+                      New
+                    </Button>
+                  </div>
+                  <Select
+                    onValueChange={handleEstablishmentChange}
+                    value={selectedEstablishmentId !== null ? String(selectedEstablishmentId) : UNASSIGNED_SELECT_VALUE}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={establishmentsQuery.isLoading ? "Loading establishments..." : "Select an establishment"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={UNASSIGNED_SELECT_VALUE}>No establishment</SelectItem>
+                      {establishments.map((establishment) => (
+                        <SelectItem key={establishment.id} value={String(establishment.id)}>
+                          {establishment.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {establishmentsQuery.isError && <p className="text-xs text-destructive">Failed to load establishments.</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label className="text-foreground">Caisse</Label>
+                    <Button
+                      onClick={() => setIsCreateCaisseDialogOpen(true)}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                      disabled={selectedEstablishmentId === null}
+                    >
+                      <Plus className="mr-1 h-3.5 w-3.5" />
+                      New
+                    </Button>
+                  </div>
+                  <Select
+                    onValueChange={handleCaisseChange}
+                    value={selectedCaisseId !== null ? String(selectedCaisseId) : UNASSIGNED_SELECT_VALUE}
+                    disabled={selectedEstablishmentId === null || caissesQuery.isLoading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          selectedEstablishmentId === null
+                            ? "Select an establishment first"
+                            : caissesQuery.isLoading
+                              ? "Loading caisses..."
+                              : "Select a caisse"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={UNASSIGNED_SELECT_VALUE}>No caisse</SelectItem>
+                      {caisses.map((caisse) => (
+                        <SelectItem key={caisse.id} value={String(caisse.id)}>
+                          {caisse.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedEstablishmentId !== null && !caissesQuery.isLoading && caisses.length === 0 && (
+                    <p className="text-xs text-muted-foreground">No caisses yet for this establishment.</p>
+                  )}
+                  {caissesQuery.isError && <p className="text-xs text-destructive">Failed to load caisses for the selected establishment.</p>}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border bg-background/50 p-3 text-xs text-muted-foreground">
+                {selectedCaisse?.zone
+                  ? "This caisse already has a saved zone. The current source can reuse it until you edit the zone." 
+                  : "Metadata is optional, but selecting it now links this source to the SQLite hierarchy and lets saved caisse zones be reused when they exist."}
+              </div>
+            </div>
+          }
           sourceKind={sourceMode === "file" ? "Selected file" : sourceMode === "onvif" ? "ONVIF snapshot" : "RTSP preview"}
           sourceLabel={
             sourceMode === "file"
@@ -2497,9 +2837,12 @@ export default function Dashboard() {
           onBack={() => setSetupStep("zone")}
           onConfirm={() => setSetupStep("review")}
           onModelChange={setSelectedModel}
+          onSelectedSourceChange={sourceMode === "file" ? handleSelectZoneVideo : undefined}
           onOpenChange={handleDialogOpenChange}
           open={setupStep === "model"}
           selectedModel={selectedModel}
+          selectedSourceKey={sourceMode === "file" ? selectedLocalZoneVideoKey : undefined}
+          sourceOptions={sourceMode === "file" ? localZoneVideoOptions : []}
           sourceMode={sourceMode}
           zonePointCount={zonePoints.length}
         />
@@ -2523,6 +2866,29 @@ export default function Dashboard() {
           targetSourceCount={parsedTargetSourceCount}
           webhookEnabled={batchWebhookEnabled}
         />
+
+        <AlertDialog open={feedPendingDeletion !== null} onOpenChange={(open) => {
+          if (!open) {
+            setFeedPendingDeletion(null);
+          }
+        }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove Feed</AlertDialogTitle>
+              <AlertDialogDescription>
+                {feedPendingDeletion
+                  ? `Remove ${feedPendingDeletion.name} from the dashboard and backend registry? This stops using the source until you add it again.`
+                  : "Remove this feed from the dashboard and backend registry?"}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={activeFeedAction?.action === "delete"}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => void handleConfirmDeleteFeed()} disabled={activeFeedAction?.action === "delete"}>
+                {activeFeedAction?.action === "delete" ? "Removing..." : "Remove Feed"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <Dialog open={isCreateEstablishmentDialogOpen} onOpenChange={setIsCreateEstablishmentDialogOpen}>
           <DialogContent className="border-border bg-card sm:max-w-md">
