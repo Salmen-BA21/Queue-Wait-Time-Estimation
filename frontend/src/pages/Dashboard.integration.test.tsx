@@ -199,6 +199,30 @@ function renderDashboard() {
   );
 }
 
+function mockDashboardState(feeds: VideoFeed[] = []) {
+  const dashboardState = createUseLiveDashboardValue(feeds);
+  vi.mocked(useLiveDashboard).mockReturnValue(dashboardState as unknown as ReturnType<typeof useLiveDashboard>);
+  return dashboardState;
+}
+
+function getSetupFileInput(): HTMLInputElement {
+  const fileInput = document.querySelector('input[type="file"]');
+  if (!(fileInput instanceof HTMLInputElement)) {
+    throw new Error("Expected file input to be present in the setup dialog.");
+  }
+  return fileInput;
+}
+
+function createVideoFile(name: string, contents: string): File {
+  return new File([contents], name, { type: "video/mp4" });
+}
+
+async function openBatchSetup() {
+  renderDashboard();
+  fireEvent.click(screen.getByRole("button", { name: "Setup Batch" }));
+  await screen.findByLabelText("Feed name");
+}
+
 describe("Dashboard integration", () => {
   beforeEach(() => {
     vi.mocked(listEstablishments).mockResolvedValue([] satisfies Establishment[]);
@@ -238,20 +262,12 @@ describe("Dashboard integration", () => {
   });
 
   it("stages an RTSP source and launches the batch with shared runtime settings", async () => {
-    vi.mocked(useLiveDashboard).mockReturnValue(createUseLiveDashboardValue([]) as unknown as ReturnType<typeof useLiveDashboard>);
-
-    renderDashboard();
-
-    fireEvent.click(screen.getByRole("button", { name: "Setup Batch" }));
+    mockDashboardState([]);
+    await openBatchSetup();
     fireEvent.change(screen.getByLabelText("Feed name"), { target: { value: "Checkout Upload" } });
 
-    const fileInput = document.querySelector('input[type="file"]');
-    if (!(fileInput instanceof HTMLInputElement)) {
-      throw new Error("Expected file input to be present in the setup dialog.");
-    }
-
-    const file = new File(["video-bytes"], "queue.mp4", { type: "video/mp4" });
-    fireEvent.change(fileInput, { target: { files: [file] } });
+    const fileInput = getSetupFileInput();
+    fireEvent.change(fileInput, { target: { files: [createVideoFile("queue.mp4", "video-bytes")] } });
 
     fireEvent.click(screen.getByRole("button", { name: "Continue to Zone" }));
     fireEvent.click(await screen.findByRole("button", { name: "Continue to Model" }));
@@ -286,19 +302,12 @@ describe("Dashboard integration", () => {
   });
 
   it("queues multiple local videos from one picker action and advances to the next file after staging", async () => {
-    vi.mocked(useLiveDashboard).mockReturnValue(createUseLiveDashboardValue([]) as unknown as ReturnType<typeof useLiveDashboard>);
+    mockDashboardState([]);
+    await openBatchSetup();
 
-    renderDashboard();
-
-    fireEvent.click(screen.getByRole("button", { name: "Setup Batch" }));
-
-    const fileInput = document.querySelector('input[type="file"]');
-    if (!(fileInput instanceof HTMLInputElement)) {
-      throw new Error("Expected file input to be present in the setup dialog.");
-    }
-
-    const fileA = new File(["video-a"], "checkout-a.mp4", { type: "video/mp4" });
-    const fileB = new File(["video-b"], "checkout-b.mp4", { type: "video/mp4" });
+    const fileInput = getSetupFileInput();
+    const fileA = createVideoFile("checkout-a.mp4", "video-a");
+    const fileB = createVideoFile("checkout-b.mp4", "video-b");
     fireEvent.change(fileInput, { target: { files: [fileA, fileB] } });
 
     expect(await screen.findByText("Selected local videos")).toBeInTheDocument();
@@ -319,19 +328,12 @@ describe("Dashboard integration", () => {
   });
 
   it("lets the operator choose which queued local video becomes active before tracing the zone", async () => {
-    vi.mocked(useLiveDashboard).mockReturnValue(createUseLiveDashboardValue([]) as unknown as ReturnType<typeof useLiveDashboard>);
+    mockDashboardState([]);
+    await openBatchSetup();
 
-    renderDashboard();
-
-    fireEvent.click(screen.getByRole("button", { name: "Setup Batch" }));
-
-    const fileInput = document.querySelector('input[type="file"]');
-    if (!(fileInput instanceof HTMLInputElement)) {
-      throw new Error("Expected file input to be present in the setup dialog.");
-    }
-
-    const fileA = new File(["video-a"], "checkout-a.mp4", { type: "video/mp4" });
-    const fileB = new File(["video-b"], "checkout-b.mp4", { type: "video/mp4" });
+    const fileInput = getSetupFileInput();
+    const fileA = createVideoFile("checkout-a.mp4", "video-a");
+    const fileB = createVideoFile("checkout-b.mp4", "video-b");
     fireEvent.change(fileInput, { target: { files: [fileA, fileB] } });
 
     expect(await screen.findByText(/Up next 1: checkout-b.mp4/)).toBeInTheDocument();
@@ -347,9 +349,7 @@ describe("Dashboard integration", () => {
   });
 
   it("routes edit-zone, remove, and restart actions through the live dashboard mutations", async () => {
-    const dashboardState = createUseLiveDashboardValue([createFeedRecord()]);
-    vi.mocked(useLiveDashboard).mockReturnValue(dashboardState as unknown as ReturnType<typeof useLiveDashboard>);
-
+    const dashboardState = mockDashboardState([createFeedRecord()]);
     renderDashboard();
 
     fireEvent.click(screen.getByRole("button", { name: "Edit Zone" }));

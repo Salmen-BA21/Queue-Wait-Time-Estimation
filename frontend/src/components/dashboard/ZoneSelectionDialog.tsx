@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useCallback, useEffect, useState } from "react";
 import { AlertTriangle, Loader2, RotateCcw, Undo2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -48,16 +48,63 @@ function clamp(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
-function loadFirstFrame(file: File): Promise<string> {
+function createAbortError(): Error {
+  const error = new Error("Preview load aborted.");
+  error.name = "AbortError";
+  return error;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+function loadFirstFrame(file: File, signal?: AbortSignal): Promise<string> {
   return new Promise((resolve, reject) => {
-    const objectUrl = URL.createObjectURL(file);
-    const video = document.createElement("video");
+    if (signal?.aborted) {
+      reject(createAbortError());
+      return;
+    }
+
+    let objectUrl = "";
+    let video: HTMLVideoElement;
+    let settled = false;
+
+    try {
+      objectUrl = URL.createObjectURL(file);
+      video = document.createElement("video");
+    } catch (error) {
+      reject(error instanceof Error ? error : new Error("Unable to prepare the selected video."));
+      return;
+    }
+
+    const finalize = (callback: () => void) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      callback();
+    };
 
     const cleanup = () => {
-      video.pause();
-      video.removeAttribute("src");
-      video.load();
-      URL.revokeObjectURL(objectUrl);
+      video.onloadeddata = null;
+      video.onerror = null;
+      signal?.removeEventListener("abort", handleAbort);
+      try {
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+      } catch {
+        return;
+      } finally {
+        if (objectUrl) {
+          URL.revokeObjectURL(objectUrl);
+        }
+      }
+    };
+
+    const handleAbort = () => {
+      finalize(() => reject(createAbortError()));
     };
 
     video.preload = "auto";
@@ -66,31 +113,39 @@ function loadFirstFrame(file: File): Promise<string> {
 
     video.onloadeddata = () => {
       try {
+        if (signal?.aborted) {
+          handleAbort();
+          return;
+        }
+
+        if (video.videoWidth <= 0 || video.videoHeight <= 0) {
+          finalize(() => reject(new Error("Unable to read the selected video frame.")));
+          return;
+        }
+
         const canvas = document.createElement("canvas");
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
 
         const context = canvas.getContext("2d");
         if (!context) {
-          cleanup();
-          reject(new Error("Unable to prepare the zone preview."));
+          finalize(() => reject(new Error("Unable to prepare the zone preview.")));
           return;
         }
 
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
-        cleanup();
-        resolve(dataUrl);
+        finalize(() => resolve(dataUrl));
       } catch (error) {
-        cleanup();
-        reject(error instanceof Error ? error : new Error("Unable to decode the selected video."));
+        finalize(() => reject(error instanceof Error ? error : new Error("Unable to decode the selected video.")));
       }
     };
 
     video.onerror = () => {
-      cleanup();
-      reject(new Error("The selected video could not be opened in the browser."));
+      finalize(() => reject(new Error("The selected video could not be opened in the browser.")));
     };
+
+    signal?.addEventListener("abort", handleAbort, { once: true });
 
     video.src = objectUrl;
     video.load();
@@ -124,42 +179,53 @@ export function ZoneSelectionDialog({
   const [resolvedSourceLabel, setResolvedSourceLabel] = useState<string>(sourceLabel ?? file?.name ?? "No source selected");
   const [resolvedSourceKind, setResolvedSourceKind] = useState<string>(sourceKind ?? (file ? "Selected file" : "Camera source"));
 
-  const reloadPreview = async () => {
+  const loadPreview = useCallback(async (signal?: AbortSignal): Promise<PreviewFrameResult> => {
+    if (file) {
+      const frameSrc = await loadFirstFrame(file, signal);
+      return {
+        frameSrc,
+        sourceLabel: sourceLabel ?? file.name,
+        sourceKind: sourceKind ?? "Selected file",
+      };
+    }
+
+    if (loadPreviewFrame) {
+      return loadPreviewFrame();
+    }
+
+    throw new Error("No source is available for zone selection.");
+  }, [file, loadPreviewFrame, sourceKind, sourceLabel]);
+
+  const applyPreviewResult = useCallback((result: PreviewFrameResult) => {
+    setFrameSrc(result.frameSrc);
+    setResolvedSourceLabel(result.sourceLabel);
+    setResolvedSourceKind(result.sourceKind);
+  }, []);
+
+  const reloadPreview = useCallback(async () => {
     if (!open) {
       return;
     }
 
+    const controller = new AbortController();
     setIsLoading(true);
     setPreviewError(null);
 
     try {
-      if (file) {
-        const src = await loadFirstFrame(file);
-        setFrameSrc(src);
-        setResolvedSourceLabel(sourceLabel ?? file.name);
-        setResolvedSourceKind(sourceKind ?? "Selected file");
-        return;
-      }
-
-      if (loadPreviewFrame) {
-        const result = await loadPreviewFrame();
-        setFrameSrc(result.frameSrc);
-        setResolvedSourceLabel(result.sourceLabel);
-        setResolvedSourceKind(result.sourceKind);
-        return;
-      }
-
-      setFrameSrc(null);
-      setResolvedSourceLabel(sourceLabel ?? "No source selected");
-      setResolvedSourceKind(sourceKind ?? "Source preview");
-      setPreviewError("No source is available for zone selection.");
+      const result = await loadPreview(controller.signal);
+      applyPreviewResult(result);
     } catch (error) {
+      if (isAbortError(error)) {
+        return;
+      }
       setFrameSrc(null);
       setPreviewError(error instanceof Error ? error.message : "Unable to load the preview frame.");
     } finally {
-      setIsLoading(false);
+      if (!controller.signal.aborted) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [applyPreviewResult, loadPreview, open]);
 
   useEffect(() => {
     if (!open || (!file && !loadPreviewFrame)) {
@@ -171,43 +237,32 @@ export function ZoneSelectionDialog({
       return undefined;
     }
 
-    let cancelled = false;
+    const controller = new AbortController();
     void (async () => {
       setIsLoading(true);
       setPreviewError(null);
 
       try {
-        if (file) {
-          const src = await loadFirstFrame(file);
-          if (!cancelled) {
-            setFrameSrc(src);
-            setResolvedSourceLabel(sourceLabel ?? file.name);
-            setResolvedSourceKind(sourceKind ?? "Selected file");
-          }
-        } else if (loadPreviewFrame) {
-          const result = await loadPreviewFrame();
-          if (!cancelled) {
-            setFrameSrc(result.frameSrc);
-            setResolvedSourceLabel(result.sourceLabel);
-            setResolvedSourceKind(result.sourceKind);
-          }
+        const result = await loadPreview(controller.signal);
+        if (!controller.signal.aborted) {
+          applyPreviewResult(result);
         }
       } catch (error) {
-        if (!cancelled) {
+        if (!controller.signal.aborted && !isAbortError(error)) {
           setPreviewError(error instanceof Error ? error.message : "Unable to load the preview frame.");
           setFrameSrc(null);
         }
       } finally {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setIsLoading(false);
         }
       }
     })();
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
-  }, [file, loadPreviewFrame, open, sourceKind, sourceLabel]);
+  }, [applyPreviewResult, file, loadPreview, loadPreviewFrame, open, sourceKind, sourceLabel]);
 
   const handlePreviewClick = (event: React.MouseEvent<HTMLImageElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();

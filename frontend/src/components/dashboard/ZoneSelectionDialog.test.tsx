@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { ZoneSelectionDialog } from "@/components/dashboard/ZoneSelectionDialog";
@@ -39,5 +39,37 @@ describe("ZoneSelectionDialog", () => {
     expect(screen.getByText(/Switch videos here to load a different frame/i)).toBeInTheDocument();
     expect(screen.getByRole("combobox")).toBeInTheDocument();
     expect(screen.getAllByText("checkout-a.mp4").length).toBeGreaterThan(0);
+  });
+
+  it("allows retrying when preview loading fails", async () => {
+    const loadPreviewFrame = vi
+      .fn<() => Promise<{ frameSrc: string; sourceKind: string; sourceLabel: string }>>()
+      .mockRejectedValueOnce(new Error("Snapshot failed"))
+      .mockResolvedValueOnce({
+        frameSrc: "data:image/png;base64,ZmFrZQ==",
+        sourceKind: "RTSP preview",
+        sourceLabel: "rtsp://camera-1/live",
+      });
+
+    render(
+      <ZoneSelectionDialog
+        feedName="checkout-a"
+        file={null}
+        loadPreviewFrame={loadPreviewFrame}
+        onBack={() => {}}
+        onContinue={() => {}}
+        onOpenChange={() => {}}
+        onPointsChange={() => {}}
+        open
+        points={[]}
+      />,
+    );
+
+    expect(await screen.findByText("Snapshot failed")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Retry Snapshot" }));
+
+    await waitFor(() => expect(loadPreviewFrame).toHaveBeenCalledTimes(2));
+    expect(await screen.findByAltText("Queue zone preview")).toBeInTheDocument();
   });
 });

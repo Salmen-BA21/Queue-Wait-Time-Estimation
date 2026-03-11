@@ -11,6 +11,39 @@ export interface ApiResponse<T> {
   message?: string | null;
 }
 
+export class ApiError extends Error {
+  status: number;
+  url: string;
+  detail: unknown;
+
+  constructor(message: string, options: { status: number; url: string; detail?: unknown }) {
+    super(message);
+    this.name = "ApiError";
+    this.status = options.status;
+    this.url = options.url;
+    this.detail = options.detail ?? null;
+  }
+}
+
+export class NetworkError extends Error {
+  url: string;
+  cause: unknown;
+
+  constructor(message: string, options: { url: string; cause?: unknown }) {
+    super(message);
+    this.name = "NetworkError";
+    this.url = options.url;
+    this.cause = options.cause ?? null;
+  }
+}
+
+export class ValidationError extends ApiError {
+  constructor(message: string, options: { status: number; url: string; detail?: unknown }) {
+    super(message, options);
+    this.name = "ValidationError";
+  }
+}
+
 export interface ZonePoint {
   x: number;
   y: number;
@@ -283,6 +316,49 @@ function buildWebSocketUrl(path: string): string {
   return url.toString();
 }
 
+function formatApiDetail(detail: unknown): string | null {
+  if (typeof detail === "string" && detail.trim()) {
+    return detail;
+  }
+
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => {
+        if (typeof item === "string") {
+          return item;
+        }
+
+        if (item && typeof item === "object" && "msg" in item && typeof item.msg === "string") {
+          return item.msg;
+        }
+
+        return null;
+      })
+      .filter((value): value is string => Boolean(value));
+
+    return messages.length > 0 ? messages.join("; ") : null;
+  }
+
+  if (detail && typeof detail === "object" && "message" in detail && typeof detail.message === "string") {
+    return detail.message;
+  }
+
+  return null;
+}
+
+async function parseResponsePayload<T>(response: Response): Promise<ApiResponse<T> | { detail?: unknown } | null> {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    return null;
+  }
+
+  try {
+    return (await response.json()) as ApiResponse<T> | { detail?: unknown };
+  } catch {
+    return null;
+  }
+}
+
 async function fetchApi<T>(path: string, init?: RequestInit): Promise<T> {
   const url = buildUrl(path);
   let response: Response;
@@ -300,19 +376,39 @@ async function fetchApi<T>(path: string, init?: RequestInit): Promise<T> {
     });
   } catch (error) {
     const reason = error instanceof Error ? error.message : "Unknown network error";
-    throw new Error(
+    throw new NetworkError(
       `Unable to reach the backend at ${url}. Check that the FastAPI server is running and that CORS allows this frontend origin. Original error: ${reason}`,
+      { url, cause: error },
     );
   }
 
-  const payload = (await response.json()) as ApiResponse<T> | { detail?: string };
+  const payload = await parseResponsePayload<T>(response);
 
   if (!response.ok) {
-    throw new Error("detail" in payload && payload.detail ? payload.detail : `Request failed with status ${response.status}`);
+    const detail = payload && "detail" in payload ? payload.detail : null;
+    const message = formatApiDetail(detail) ?? `Request failed with status ${response.status}`;
+
+    if (response.status === 400 || response.status === 422) {
+      throw new ValidationError(message, {
+        status: response.status,
+        url,
+        detail,
+      });
+    }
+
+    throw new ApiError(message, {
+      status: response.status,
+      url,
+      detail,
+    });
   }
 
-  if (!("data" in payload)) {
-    throw new Error("Malformed API response.");
+  if (!payload || !("data" in payload)) {
+    throw new ApiError("Malformed API response.", {
+      status: response.status,
+      url,
+      detail: payload,
+    });
   }
 
   return payload.data;
