@@ -12,10 +12,19 @@ Main backlog items for this sprint were person detection, multi-object tracking,
 \subsection{System Architecture}
 The foundation layer consists of three core components:
 \begin{itemize}
-    \item YOLO26 person detection,
-    \item ByteTrack object tracking,
+    \item YOLO26 person detection\cite{ultralytics_docs},
+    \item ByteTrack object tracking\cite{bytetrack2022},
     \item Polygon zone filtering.
 \end{itemize}
+
+\begin{figure}[ht]
+    \centering
+    \fbox{\parbox[c][6cm][c]{0.8\textwidth}{\centering Placeholder for architecture diagram (add architecture_diagram.png)}}
+    \caption{High-level system architecture: detectors, tracker, zone manager, analyzer, and integration components.}
+    \label{fig:architecture}
+\end{figure}
+
+See Figure~\ref{fig:architecture} for a high-level overview of the main components and data flow.
 
 \subsection{Module Implementation}
 \subsubsection{Detector Module}
@@ -81,6 +90,9 @@ Rates are modeled using posterior Gamma distributions:
 \mu \sim \Gamma(\alpha_{\mu}, \beta_{\mu}).
 \end{equation}
 
+This Bayesian approach follows standard inference patterns in machine learning and statistics \cite{bishop_prml},
+and is combined with queueing-theory reasoning for interpretability \cite{gross_queueing}.
+
 \subsection{Confidence Intervals}
 Ninety-five percent credible intervals are computed for each metric.
 
@@ -123,6 +135,7 @@ The project is organized into specialized modules:
     \item \texttt{threshold\_detector.py}: critical condition detection,
     \item \texttt{gui/app.py}: graphical interface and multi-video launcher.
 \end{itemize}
+\label{sec:code_org}
 
 \section{Software Validation}
 Unit tests are included (notably for the interface and uncertainty modules).

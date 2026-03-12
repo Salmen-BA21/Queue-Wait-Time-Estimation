@@ -18,6 +18,9 @@ The monitored indicators include counting accuracy, estimation stability, and al
 The system correctly tracks queue-load evolution and flags critical phases.
 The addition of credible intervals improves the operational interpretation of results.
 
+Figure~\ref{fig:sample_frame} shows a sample detection overlay on a video frame, and Figure~\ref{fig:eval_waittime}
+illustrates evaluation plots for waiting-time estimation across scenarios.
+
 \section{Example Results Table}
 \begin{table}[H]
     \centering
@@ -35,3 +38,17 @@ The addition of credible intervals improves the operational interpretation of re
 
 \section{Evaluation Limitations}
 Comprehensive multi-scenario evaluation still needs to be extended (camera-angle variations, strong occlusions, lighting changes, multi-zone setups).
+
+\begin{figure}[H]
+    \centering
+    \fbox{\parbox[c][5cm][c]{0.7\textwidth}{\centering Placeholder for sample frame (add sample_frame_detection.png)}}
+    \caption{Sample frame with detection bounding boxes and assigned tracker IDs.}
+    \label{fig:sample_frame}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \fbox{\parbox[c][6cm][c]{0.8\textwidth}{\centering Placeholder for evaluation plot (add evaluation_plot_waittime.png)}}
+    \caption{Waiting-time estimation error across evaluation scenarios (boxplots and mean RMSE).}
+    \label{fig:eval_waittime}
+\end{figure}
