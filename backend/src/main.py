@@ -19,6 +19,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import supervision as sv
 
 from src.config import (
     AppConfig,
@@ -183,6 +184,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional JSONL file used to stream structured dashboard events back to the API runtime.",
     )
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="Run without opening any GUI windows (cv2.imshow). (default: False)",
+    )
     return parser
 
 
@@ -274,28 +280,34 @@ def run(cfg: AppConfig) -> None:
             )
 
             # 5. Draw
-            labels = _build_labels(detections, in_zone)
-            frame = draw_detections(frame, detections, annotators, labels)
-            frame = zone_mgr.annotate(frame)
-            frame = draw_metrics_overlay(frame, _metrics_dict(metrics))
+            if not cfg.headless:
+                labels = _build_labels(detections, in_zone)
+                frame = draw_detections(frame, detections, annotators, labels)
+                frame = zone_mgr.annotate(frame)
+                frame = draw_metrics_overlay(frame, _metrics_dict(metrics))
 
-            # Resize frame if scale != 1.0
-            if cfg.resize_scale != 1.0:
-                frame = cv2.resize(frame, (0, 0), fx=cfg.resize_scale, fy=cfg.resize_scale)
+                # Resize frame if scale != 1.0
+                if cfg.resize_scale != 1.0:
+                    frame = cv2.resize(frame, (0, 0), fx=cfg.resize_scale, fy=cfg.resize_scale)
 
-            # 6. Show
-            cv2.imshow(WINDOW_NAME, frame)
-            key = cv2.waitKey(frame_delay) & 0xFF
-            if key == ord("q"):
-                logger.info("Quit requested by user.")
-                break
+                # 6. Show
+                cv2.imshow(WINDOW_NAME, frame)
+                key = cv2.waitKey(frame_delay) & 0xFF
+                if key == ord("q"):
+                    logger.info("Quit requested by user.")
+                    break
+            else:
+                # Still check for break conditions/events from the input
+                # or just use sleep to match the frame relay speed if needed,
+                # though headless usually runs as fast as the source permits.
+                pass
 
             # 7. Periodic logging & webhook sending
             now = time.monotonic()
             if (now - last_dashboard_event_time) >= 1.0:
                 event_writer.emit(
                     "metrics_update",
-                    {"metrics": _dashboard_metrics_payload(metrics, event_timestamp)},
+                    {"metrics": _dashboard_metrics_payload(metrics, event_timestamp, detections)},
                 )
                 last_dashboard_event_time = now
 
@@ -408,10 +420,29 @@ def _log_metrics(m: QueueMetrics, frame_count: int) -> None:
     )
 
 
-def _dashboard_metrics_payload(m: QueueMetrics, timestamp: float) -> dict[str, object]:
+def _dashboard_metrics_payload(
+    m: QueueMetrics,
+    timestamp: float,
+    detections: sv.Detections | None = None,
+) -> dict[str, object]:
     """Convert runtime metrics into the frontend websocket contract."""
     wait_time_seconds: float | None = m.estimated_wait_sec if m.queue_stable else None
     wait_time_ci: list[float] | None = [m.wait_time_lower, m.wait_time_upper] if m.queue_stable else None
+
+    # Convert supervision detections (xyxy) to nested list for JSON
+    # Each detection is [x1, y1, x2, y2, confidence, class_id, tracker_id]
+    det_list: list[list[float]] | None = None
+    if detections is not None:
+        det_list = []
+        for i, box in enumerate(detections.xyxy):
+            row = [
+                float(box[0]), float(box[1]), float(box[2]), float(box[3]),
+                float(detections.confidence[i]) if detections.confidence is not None else 1.0,
+                float(detections.class_id[i]) if detections.class_id is not None else 0.0,
+                float(detections.tracker_id[i]) if detections.tracker_id is not None else -1.0,
+            ]
+            det_list.append(row)
+
     return {
         "timestamp": timestamp,
         "people_in_zone": m.people_in_zone,
@@ -421,6 +452,7 @@ def _dashboard_metrics_payload(m: QueueMetrics, timestamp: float) -> dict[str, o
         "wait_time_ci": wait_time_ci,
         "uncertainty_level": m.uncertainty_level,
         "queue_stable": m.queue_stable,
+        "detections": det_list,
     }
 
 
@@ -468,6 +500,7 @@ def main() -> None:
         caisse_id=args.caisse_id,
         webhook_enabled=WEBHOOK_ENABLED and not args.disable_webhook,
         events_file=args.events_file,
+        headless=args.headless,
     )
 
     logger.info("Configuration: %s", cfg)

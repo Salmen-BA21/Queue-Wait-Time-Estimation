@@ -3,8 +3,9 @@ import { AlertTriangle, Camera, Loader2, Play, RotateCcw, Square, Trash2, Wifi, 
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { resolveApiUrl, type VideoFeed } from "@/lib/api";
+import { getFeedSnapshot, resolveApiUrl, type VideoFeed } from "@/lib/api";
 
 export type FeedGridAction = "start" | "stop" | "restart" | "delete";
 
@@ -44,40 +45,213 @@ function isRecoveryWarning(feed: VideoFeed): boolean {
   return feed.last_warning_code === "recovery_required";
 }
 
+function shouldUseSnapshotTransport(feed: VideoFeed): boolean {
+  const source = feed.source.trim().toLowerCase();
+  return source.startsWith("rtsp://") || /^\d+$/.test(source);
+}
+
 function FeedTransportSurface({
   feed,
   uiStatus,
   peopleInZone,
   waitTimeSeconds,
+  detections,
+  isStopping,
+  onOpenViewer,
 }: {
   feed: VideoFeed;
   uiStatus: "online" | "offline" | "warning";
   peopleInZone: number;
-  waitTimeSeconds: number | undefined;
+  waitTimeSeconds: number | undefined | null;
+  detections?: number[][] | null;
+  isStopping: boolean;
+  onOpenViewer?: () => void;
 }) {
   const [playbackFailed, setPlaybackFailed] = useState(false);
+  const [videoDims, setVideoDims] = useState<{ width: number; height: number } | null>(null);
+  const [liveFrameUrl, setLiveFrameUrl] = useState<string | null>(null);
+  const usesSnapshotTransport = shouldUseSnapshotTransport(feed);
 
   useEffect(() => {
     setPlaybackFailed(false);
   }, [feed.preview_path]);
 
+  const transportActive = uiStatus !== "offline" && !isStopping;
+
+  useEffect(() => {
+    let cancelled = false;
+    let inFlight = false;
+
+    if (!usesSnapshotTransport || !transportActive || (feed.status !== "running" && feed.status !== "initializing")) {
+      setLiveFrameUrl(null);
+      return;
+    }
+
+    const refreshSnapshot = async () => {
+      if (inFlight || cancelled) {
+        return;
+      }
+
+      inFlight = true;
+      try {
+        const snapshot = await getFeedSnapshot(feed.feed_id);
+        if (!cancelled && snapshot.captured && snapshot.image_data_url) {
+          setLiveFrameUrl(snapshot.image_data_url);
+        }
+      } catch {
+        // Keep the last known frame or fallback preview without interrupting the feed card.
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void refreshSnapshot();
+    const intervalId = window.setInterval(() => {
+      void refreshSnapshot();
+    }, 800);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [feed.feed_id, feed.status, transportActive, usesSnapshotTransport]);
+
   const previewUrl = feed.preview_path ? resolveApiUrl(feed.preview_path) : null;
-  const showPreview = Boolean(previewUrl) && !playbackFailed;
+  const showLiveFrame = usesSnapshotTransport && transportActive && Boolean(liveFrameUrl) && !playbackFailed;
+  const showPreview = transportActive && !showLiveFrame && Boolean(previewUrl) && !playbackFailed;
+  const zonePoints = feed.zone?.points ?? [];
+  const zonePolygonPoints = videoDims
+    ? zonePoints
+        .map((point) => `${point.x * videoDims.width},${point.y * videoDims.height}`)
+        .join(" ")
+    : "";
+
+  const onVideoLoad = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const video = e.currentTarget;
+    setVideoDims({ width: video.videoWidth, height: video.videoHeight });
+  };
+
+  const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const image = e.currentTarget;
+    setVideoDims({ width: image.naturalWidth, height: image.naturalHeight });
+  };
 
   return (
-    <div className="relative flex aspect-video items-center justify-center bg-background/80">
-      {showPreview ? (
-        <video
-          key={previewUrl}
-          className="h-full w-full object-cover"
-          src={previewUrl}
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="metadata"
-          onError={() => setPlaybackFailed(true)}
-        />
+    <button
+      type="button"
+      onClick={onOpenViewer}
+      className="relative flex aspect-video w-full items-center justify-center overflow-hidden bg-background/80 text-left"
+      disabled={!onOpenViewer}
+      aria-label={onOpenViewer ? `Open ${feed.name} in expanded view` : undefined}
+    >
+      {showLiveFrame ? (
+        <>
+          <img
+            key={liveFrameUrl}
+            className="h-full w-full object-cover"
+            src={liveFrameUrl ?? undefined}
+            alt={`${feed.name} live frame`}
+            onLoad={onImageLoad}
+            onError={() => setPlaybackFailed(true)}
+          />
+          {/* Tracking overlays (zone polygon + person boxes) */}
+          {videoDims && (zonePolygonPoints || (uiStatus === "online" && detections?.length)) && (
+            <svg
+              className="absolute inset-0 h-full w-full pointer-events-none"
+              viewBox={`0 0 ${videoDims.width} ${videoDims.height}`}
+              preserveAspectRatio="xMidYMid slice"
+            >
+              {zonePolygonPoints && (
+                <>
+                  <polygon
+                    points={zonePolygonPoints}
+                    className="fill-cyan-400/10 stroke-cyan-300"
+                    strokeWidth={3}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <polyline
+                    points={zonePolygonPoints}
+                    className="stroke-cyan-100/70"
+                    strokeWidth={1}
+                    fill="none"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </>
+              )}
+
+              {uiStatus === "online" && detections?.map((det, idx) => {
+                const [x1, y1, x2, y2] = det;
+                return (
+                  <rect
+                    key={idx}
+                    x={x1}
+                    y={y1}
+                    width={x2 - x1}
+                    height={y2 - y1}
+                    className="fill-primary/10 stroke-primary stroke-[2]"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                );
+              })}
+            </svg>
+          )}
+        </>
+      ) : showPreview ? (
+        <>
+          <video
+            key={previewUrl}
+            className="h-full w-full object-cover"
+            src={previewUrl}
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="metadata"
+            onLoadedMetadata={onVideoLoad}
+            onError={() => setPlaybackFailed(true)}
+          />
+          {/* Tracking overlays (zone polygon + person boxes) */}
+          {videoDims && (zonePolygonPoints || (uiStatus === "online" && detections?.length)) && (
+            <svg
+              className="absolute inset-0 h-full w-full pointer-events-none"
+              viewBox={`0 0 ${videoDims.width} ${videoDims.height}`}
+              preserveAspectRatio="xMidYMid slice"
+            >
+              {zonePolygonPoints && (
+                <>
+                  <polygon
+                    points={zonePolygonPoints}
+                    className="fill-cyan-400/10 stroke-cyan-300"
+                    strokeWidth={3}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <polyline
+                    points={zonePolygonPoints}
+                    className="stroke-cyan-100/70"
+                    strokeWidth={1}
+                    fill="none"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </>
+              )}
+
+              {uiStatus === "online" && detections?.map((det, idx) => {
+                const [x1, y1, x2, y2] = det;
+                return (
+                  <rect
+                    key={idx}
+                    x={x1}
+                    y={y1}
+                    width={x2 - x1}
+                    height={y2 - y1}
+                    className="fill-primary/10 stroke-primary stroke-[2]"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                );
+              })}
+            </svg>
+          )}
+        </>
       ) : (
         <div className="space-y-2 px-4 text-center">
           {uiStatus === "offline" ? (
@@ -110,7 +284,7 @@ function FeedTransportSurface({
           {formatWaitTime(waitTimeSeconds)}
         </div>
       )}
-    </div>
+    </button>
   );
 }
 
@@ -130,6 +304,9 @@ function FeedGridComponent({
   onEditZone: (feed: VideoFeed) => void;
   onFeedAction: (feed: VideoFeed, action: FeedGridAction) => void;
 }) {
+  const [expandedFeedId, setExpandedFeedId] = useState<string | null>(null);
+  const expandedFeed = feeds.find((feed) => feed.feed_id === expandedFeedId) ?? null;
+
   return (
     <div>
       <h2 className="mb-3 text-sm font-semibold text-foreground">Surveillance Wall</h2>
@@ -146,7 +323,8 @@ function FeedGridComponent({
         {feeds.map((feed) => {
           const uiStatus = mapFeedStatus(feed.status);
           const peopleInZone = feed.latest_metrics?.people_in_zone ?? 0;
-          const waitTimeSeconds = feed.latest_metrics?.wait_time_seconds;
+          const wait_time_seconds = feed.latest_metrics?.wait_time_seconds;
+          const detections = feed.latest_metrics?.detections;
           const currentAction = activeFeedAction?.feedId === feed.feed_id ? activeFeedAction.action : null;
           const isFeedActionPending = activeFeedAction?.feedId === feed.feed_id;
           const canStart = feed.status === "created" || feed.status === "stopped" || feed.status === "error";
@@ -163,7 +341,10 @@ function FeedGridComponent({
                 feed={feed}
                 uiStatus={uiStatus}
                 peopleInZone={peopleInZone}
-                waitTimeSeconds={waitTimeSeconds}
+                waitTimeSeconds={wait_time_seconds}
+                detections={detections}
+                isStopping={currentAction === "stop"}
+                onOpenViewer={() => setExpandedFeedId(feed.feed_id)}
               />
               <div className="p-3">
                 <div className="flex items-start justify-between gap-3">
@@ -305,6 +486,28 @@ function FeedGridComponent({
           );
         })}
       </div>
+
+      <Dialog open={expandedFeed !== null} onOpenChange={(open) => !open && setExpandedFeedId(null)}>
+        {expandedFeed && (
+          <DialogContent className="w-[95vw] max-w-6xl p-0">
+            <DialogTitle className="sr-only">{expandedFeed.name} expanded view</DialogTitle>
+            <div className="border-b border-border px-4 py-3">
+              <p className="text-sm font-semibold text-foreground">{expandedFeed.name}</p>
+              <p className="truncate font-mono text-xs text-muted-foreground">{expandedFeed.source}</p>
+            </div>
+            <FeedTransportSurface
+              feed={expandedFeed}
+              uiStatus={mapFeedStatus(expandedFeed.status)}
+              peopleInZone={expandedFeed.latest_metrics?.people_in_zone ?? 0}
+              waitTimeSeconds={expandedFeed.latest_metrics?.wait_time_seconds}
+              detections={expandedFeed.latest_metrics?.detections}
+              isStopping={
+                activeFeedAction?.feedId === expandedFeed.feed_id && activeFeedAction.action === "stop"
+              }
+            />
+          </DialogContent>
+        )}
+      </Dialog>
     </div>
   );
 }

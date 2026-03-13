@@ -114,6 +114,7 @@ class QueueMetricsModel(BaseModel):
     wait_time_ci: list[float] | None = None
     uncertainty_level: str
     queue_stable: bool
+    detections: list[list[float]] | None = None
 
 
 class AlertModel(BaseModel):

@@ -26,6 +26,7 @@ from src.api.models import (
     BatchFeedLaunchItemResult,
     BatchFeedLaunchResponse,
     BatchFeedLaunchSummary,
+    BatchRuntimeSettings,
     BatchLaunchMode,
     FeedStatusEvent,
     FeedStatusEventPayload,
@@ -419,6 +420,7 @@ class SubprocessFeedWorkerRunner:
             str(DEFAULT_RESIZE_SCALE),
             "--events-file",
             str(event_path),
+            "--headless",
         ]
 
         if record.zone is not None:
@@ -896,10 +898,10 @@ class FeedRegistry:
 
         return BatchFeedLaunchResponse(
             launch_mode=launch_mode,
-            runtime={
-                "log_level": log_level,
-                "webhook_enabled": webhook_enabled,
-            },
+            runtime=BatchRuntimeSettings(
+                log_level=log_level,
+                webhook_enabled=webhook_enabled,
+            ),
             results=results,
             summary=BatchFeedLaunchSummary(
                 total=len(feeds),

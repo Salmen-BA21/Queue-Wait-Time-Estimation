@@ -97,6 +97,7 @@ class AppConfig:
     caisse_id: Optional[int] = None
     webhook_enabled: bool = WEBHOOK_ENABLED
     events_file: Optional[str] = None
+    headless: bool = False
 
     @property
     def model_path(self) -> str:

@@ -554,10 +554,10 @@ export default function Dashboard() {
     () => [uploadedFile, ...queuedLocalFiles].filter((file): file is File => file !== null),
     [queuedLocalFiles, uploadedFile],
   );
-  const preparedLocalFileDrafts = useMemo(
+  const preparedLocalFileDrafts = useMemo<StagedFeedDraft[]>(
     () =>
       sourceMode === "file"
-        ? allSelectedLocalFiles.map((file) => {
+        ? allSelectedLocalFiles.map<StagedFeedDraft>((file) => {
             const fileKey = getLocalFileKey(file);
             const storedConfig = localFileConfigs[fileKey] ?? {};
             return {
@@ -588,7 +588,7 @@ export default function Dashboard() {
               onvifTestResult: null,
             };
           })
-        : [],
+        : ([] as StagedFeedDraft[]),
     [
       allSelectedLocalFiles,
       caisses,

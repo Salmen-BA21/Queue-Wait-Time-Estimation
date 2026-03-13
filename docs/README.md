@@ -48,3 +48,31 @@ Legacy phase documents are archived to preserve history. New updates should be w
 ---
 
 *Last organized: February 27, 2026*
+
+## Development — Running locally
+
+Follow these steps to launch the development backend and frontend on a developer machine.
+
+- **Backend (Windows PowerShell)**:
+	- Create a virtual environment (only once):
+		- `python -m venv .venv`
+	- Activate the environment:
+		- PowerShell: `.venv\Scripts\Activate.ps1`
+	- Install dependencies:
+		- `pip install -r requirements.txt`
+	- Start the FastAPI development server (auto-reload):
+		- `uvicorn backend.app:app --reload --host 127.0.0.1 --port 8000`
+	- The backend API will be available at `http://127.0.0.1:8000` and the OpenAPI UI at `http://127.0.0.1:8000/docs`.
+
+- **Frontend (Windows PowerShell / any shell)**:
+	- Change into the frontend folder:
+		- `cd frontend`
+	- Install node dependencies (only once or after package changes):
+		- `npm install`
+	- Start the Vite dev server:
+		- `npm run dev`
+	- By default Vite serves the app on `http://localhost:5173`. The frontend is configured to allow CORS from common dev origins.
+
+- **Notes**:
+	- If you prefer a different frontend port, set the `PORT` environment variable before running `npm run dev`.
+	- If running the backend on a remote machine, update the frontend API base URL to point to the backend host and ensure CORS and network access are permitted.

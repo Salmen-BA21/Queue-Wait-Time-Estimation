@@ -62,6 +62,7 @@ export interface QueueMetrics {
   wait_time_ci: [number, number] | null;
   uncertainty_level: string;
   queue_stable: boolean;
+  detections?: number[][] | null;
 }
 
 export interface QueueAlert {
