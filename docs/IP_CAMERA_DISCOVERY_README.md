@@ -4,12 +4,15 @@ This feature automatically discovers IP cameras on your local network using stan
 
 ## 🎯 Features
 
-- **Automatic Discovery**: Uses WS-Discovery protocol to find IP cameras
-- **Device Information**: Extracts camera details (name, manufacturer, model, IP, etc.)
+- **Automatic Discovery**: Uses WS-Discovery protocol to find IP cameras on your network
+- **Broad Camera Support**: Compatible with diverse ONVIF implementations (standard and vendor-specific)
+- **Device Information**: Extracts camera details (name, manufacturer, model, IP, serial number, hardware version, location)
 - **RTSP Stream Detection**: Automatically retrieves RTSP stream URLs from discovered devices
-- **Authentication Support**: Handles username/password authentication for device queries
+  - Tries ONVIF media service first (standard method)
+  - Falls back to common stream paths (`/profile0`, `/profile1`, `/stream1`, `/live/main`, etc.) for cameras without media service
+- **Authentication Support**: Handles username/password authentication for device queries and stream access
 - **GUI Integration**: Fully integrated into the queue monitoring GUI application
-- **Connection Testing**: Test RTSP streams before adding to monitoring
+- **Connection Testing**: Test RTSP streams with credentials before adding to monitoring
 
 ## 🚀 GUI Integration
 
@@ -75,7 +78,7 @@ for device in devices:
 
 ```python
 # Get RTSP URLs from a discovered device
-rtsp_urls = RTSPCamera.get_rtsp_urls_from_device(
+rtsp_urls = RTSPCamera.get_rtsp_urls_from_onvif_device(
     device,
     username="admin",  # Optional
     password="password123"  # Optional
@@ -91,15 +94,69 @@ for url in rtsp_urls:
         print(f"  FPS: {info['fps']}")
 ```
 
+## 🔍 How RTSP Stream Discovery Works
+
+The system uses a **two-stage approach** to find RTSP streams, ensuring compatibility with a broad range of cameras:
+
+### Stage 1: ONVIF Media Service (Primary)
+
+1. Checks if discovered device exposes an ONVIF media service
+2. Sends SOAP request to get available stream profiles
+3. Requests RTSP URI for each profile
+4. Returns discovered URLs with credentials embedded
+
+**Pros**: Standard method, most reliable  
+**Cons**: Requires media service endpoint (not all cameras expose this)
+
+### Stage 2: Fallback Path Testing (Automatic)
+
+If Stage 1 finds no streams, the system automatically tests common RTSP paths:
+- Profile paths: `/profile0`, `/profile1`, `/profile2`
+- Stream paths: `/stream0`, `/stream1`, `/stream2`
+- Live paths: `/live`, `/live/main`, `/live/0`, `/live/1`
+- Root: `/`
+
+For each candidate path:
+1. Constructs full RTSP URL with camera IP
+2. Embeds credentials if provided
+3. Tests connection for 3 seconds
+4. Returns first working stream
+
+**Pros**: Works with cameras that lack media service (e.g., DVRs, budget models)  
+**Cons**: Slightly slower (tests multiple paths), not guaranteed to find all streams
+
+### Example: Discovering Camera Without Media Service
+
+```python
+from backend.src.rtsp_camera import RTSPCamera
+
+# Discover device (e.g., Digital Watchdog DVR)
+devices = RTSPCamera.discover_onvif_devices()
+device = devices[0]
+
+# No media service in device['services']
+print(device['services'])  # Output: {'device': '...'}
+
+# Stage 2 fallback automatically activates
+urls = RTSPCamera.get_rtsp_urls_from_onvif_device(
+    device,
+    username="admin",
+    password="password123"
+)
+
+# Successfully finds /profile1
+print(urls)  # Output: ['rtsp://admin:***@192.168.1.80:554/profile1']
+```
+
 ### Integration with Queue System
 
 ```python
-# Discover cameras and automatically add them to your queue monitoring
-devices = RTSPCamera.discover_ip_devices()
+# Add discovered cameras to your queue monitoring
+devices = RTSPCamera.discover_onvif_devices()
 
 camera_configs = []
 for device in devices:
-    rtsp_urls = RTSPCamera.get_rtsp_urls_from_device(device)
+    rtsp_urls = RTSPCamera.get_rtsp_urls_from_onvif_device(device)
 
     for rtsp_url in rtsp_urls:
         # Test connection first

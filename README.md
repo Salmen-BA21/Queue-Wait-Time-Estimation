@@ -35,6 +35,14 @@ Detects people, tracks them across frames, counts how many stand inside a config
 
 This feature works like network device discovery tools - it finds IP cameras without needing to know their addresses in advance.
 
+### Key Capabilities
+
+- **Broad Compatibility**: Works with cameras that expose ONVIF media service AND cameras that don't (via automatic fallback)
+- **Dual Discovery Method**: 
+  - Primary: ONVIF media service (standard method)
+  - Fallback: Automatic testing of common RTSP paths (`/profile1`, `/live/main`, etc.) 
+- **Credential Support**: Test streams with username/password authentication
+
 ### GUI Integration
 
 The discovery feature is fully integrated into the GUI application:
@@ -42,7 +50,7 @@ The discovery feature is fully integrated into the GUI application:
 1. **Launch the GUI**: `python -m backend.src.gui.app`
 2. **Step 1**: Select "IP Camera Discovery" tab
 3. **Discover**: Click "🔍 Discover Cameras" to scan your network
-4. **Select & Test**: Choose cameras from the list and test connections
+4. **Select & Test**: Choose cameras from the list and test connections with credentials
 5. **Add to Analysis**: Add discovered cameras to your monitoring setup
 
 ### Programmatic Usage
@@ -51,14 +59,18 @@ The discovery feature is fully integrated into the GUI application:
 from backend.src.rtsp_camera import RTSPCamera
 
 # Discover all IP cameras on your network
-devices = RTSPCamera.discover_ip_devices()
+devices = RTSPCamera.discover_onvif_devices()
 
 for device in devices:
     print(f"Found: {device['name']} ({device['manufacturer']} {device['model']})")
     print(f"IP: {device['ip']}")
 
-    # Get RTSP stream URLs
-    rtsp_urls = RTSPCamera.get_rtsp_urls_from_device(device)
+    # Get RTSP stream URLs (works even without media service)
+    rtsp_urls = RTSPCamera.get_rtsp_urls_from_onvif_device(
+        device,
+        username="admin",
+        password="password123"
+    )
     for url in rtsp_urls:
         print(f"Stream: {url}")
 ```
@@ -73,7 +85,7 @@ python -m backend.src.gui.app
 python backend/scripts/discover_cameras.py
 
 # Or run the basic test
-python backend/scripts/test_ip_discovery.py
+python backend/scripts/test_ip_camera_discovery.py
 ```
 
 ### Documentation
