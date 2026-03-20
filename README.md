@@ -37,10 +37,11 @@ This feature works like network device discovery tools - it finds IP cameras wit
 
 ### Key Capabilities
 
-- **Broad Compatibility**: Works with cameras that expose ONVIF media service AND cameras that don't (via automatic fallback)
+- **Broad Compatibility**: Works with cameras that expose ONVIF media service or cameras that only advertise media through device capabilities
 - **Dual Discovery Method**: 
-  - Primary: ONVIF media service (standard method)
-  - Fallback: Automatic testing of common RTSP paths (`/profile1`, `/live/main`, etc.) 
+   - Primary: ONVIF media service (standard method)
+   - Secondary: Resolve media XAddr from device capabilities when discovery omits it
+   - No guessing: if ONVIF does not yield a stream URI, the helper returns no stream
 - **Credential Support**: Test streams with username/password authentication
 
 ### GUI Integration
@@ -65,7 +66,7 @@ for device in devices:
     print(f"Found: {device['name']} ({device['manufacturer']} {device['model']})")
     print(f"IP: {device['ip']}")
 
-    # Get RTSP stream URLs (works even without media service)
+    # Get RTSP stream URLs (works even when media is only exposed via device capabilities)
     rtsp_urls = RTSPCamera.get_rtsp_urls_from_onvif_device(
         device,
         username="admin",

@@ -96,7 +96,7 @@ for url in rtsp_urls:
 
 ## 🔍 How RTSP Stream Discovery Works
 
-The system uses a **two-stage approach** to find RTSP streams, ensuring compatibility with a broad range of cameras:
+The system uses a **two-step approach** to find RTSP streams, ensuring compatibility with a broad range of cameras:
 
 ### Stage 1: ONVIF Media Service (Primary)
 
@@ -108,22 +108,16 @@ The system uses a **two-stage approach** to find RTSP streams, ensuring compatib
 **Pros**: Standard method, most reliable  
 **Cons**: Requires media service endpoint (not all cameras expose this)
 
-### Stage 2: Fallback Path Testing (Automatic)
+### Stage 2: Resolve Media XAddr from Device Service
 
-If Stage 1 finds no streams, the system automatically tests common RTSP paths:
-- Profile paths: `/profile0`, `/profile1`, `/profile2`
-- Stream paths: `/stream0`, `/stream1`, `/stream2`
-- Live paths: `/live`, `/live/main`, `/live/0`, `/live/1`
-- Root: `/`
+If WS-Discovery does not list the media service directly, the system queries the device service capabilities:
 
-For each candidate path:
-1. Constructs full RTSP URL with camera IP
-2. Embeds credentials if provided
-3. Tests connection for 3 seconds
-4. Returns first working stream
+1. Calls `GetCapabilities` on the device service endpoint
+2. Reads the advertised `Media` or `Media2` XAddr
+3. Re-runs the media profile/URI lookup against that endpoint
 
-**Pros**: Works with cameras that lack media service (e.g., DVRs, budget models)  
-**Cons**: Slightly slower (tests multiple paths), not guaranteed to find all streams
+**Pros**: Handles cameras that hide media from discovery but still advertise it through device capabilities  
+**Cons**: Adds one SOAP round-trip before stream resolution
 
 ### Example: Discovering Camera Without Media Service
 
@@ -137,15 +131,15 @@ device = devices[0]
 # No media service in device['services']
 print(device['services'])  # Output: {'device': '...'}
 
-# Stage 2 fallback automatically activates
+# Stage 2 resolves the media XAddr from device capabilities
 urls = RTSPCamera.get_rtsp_urls_from_onvif_device(
     device,
     username="admin",
     password="password123"
 )
 
-# Successfully finds /profile1
-print(urls)  # Output: ['rtsp://admin:***@192.168.1.80:554/profile1']
+# If ONVIF does not expose a usable RTSP URI, this returns an empty list.
+print(urls)
 ```
 
 ### Integration with Queue System
