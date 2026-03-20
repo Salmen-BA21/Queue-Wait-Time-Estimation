@@ -13,11 +13,14 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from src.rtsp_camera import (  # noqa: E402
-    RTSPCamera,
-    _discover_media_xaddr_from_device_service,
-    _extract_capability_xaddr,
-    _extract_rtsp_uri_from_stream_response,
-    _query_onvif_media_streams,
+  RTSPCamera,
+)
+from src.onvif_client import (
+  _discover_media_xaddr_from_device_service,
+  _extract_capability_xaddr,
+  _extract_rtsp_uri_from_stream_response,
+  get_rtsp_urls_from_onvif_device,
+  _query_onvif_media_streams,
 )
 
 
@@ -63,7 +66,7 @@ class TestOnvifMediaResolution(unittest.TestCase):
 
         self.assertEqual(uri, "rtsp://192.168.1.90:554/profile1")
 
-    @patch("src.rtsp_camera.requests.post")
+    @patch("src.onvif_client.requests.post")
     def test_query_onvif_media_streams_returns_profile_uri(self, mock_post) -> None:
         profile_response = SimpleNamespace(
             status_code=200,
@@ -127,7 +130,7 @@ class TestOnvifMediaResolution(unittest.TestCase):
 
         fake_response = SimpleNamespace(status_code=200, content=device_response)
 
-        with patch("src.rtsp_camera.requests.post", return_value=fake_response):
+        with patch("src.onvif_client.requests.post", return_value=fake_response):
             xaddr = _discover_media_xaddr_from_device_service(
                 "http://192.168.1.90/onvif/device_service"
             )
@@ -141,11 +144,11 @@ class TestOnvifMediaResolution(unittest.TestCase):
         }
 
         with (
-            patch("src.rtsp_camera._discover_media_xaddr_from_device_service", return_value="http://192.168.1.90/onvif/media"),
-            patch("src.rtsp_camera._query_onvif_media_streams", return_value=["rtsp://192.168.1.90:554/custom"]),
-            patch("src.rtsp_camera.RTSPCamera.test_connection") as mock_test_connection,
+            patch("src.onvif_client._discover_media_xaddr_from_device_service", return_value="http://192.168.1.90/onvif/media"),
+            patch("src.onvif_client._query_onvif_media_streams", return_value=["rtsp://192.168.1.90:554/custom"]),
+          patch("src.rtsp_camera.RTSPCamera.test_connection") as mock_test_connection,
         ):
-            urls = RTSPCamera.get_rtsp_urls_from_onvif_device(device)
+          urls = get_rtsp_urls_from_onvif_device(device)
 
         mock_test_connection.assert_not_called()
         self.assertEqual(urls, ["rtsp://192.168.1.90:554/custom"])

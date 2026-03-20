@@ -10,7 +10,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from src.rtsp_camera import ONVIFDiscovery
+from src.onvif_client import ONVIFDiscovery
 
 
 class TestONVIFDiscoveryParsing(unittest.TestCase):

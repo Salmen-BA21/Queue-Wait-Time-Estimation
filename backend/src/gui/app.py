@@ -687,10 +687,10 @@ class MainWindow:
         self.root.update_idletasks()
 
         try:
-            from src.rtsp_camera import RTSPCamera
-
             # Discover cameras
-            self.discovered_cameras = RTSPCamera.discover_onvif_devices(timeout=5.0)
+            from src.onvif_client import discover_onvif_devices
+
+            self.discovered_cameras = discover_onvif_devices(timeout=5.0)
 
             if not self.discovered_cameras:
                 self.onvif_status_var.set("❌ No IP cameras found")
@@ -788,15 +788,14 @@ class MainWindow:
 
         def test_connection():
             try:
+                from src.onvif_client import get_rtsp_urls_from_onvif_device
                 from src.rtsp_camera import RTSPCamera
 
                 username = username_var.get().strip() or None
                 password = password_var.get().strip() or None
 
                 # Get RTSP streams
-                streams = RTSPCamera.get_rtsp_urls_from_onvif_device(
-                    camera, username=username, password=password
-                )
+                streams = get_rtsp_urls_from_onvif_device(camera, username=username, password=password)
 
                 if not streams:
                     test_result["success"] = False
@@ -886,15 +885,13 @@ class MainWindow:
 
             def add_camera():
                 try:
-                    from src.rtsp_camera import RTSPCamera
+                    from src.onvif_client import get_rtsp_urls_from_onvif_device
 
                     username = username_var.get().strip() or None
                     password = password_var.get().strip() or None
 
                     # Get RTSP streams
-                    streams = RTSPCamera.get_rtsp_urls_from_onvif_device(
-                        camera, username=username, password=password
-                    )
+                    streams = get_rtsp_urls_from_onvif_device(camera, username=username, password=password)
 
                     if not streams:
                         messagebox.showerror(

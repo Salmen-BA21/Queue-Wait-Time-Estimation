@@ -114,13 +114,13 @@ def run_rtsp_snapshot_capture(
 def run_onvif_discovery(*, timeout_seconds: float) -> list[dict]:
     """Delegate ONVIF discovery to the backend camera utility with lazy imports."""
     try:
-        from src.rtsp_camera import RTSPCamera
+        from src.onvif_client import discover_onvif_devices
     except ModuleNotFoundError as exc:
         raise RuntimeError(
             "ONVIF discovery is unavailable because required video dependencies are not installed."
         ) from exc
 
-    return RTSPCamera.discover_onvif_devices(timeout=timeout_seconds)
+    return discover_onvif_devices(timeout_seconds)
 
 
 def run_onvif_stream_resolution(
@@ -131,17 +131,13 @@ def run_onvif_stream_resolution(
 ) -> list[str]:
     """Resolve RTSP stream URLs for a discovered ONVIF device with lazy imports."""
     try:
-        from src.rtsp_camera import RTSPCamera
+        from src.onvif_client import get_rtsp_urls_from_onvif_device
     except ModuleNotFoundError as exc:
         raise RuntimeError(
             "ONVIF stream resolution is unavailable because required video dependencies are not installed."
         ) from exc
 
-    return RTSPCamera.get_rtsp_urls_from_onvif_device(
-        device,
-        username=username,
-        password=password,
-    )
+    return get_rtsp_urls_from_onvif_device(device, username=username, password=password)
 
 
 @asynccontextmanager

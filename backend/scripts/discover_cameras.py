@@ -13,14 +13,15 @@ Requirements:
     - ONVIF-compatible IP cameras on the network
 """
 
-import sys
 import os
+import sys
 
 # Add backend/src to Python path
 backend_dir = os.path.join(os.path.dirname(__file__), '..')
 sys.path.insert(0, backend_dir)
 sys.path.insert(0, os.path.join(backend_dir, 'src'))
 
+from src.onvif_client import discover_onvif_devices, get_rtsp_urls_from_onvif_device
 from src.rtsp_camera import RTSPCamera
 
 def main():
@@ -29,7 +30,7 @@ def main():
 
     # Discover ONVIF devices
     print("\n1. Discovering ONVIF devices...")
-    devices = RTSPCamera.discover_onvif_devices(timeout=5.0)
+    devices = discover_onvif_devices(timeout=5.0)
 
     if not devices:
         print("❌ No ONVIF devices found.")
@@ -52,7 +53,7 @@ def main():
         # Try to get RTSP streams
         print("\n   Getting RTSP streams...")
         try:
-            rtsp_urls = RTSPCamera.get_rtsp_urls_from_onvif_device(device)
+            rtsp_urls = get_rtsp_urls_from_onvif_device(device)
 
             if rtsp_urls:
                 print("   ✅ Found RTSP streams:")
@@ -68,7 +69,7 @@ def main():
                         print(f"         ❌ Failed - {info.get('error', 'Unknown error')}")
             else:
                 print("   ⚠️  No RTSP streams found (may require authentication)")
-                print("      Try: RTSPCamera.get_rtsp_urls_from_onvif_device(device, username='admin', password='password')")
+                print("      Try: get_rtsp_urls_from_onvif_device(device, username='admin', password='password')")
 
         except Exception as e:
             print(f"   ❌ Error getting streams: {e}")
@@ -85,7 +86,7 @@ def main():
 camera_configs = []
 
 for device in devices:
-    rtsp_urls = RTSPCamera.get_rtsp_urls_from_onvif_device(device)
+    rtsp_urls = get_rtsp_urls_from_onvif_device(device)
     for url in rtsp_urls:
         ok, info = RTSPCamera.test_connection(url)
         if ok:

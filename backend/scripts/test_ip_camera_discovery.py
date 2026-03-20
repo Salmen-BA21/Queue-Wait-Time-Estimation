@@ -10,7 +10,7 @@ import os
 # Add backend to path so the 'src' package can be imported
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.rtsp_camera import RTSPCamera
+from src.onvif_client import discover_onvif_devices, get_rtsp_urls_from_onvif_device
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -20,7 +20,7 @@ def main():
     print("This may take up to 5 seconds...\n")
 
     try:
-        devices = RTSPCamera.discover_onvif_devices(timeout=5.0)
+        devices = discover_onvif_devices(timeout=5.0)
 
         if not devices:
             print("❌ No ONVIF devices found on the network.")
@@ -55,7 +55,7 @@ def main():
             # Try to get RTSP URLs (without credentials for now)
             print("   Attempting to get RTSP stream URLs...")
             try:
-                rtsp_urls = RTSPCamera.get_rtsp_urls_from_onvif_device(device)
+                rtsp_urls = get_rtsp_urls_from_onvif_device(device)
                 if rtsp_urls:
                     print("   RTSP Streams:")
                     for url in rtsp_urls:
