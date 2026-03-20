@@ -40,7 +40,7 @@ import type {
   VideoFeed,
   ZonePoint,
 } from "@/lib/api";
-import { formatResolution, getOnvifDeviceKey, type SetupStep, type SourceMode, type StagedFeedDraft } from "@/lib/dashboard-setup";
+import { formatResolution, getOnvifDeviceKey, type OnvifDeviceCredentials, type SetupStep, type SourceMode, type StagedFeedDraft } from "@/lib/dashboard-setup";
 
 const UNASSIGNED_SELECT_VALUE = "__unassigned__";
 
@@ -56,10 +56,7 @@ interface DashboardSetupDialogsProps {
   setSetupStep: (step: SetupStep) => void;
   handleDialogOpenChange: (open: boolean) => void;
   handleSourceStepSubmit: FormEventHandler<HTMLFormElement>;
-  targetSourceCount: string;
-  setTargetSourceCount: Dispatch<SetStateAction<string>>;
   preparedSourceCount: number;
-  targetSourceCountValue: number;
   feedName: string;
   setFeedName: Dispatch<SetStateAction<string>>;
   sourceMode: SourceMode;
@@ -84,14 +81,18 @@ interface DashboardSetupDialogsProps {
   setRtspTestResult: Dispatch<SetStateAction<RTSPConnectionTestResult | null>>;
   isTestingRtsp: boolean;
   handleTestRtsp: () => void;
-  onvifTimeout: string;
-  setOnvifTimeout: Dispatch<SetStateAction<string>>;
   handleDiscoverOnvif: () => void;
   isDiscoveringOnvif: boolean;
   onvifDevices: ONVIFDevice[];
+  onvifDeviceCredentials: Record<string, OnvifDeviceCredentials>;
   selectedOnvifDevice: ONVIFDevice | null;
   selectedOnvifDeviceKey: string;
+  selectedOnvifDeviceKeys: string[];
   handleSelectOnvifDevice: (device: ONVIFDevice) => void;
+  handleToggleOnvifDevice: (device: ONVIFDevice) => void;
+  handleSelectAllOnvifDevices: () => void;
+  handleClearOnvifDeviceSelection: () => void;
+  handleSetOnvifDeviceCredentials: (device: ONVIFDevice, credentials: OnvifDeviceCredentials) => void;
   onvifUsername: string;
   setOnvifUsername: Dispatch<SetStateAction<string>>;
   onvifPassword: string;
@@ -102,6 +103,7 @@ interface DashboardSetupDialogsProps {
   isResolvingOnvifStreams: boolean;
   handleTestOnvif: () => void;
   isTestingOnvif: boolean;
+  handleBulkAddSelectedOnvifDevices: () => void;
   onvifStreams: ONVIFStream[];
   setOnvifStreams: Dispatch<SetStateAction<ONVIFStream[]>>;
   onvifTestResult: ONVIFCameraTestResult | null;
@@ -173,10 +175,7 @@ export function DashboardSetupDialogs({
   setSetupStep,
   handleDialogOpenChange,
   handleSourceStepSubmit,
-  targetSourceCount,
-  setTargetSourceCount,
   preparedSourceCount,
-  targetSourceCountValue,
   feedName,
   setFeedName,
   sourceMode,
@@ -201,14 +200,18 @@ export function DashboardSetupDialogs({
   setRtspTestResult,
   isTestingRtsp,
   handleTestRtsp,
-  onvifTimeout,
-  setOnvifTimeout,
   handleDiscoverOnvif,
   isDiscoveringOnvif,
   onvifDevices,
+  onvifDeviceCredentials,
   selectedOnvifDevice,
   selectedOnvifDeviceKey,
+  selectedOnvifDeviceKeys,
   handleSelectOnvifDevice,
+  handleToggleOnvifDevice,
+  handleSelectAllOnvifDevices,
+  handleClearOnvifDeviceSelection,
+  handleSetOnvifDeviceCredentials,
   onvifUsername,
   setOnvifUsername,
   onvifPassword,
@@ -219,6 +222,7 @@ export function DashboardSetupDialogs({
   isResolvingOnvifStreams,
   handleTestOnvif,
   isTestingOnvif,
+  handleBulkAddSelectedOnvifDevices,
   onvifStreams,
   setOnvifStreams,
   onvifTestResult,
@@ -296,14 +300,8 @@ export function DashboardSetupDialogs({
           </DialogHeader>
 
           <form className="space-y-4" onSubmit={handleSourceStepSubmit}>
-            <div className="grid gap-4 rounded-xl border border-border bg-background/40 p-4 md:grid-cols-[180px_minmax(0,1fr)] md:items-end">
-              <div className="space-y-2">
-                <Label className="text-foreground" htmlFor="target-source-count">Source count target</Label>
-                <Input id="target-source-count" inputMode="numeric" min="1" onChange={(event) => setTargetSourceCount(event.target.value)} value={targetSourceCount} />
-              </div>
-              <div className="rounded-lg border border-border bg-background/50 p-3 text-xs text-muted-foreground">
-                {preparedSourceCount} prepared so far. This session must contain exactly {targetSourceCountValue} source{targetSourceCountValue === 1 ? "" : "s"} before review and launch.
-              </div>
+            <div className="rounded-xl border border-border bg-background/40 p-4 text-xs text-muted-foreground">
+              {preparedSourceCount} source{preparedSourceCount === 1 ? " is" : "s are"} prepared so far. Add as many sources as you need, then review and launch when ready.
             </div>
 
             <div className="space-y-2">
@@ -469,11 +467,7 @@ export function DashboardSetupDialogs({
                     </div>
                   </div>
 
-                  <div className="grid gap-4 md:grid-cols-[180px_auto] md:items-end">
-                    <div className="space-y-2">
-                      <Label className="text-foreground" htmlFor="onvif-timeout">Discovery timeout (s)</Label>
-                      <Input id="onvif-timeout" inputMode="decimal" onChange={(event) => setOnvifTimeout(event.target.value)} placeholder="5" value={onvifTimeout} />
-                    </div>
+                  <div className="flex items-end justify-end">
                     <Button onClick={handleDiscoverOnvif} type="button" variant="outline" disabled={isDiscoveringOnvif}>
                       {isDiscoveringOnvif ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
                       Discover Cameras
@@ -482,47 +476,96 @@ export function DashboardSetupDialogs({
 
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline">{onvifDevices.length} discovered</Badge>
-                    {selectedOnvifDevice && <Badge variant="outline">Selected: {selectedOnvifDevice.name}</Badge>}
+                    <Badge variant="outline">{selectedOnvifDeviceKeys.length} selected</Badge>
+                    {selectedOnvifDevice && <Badge variant="outline">Active: {selectedOnvifDevice.name}</Badge>}
                   </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Resolve Streams and Test Camera apply to the active camera only. Use the Active badge to see which selected camera is currently being tested.
+                  </p>
 
                   <div className="space-y-2">
                     {onvifDevices.length === 0 ? (
                       <div className="rounded-lg border border-dashed border-border bg-background/50 p-4 text-sm text-muted-foreground">Discover ONVIF devices on the local network to continue this camera onboarding path.</div>
                     ) : (
-                      <div className="grid max-h-64 gap-2 overflow-y-auto pr-1">
-                        {onvifDevices.map((device) => {
-                          const isSelected = selectedOnvifDeviceKey === getOnvifDeviceKey(device);
-                          return (
-                            <button
-                              key={getOnvifDeviceKey(device)}
-                              className={`rounded-xl border p-3 text-left transition-colors ${isSelected ? "border-primary bg-primary/10" : "border-border bg-background/50 hover:border-primary/40"}`}
-                              onClick={() => handleSelectOnvifDevice(device)}
-                              type="button"
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div>
-                                  <p className="text-sm font-medium text-foreground">{device.name}</p>
-                                  <p className="font-mono text-xs text-muted-foreground">{device.ip}</p>
-                                </div>
-                                <Badge variant="outline">{device.model}</Badge>
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button onClick={handleSelectAllOnvifDevices} type="button" variant="outline" size="sm">Select all</Button>
+                          <Button onClick={handleClearOnvifDeviceSelection} type="button" variant="outline" size="sm" disabled={selectedOnvifDeviceKeys.length === 0}>Clear selection</Button>
+                          {selectedOnvifDeviceKeys.length > 1 && <Badge variant="outline">Bulk add enabled</Badge>}
+                        </div>
+
+                        <div className="grid max-h-64 gap-2 overflow-y-auto pr-1">
+                          {onvifDevices.map((device) => {
+                            const deviceKey = getOnvifDeviceKey(device);
+                            const isSelected = selectedOnvifDeviceKeys.includes(deviceKey);
+                            const credentialValues = onvifDeviceCredentials[deviceKey] ?? { username: onvifUsername, password: onvifPassword };
+                            const safeDeviceKey = deviceKey.replace(/[^a-zA-Z0-9_-]/g, "_");
+                            return (
+                              <div
+                                key={deviceKey}
+                                className={`rounded-xl border p-3 text-left transition-colors ${isSelected ? "border-primary bg-primary/10" : "border-border bg-background/50 hover:border-primary/40"}`}
+                              >
+                                <button
+                                  className="w-full text-left"
+                                  aria-pressed={isSelected}
+                                  onClick={() => handleToggleOnvifDevice(device)}
+                                  type="button"
+                                >
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-start gap-3">
+                                      <span className={`mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border ${isSelected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"}`} aria-hidden="true">
+                                        {isSelected ? "✓" : ""}
+                                      </span>
+                                      <div>
+                                        <p className="text-sm font-medium text-foreground">{device.name}</p>
+                                        <p className="font-mono text-xs text-muted-foreground">{device.ip}</p>
+                                      </div>
+                                    </div>
+                                    <Badge variant="outline">{device.model}</Badge>
+                                  </div>
+                                  <p className="mt-2 text-xs text-muted-foreground">{device.manufacturer} · {device.location} · {Object.keys(device.services).length} services</p>
+                                </button>
+                                {isSelected && (
+                                  <div className="mt-3 grid gap-3 border-t border-border/60 pt-3 md:grid-cols-2">
+                                    <div className="space-y-2">
+                                      <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground/70">Testing this camera</p>
+                                      <Label className="text-foreground" htmlFor={`onvif-username-${safeDeviceKey}`}>Username for {device.name}</Label>
+                                      <Input
+                                        id={`onvif-username-${safeDeviceKey}`}
+                                        onClick={(event) => event.stopPropagation()}
+                                        onChange={(event) => handleSetOnvifDeviceCredentials(device, { username: event.target.value, password: credentialValues.password })}
+                                        placeholder="admin"
+                                        value={credentialValues.username}
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label className="text-foreground" htmlFor={`onvif-password-${safeDeviceKey}`}>Password for {device.name}</Label>
+                                      <Input
+                                        id={`onvif-password-${safeDeviceKey}`}
+                                        onClick={(event) => event.stopPropagation()}
+                                        onChange={(event) => handleSetOnvifDeviceCredentials(device, { username: credentialValues.username, password: event.target.value })}
+                                        placeholder="Optional"
+                                        type="password"
+                                        value={credentialValues.password}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                              <p className="mt-2 text-xs text-muted-foreground">{device.manufacturer} · {device.location} · {Object.keys(device.services).length} services</p>
-                            </button>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label className="text-foreground" htmlFor="onvif-username">ONVIF username</Label>
-                      <Input id="onvif-username" onChange={(event) => { setOnvifUsername(event.target.value); setOnvifStreams([]); setOnvifTestResult(null); setFeedSource(""); }} placeholder="admin" value={onvifUsername} />
+                    <div className="rounded-xl border border-dashed border-border bg-background/30 p-3 text-xs text-muted-foreground">
+                      For multiple ONVIF cameras, use the selected cameras as a review queue. The feed name becomes a batch prefix and each selected device is added as its own draft.
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-foreground" htmlFor="onvif-password">ONVIF password</Label>
-                      <Input id="onvif-password" onChange={(event) => { setOnvifPassword(event.target.value); setOnvifStreams([]); setOnvifTestResult(null); setFeedSource(""); }} placeholder="Optional" type="password" value={onvifPassword} />
-                    </div>
+
+                  <div className="rounded-xl border border-dashed border-border bg-background/30 p-3 text-xs text-muted-foreground">
+                    Set credentials inside each selected camera card above. Those values are used when streams are resolved and when the camera is tested.
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-end">
@@ -543,6 +586,10 @@ export function DashboardSetupDialogs({
                     <Button onClick={handleTestOnvif} type="button" variant="outline" disabled={!selectedOnvifDevice || isTestingOnvif || isResolvingOnvifStreams}>
                       {isTestingOnvif ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
                       Test Camera
+                    </Button>
+                    <Button onClick={handleBulkAddSelectedOnvifDevices} type="button" disabled={selectedOnvifDeviceKeys.length === 0 || isTestingOnvif || isResolvingOnvifStreams}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Selected Cameras
                     </Button>
                   </div>
 
@@ -625,6 +672,82 @@ export function DashboardSetupDialogs({
                 </div>
               </div>
             )}
+
+            <div className="space-y-3 rounded-xl border border-border bg-background/40 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Selected videos and streams</p>
+                  <p className="text-xs text-muted-foreground">This is the live selection you are building before you continue to zone tracing.</p>
+                </div>
+                <Badge variant="outline">
+                  {sourceMode === "file"
+                    ? `${(uploadedFile ? 1 : 0) + queuedLocalFiles.length} video${(uploadedFile ? 1 : 0) + queuedLocalFiles.length === 1 ? "" : "s"}`
+                    : sourceMode === "rtsp"
+                      ? `${feedSource.trim() ? 1 : 0} stream`
+                      : `${selectedOnvifDeviceKeys.length} camera${selectedOnvifDeviceKeys.length === 1 ? "" : "s"}`}
+                </Badge>
+              </div>
+
+              <div className="grid gap-2">
+                {sourceMode === "file" ? (
+                  <>
+                    {uploadedFile && (
+                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 p-3">
+                        <div className="min-w-0 space-y-1">
+                          <p className="text-sm font-medium text-foreground">Active MP4</p>
+                          <p className="truncate text-xs text-muted-foreground">{uploadedFile.name}</p>
+                        </div>
+                        <Badge variant="outline">Video</Badge>
+                      </div>
+                    )}
+                    {queuedLocalFiles.map((file, index) => (
+                      <div key={getLocalFileKey(file)} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 p-3">
+                        <div className="min-w-0 space-y-1">
+                          <p className="text-sm font-medium text-foreground">Queued video {index + 1}</p>
+                          <p className="truncate text-xs text-muted-foreground">{file.name}</p>
+                        </div>
+                        <Badge variant="outline">Video</Badge>
+                      </div>
+                    ))}
+                    {!uploadedFile && queuedLocalFiles.length === 0 && (
+                      <div className="rounded-lg border border-dashed border-border bg-background/50 p-3 text-xs text-muted-foreground">
+                        Pick one or more local videos to see them listed here.
+                      </div>
+                    )}
+                  </>
+                ) : sourceMode === "rtsp" ? (
+                  feedSource.trim() ? (
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 p-3">
+                      <div className="min-w-0 space-y-1">
+                        <p className="text-sm font-medium text-foreground">RTSP stream</p>
+                        <p className="truncate text-xs text-muted-foreground">{feedSource.trim()}</p>
+                      </div>
+                      <Badge variant="outline">Stream</Badge>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-border bg-background/50 p-3 text-xs text-muted-foreground">
+                      Enter an RTSP URL to see the selected stream here.
+                    </div>
+                  )
+                ) : selectedOnvifDeviceKeys.length > 0 ? (
+                  onvifDevices
+                    .filter((device) => selectedOnvifDeviceKeys.includes(getOnvifDeviceKey(device)))
+                    .map((device) => (
+                      <div key={getOnvifDeviceKey(device)} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 p-3">
+                        <div className="min-w-0 space-y-1">
+                          <p className="text-sm font-medium text-foreground">{device.name}</p>
+                          <p className="truncate text-xs text-muted-foreground">{device.ip} · {device.model}</p>
+                        </div>
+                        <Badge variant="outline">ONVIF</Badge>
+                      </div>
+                    ))
+                ) : (
+                  <div className="rounded-lg border border-dashed border-border bg-background/50 p-3 text-xs text-muted-foreground">
+                    Discover and select one or more ONVIF cameras to see them listed here.
+                  </div>
+                )}
+              </div>
+            </div>
 
             <DialogFooter>
               <Button onClick={resetSetupFlow} type="button" variant="outline">Cancel</Button>
@@ -771,7 +894,6 @@ export function DashboardSetupDialogs({
         onWebhookEnabledChange={setBatchWebhookEnabled}
         open={setupStep === "review"}
         stageButtonLabel="Add Current Source"
-        targetSourceCount={targetSourceCountValue}
         webhookEnabled={batchWebhookEnabled}
       />
 

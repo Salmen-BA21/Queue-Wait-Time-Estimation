@@ -32,7 +32,6 @@ export interface ReviewLaunchItem {
 interface ReviewLaunchDialogProps {
   open: boolean;
   items: ReviewLaunchItem[];
-  targetSourceCount: number;
   canSubmitBatch: boolean;
   logLevel: LogLevel;
   webhookEnabled: boolean;
@@ -62,7 +61,6 @@ function getSourceModeLabel(sourceMode: ReviewLaunchItem["sourceMode"]): string 
 export function ReviewLaunchDialog({
   open,
   items,
-  targetSourceCount,
   canSubmitBatch,
   logLevel,
   webhookEnabled,
@@ -95,8 +93,8 @@ export function ReviewLaunchDialog({
         <div className="space-y-4">
           <div className="grid gap-3 rounded-xl border border-border bg-background/40 p-4 text-sm sm:grid-cols-3">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground/70">Batch Target</p>
-              <p className="mt-1 font-medium text-foreground">{targetSourceCount} source{targetSourceCount === 1 ? "" : "s"}</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground/70">Queue Size</p>
+              <p className="mt-1 font-medium text-foreground">{selectedCount} source{selectedCount === 1 ? "" : "s"}</p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground/70">Currently Prepared</p>
@@ -104,7 +102,7 @@ export function ReviewLaunchDialog({
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground/70">Launch Gate</p>
-              <p className="mt-1 font-medium text-foreground">{canSubmitBatch ? "Ready for batch submit" : "Need exact target count"}</p>
+              <p className="mt-1 font-medium text-foreground">{canSubmitBatch ? "Ready for batch submit" : "Add at least one source"}</p>
             </div>
           </div>
 
@@ -264,7 +262,7 @@ export function ReviewLaunchDialog({
           </div>
           {!canSubmitBatch && (
             <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-100">
-              The batch must contain exactly {targetSourceCount} source{targetSourceCount === 1 ? "" : "s"} before it can be submitted.
+              Add at least one staged source before saving or launching the batch.
             </div>
           )}
         </div>

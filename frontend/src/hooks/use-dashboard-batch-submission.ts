@@ -15,7 +15,6 @@ interface UseDashboardBatchSubmissionArgs {
   stagedFeeds: StagedFeedDraft[];
   preparedLocalFileDrafts: StagedFeedDraft[];
   currentReviewDraft: StagedFeedDraft | null;
-  targetSourceCountValue: number;
   batchLogLevel: LogLevel;
   batchWebhookEnabled: boolean;
   allSelectedLocalFiles: File[];
@@ -132,7 +131,6 @@ export function useDashboardBatchSubmission({
   stagedFeeds,
   preparedLocalFileDrafts,
   currentReviewDraft,
-  targetSourceCountValue,
   batchLogLevel,
   batchWebhookEnabled,
   allSelectedLocalFiles,
@@ -153,11 +151,6 @@ export function useDashboardBatchSubmission({
 
     if (drafts.length === 0) {
       toast.error("Stage at least one source before submitting the batch.");
-      return;
-    }
-
-    if (drafts.length !== targetSourceCountValue) {
-      toast.error(`This batch expects exactly ${targetSourceCountValue} source${targetSourceCountValue === 1 ? "" : "s"}.`);
       return;
     }
 
@@ -218,7 +211,6 @@ export function useDashboardBatchSubmission({
     setUploadedFile,
     stagedFeeds,
     submitBatch,
-    targetSourceCountValue,
   ]);
 
   return { handleFinalizeBatch };

@@ -9,13 +9,19 @@ import type {
   BatchFeedLaunchResult,
   Caisse,
   Establishment,
+  ONVIFCameraTestResult,
+  ONVIFDevice,
+  ONVIFStream,
   RTSPConnectionTestResult,
   VideoFeed,
 } from "@/lib/api";
 import {
+  discoverOnvifDevices,
   launchFeedBatch,
   listCaisses,
   listEstablishments,
+  resolveOnvifStreams,
+  testOnvifCamera,
   testRtspConnection,
   uploadVideo,
 } from "@/lib/api";
@@ -30,9 +36,12 @@ vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return {
     ...actual,
+    discoverOnvifDevices: vi.fn(),
     launchFeedBatch: vi.fn(),
     listCaisses: vi.fn(),
     listEstablishments: vi.fn(),
+    resolveOnvifStreams: vi.fn(),
+    testOnvifCamera: vi.fn(),
     testRtspConnection: vi.fn(),
     uploadVideo: vi.fn(),
   };
@@ -44,6 +53,16 @@ vi.mock("sonner", () => ({
     error: vi.fn(),
   },
 }));
+
+class MockResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+if (typeof globalThis.ResizeObserver === "undefined") {
+  (globalThis as typeof globalThis & { ResizeObserver: typeof MockResizeObserver }).ResizeObserver = MockResizeObserver;
+}
 
 vi.mock("recharts", () => {
   const MockContainer = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
@@ -227,6 +246,20 @@ describe("Dashboard integration", () => {
   beforeEach(() => {
     vi.mocked(listEstablishments).mockResolvedValue([] satisfies Establishment[]);
     vi.mocked(listCaisses).mockResolvedValue([] satisfies Caisse[]);
+    vi.mocked(discoverOnvifDevices).mockResolvedValue([] satisfies ONVIFDevice[]);
+    vi.mocked(resolveOnvifStreams).mockResolvedValue([] satisfies ONVIFStream[]);
+    vi.mocked(testOnvifCamera).mockResolvedValue({
+      connected: true,
+      transport: "tcp",
+      stream_count: 1,
+      tested_stream: { url: "rtsp://camera/test" },
+      streams: [{ url: "rtsp://camera/test" }],
+      resolution: "1920x1080",
+      width: 1920,
+      height: 1080,
+      fps: 25,
+      error: null,
+    } satisfies ONVIFCameraTestResult);
     vi.mocked(testRtspConnection).mockResolvedValue({
       connected: true,
       transport: "tcp",
@@ -310,11 +343,12 @@ describe("Dashboard integration", () => {
     const fileB = createVideoFile("checkout-b.mp4", "video-b");
     fireEvent.change(fileInput, { target: { files: [fileA, fileB] } });
 
+    expect(await screen.findByText("Selected videos and streams")).toBeInTheDocument();
     expect(await screen.findByText("Selected local videos")).toBeInTheDocument();
     expect(screen.getAllByText("checkout-a.mp4").length).toBeGreaterThan(0);
     expect(screen.getByText(/Up next 1: checkout-b.mp4/)).toBeInTheDocument();
     expect(screen.getByDisplayValue("checkout-a")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("2")).toBeInTheDocument();
+    expect(screen.getByText("2 selected")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Continue to Zone" }));
     fireEvent.click(await screen.findByRole("button", { name: "Continue to Model" }));
@@ -325,6 +359,182 @@ describe("Dashboard integration", () => {
     expect(screen.getByText("checkout-a.mp4")).toBeInTheDocument();
     expect(screen.getByText("checkout-b.mp4")).toBeInTheDocument();
     expect(screen.getByText("Ready for batch submit")).toBeInTheDocument();
+  });
+
+  it("keeps an uploaded local video staged when switching to ONVIF discovery and back", async () => {
+    mockDashboardState([]);
+    await openBatchSetup();
+
+    const fileInput = getSetupFileInput();
+    fireEvent.change(fileInput, { target: { files: [createVideoFile("queue.mp4", "video-bytes")] } });
+
+    expect(await screen.findByText("Selected local videos")).toBeInTheDocument();
+    expect(screen.getAllByText("queue.mp4").length).toBeGreaterThan(0);
+
+    const onvifTab = screen.getByRole("tab", { name: "ONVIF Discovery" });
+    fireEvent.mouseDown(onvifTab);
+    fireEvent.click(onvifTab);
+
+    expect(await screen.findByText("Discover ONVIF cameras")).toBeInTheDocument();
+
+    const fileTab = screen.getByRole("tab", { name: "Local MP4" });
+    fireEvent.mouseDown(fileTab);
+    fireEvent.click(fileTab);
+
+    expect(await screen.findByText("Selected local videos")).toBeInTheDocument();
+    expect(screen.getAllByText("queue.mp4").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Continue to Zone" })).toBeEnabled();
+  });
+
+  it("lets the operator bulk-add multiple discovered ONVIF cameras into the review queue", async () => {
+    mockDashboardState([]);
+    vi.mocked(discoverOnvifDevices).mockResolvedValue([
+      {
+        ip: "192.168.1.10",
+        name: "Entrance A",
+        manufacturer: "Acme",
+        model: "Cam 1",
+        serial: "serial-a",
+        hardware: "hw-a",
+        location: "Front",
+        services: { media: "http://192.168.1.10/onvif/media" },
+        xaddrs: "http://192.168.1.10/onvif/device_service",
+      },
+      {
+        ip: "192.168.1.11",
+        name: "Entrance B",
+        manufacturer: "Acme",
+        model: "Cam 2",
+        serial: "serial-b",
+        hardware: "hw-b",
+        location: "Front",
+        services: { media: "http://192.168.1.11/onvif/media" },
+        xaddrs: "http://192.168.1.11/onvif/device_service",
+      },
+    ] satisfies ONVIFDevice[]);
+    vi.mocked(resolveOnvifStreams).mockImplementation(async ({ device }) => ([
+      { url: `rtsp://${device.ip}/stream/main` },
+    ]));
+    vi.mocked(testOnvifCamera).mockImplementation(async ({ device }) => ({
+      connected: true,
+      transport: "tcp",
+      stream_count: 1,
+      tested_stream: { url: `rtsp://${device.ip}/stream/main` },
+      streams: [{ url: `rtsp://${device.ip}/stream/main` }],
+      resolution: "1920x1080",
+      width: 1920,
+      height: 1080,
+      fps: 25,
+      error: null,
+    } satisfies ONVIFCameraTestResult));
+
+    await openBatchSetup();
+    const onvifTab = screen.getByRole("tab", { name: "ONVIF Discovery" });
+    fireEvent.mouseDown(onvifTab);
+    fireEvent.click(onvifTab);
+    fireEvent.change(screen.getByLabelText("Feed name"), { target: { value: "Lobby" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Discover Cameras" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Discover Cameras" }));
+
+    expect(await screen.findByRole("button", { name: /Entrance A/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Entrance B/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Select all" }));
+    expect(screen.getByText("Selected videos and streams")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add Selected Cameras" }));
+
+    expect(await screen.findByText("Review and Launch")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Create and Start Batch" }));
+
+    await waitFor(() => expect(launchFeedBatch).toHaveBeenCalledTimes(1));
+    expect(launchFeedBatch).toHaveBeenCalledWith(expect.objectContaining({
+      launch_mode: "create_and_start",
+      feeds: expect.arrayContaining([
+        expect.objectContaining({ name: expect.stringContaining("Entrance A"), source: "rtsp://192.168.1.10/stream/main" }),
+        expect.objectContaining({ name: expect.stringContaining("Entrance B"), source: "rtsp://192.168.1.11/stream/main" }),
+      ]),
+    }));
+  });
+
+  it("uses per-camera ONVIF credentials when bulk-adding multiple cameras", async () => {
+    mockDashboardState([]);
+    vi.mocked(discoverOnvifDevices).mockResolvedValue([
+      {
+        ip: "192.168.1.20",
+        name: "Loading Dock",
+        manufacturer: "Acme",
+        model: "Cam 3",
+        serial: "serial-c",
+        hardware: "hw-c",
+        location: "Warehouse",
+        services: { media: "http://192.168.1.20/onvif/media" },
+        xaddrs: "http://192.168.1.20/onvif/device_service",
+      },
+      {
+        ip: "192.168.1.21",
+        name: "Side Door",
+        manufacturer: "Acme",
+        model: "Cam 4",
+        serial: "serial-d",
+        hardware: "hw-d",
+        location: "Warehouse",
+        services: { media: "http://192.168.1.21/onvif/media" },
+        xaddrs: "http://192.168.1.21/onvif/device_service",
+      },
+    ] satisfies ONVIFDevice[]);
+    vi.mocked(resolveOnvifStreams).mockImplementation(async ({ device, username, password }) => {
+      expect(username).toBeDefined();
+      expect(password).toBeDefined();
+      return [{ url: `rtsp://${device.ip}/stream/main` }];
+    });
+    vi.mocked(testOnvifCamera).mockImplementation(async ({ device, username, password }) => ({
+      connected: true,
+      transport: "tcp",
+      stream_count: 1,
+      tested_stream: { url: `rtsp://${device.ip}/stream/main` },
+      streams: [{ url: `rtsp://${device.ip}/stream/main` }],
+      resolution: "1920x1080",
+      width: 1920,
+      height: 1080,
+      fps: 25,
+      error: null,
+    } satisfies ONVIFCameraTestResult));
+
+    await openBatchSetup();
+    const onvifTab = screen.getByRole("tab", { name: "ONVIF Discovery" });
+    fireEvent.mouseDown(onvifTab);
+    fireEvent.click(onvifTab);
+    fireEvent.change(screen.getByLabelText("Feed name"), { target: { value: "Warehouse" } });
+    fireEvent.click(screen.getByRole("button", { name: "Discover Cameras" }));
+
+    expect(await screen.findByRole("button", { name: /Loading Dock/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Select all" }));
+
+    fireEvent.change(screen.getByLabelText("Username for Loading Dock"), { target: { value: "dock-user" } });
+    fireEvent.change(screen.getByLabelText("Password for Loading Dock"), { target: { value: "dock-pass" } });
+    fireEvent.change(screen.getByLabelText("Username for Side Door"), { target: { value: "door-user" } });
+    fireEvent.change(screen.getByLabelText("Password for Side Door"), { target: { value: "door-pass" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Selected Cameras" }));
+
+    await waitFor(() => expect(resolveOnvifStreams).toHaveBeenCalledTimes(2));
+    expect(resolveOnvifStreams).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ username: "dock-user", password: "dock-pass" }),
+    );
+    expect(resolveOnvifStreams).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ username: "door-user", password: "door-pass" }),
+    );
+    expect(testOnvifCamera).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ username: "dock-user", password: "dock-pass" }),
+    );
+    expect(testOnvifCamera).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ username: "door-user", password: "door-pass" }),
+    );
   });
 
   it("lets the operator choose which queued local video becomes active before tracing the zone", async () => {

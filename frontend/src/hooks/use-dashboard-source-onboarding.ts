@@ -17,9 +17,14 @@ import {
 } from "@/lib/api";
 import {
   formatResolution,
+  DEFAULT_ONVIF_TIMEOUT,
   getOnvifDeviceKey,
+  createDraftId,
   suggestFeedNameFromRtspUrl,
+  type OnvifDeviceCredentials,
+  type SetupStep,
   type SourceMode,
+  type StagedFeedDraft,
 } from "@/lib/dashboard-setup";
 
 interface UseDashboardSourceOnboardingArgs {
@@ -41,18 +46,29 @@ interface UseDashboardSourceOnboardingArgs {
   rtspTransport: RTSPTransport;
   setRtspTestResult: (result: RTSPConnectionTestResult | null) => void;
   setIsTestingRtsp: (value: boolean) => void;
-  onvifTimeout: string;
   onvifUsername: string;
   onvifPassword: string;
   onvifTransport: RTSPTransport;
+  onvifDevices: ONVIFDevice[];
   setOnvifDevices: (devices: ONVIFDevice[]) => void;
+  onvifDeviceCredentials: Record<string, OnvifDeviceCredentials>;
+  setOnvifDeviceCredentials: (value: Record<string, OnvifDeviceCredentials> | ((current: Record<string, OnvifDeviceCredentials>) => Record<string, OnvifDeviceCredentials>)) => void;
   selectedOnvifDevice: ONVIFDevice | null;
-  setSelectedOnvifDeviceKey: (value: string) => void;
+  selectedOnvifDeviceKeys: string[];
+  setSelectedOnvifDeviceKeys: (value: string[] | ((current: string[]) => string[])) => void;
   setOnvifStreams: (streams: ONVIFStream[]) => void;
   setOnvifTestResult: (result: ONVIFCameraTestResult | null) => void;
   setIsDiscoveringOnvif: (value: boolean) => void;
   setIsResolvingOnvifStreams: (value: boolean) => void;
   setIsTestingOnvif: (value: boolean) => void;
+  setStagedFeeds: (value: StagedFeedDraft[] | ((current: StagedFeedDraft[]) => StagedFeedDraft[])) => void;
+  selectedModel: "n" | "s" | "m" | "l" | "x";
+  selectedEstablishmentId: number | null;
+  selectedEstablishmentName: string | null;
+  selectedCaisseId: number | null;
+  selectedCaisseName: string | null;
+  selectedCaisseHasSavedZone: boolean;
+  setSetupStep: (step: SetupStep) => void;
 }
 
 export function useDashboardSourceOnboarding({
@@ -74,37 +90,47 @@ export function useDashboardSourceOnboarding({
   rtspTransport,
   setRtspTestResult,
   setIsTestingRtsp,
-  onvifTimeout,
   onvifUsername,
   onvifPassword,
   onvifTransport,
+  onvifDevices,
   setOnvifDevices,
+  onvifDeviceCredentials,
+  setOnvifDeviceCredentials,
   selectedOnvifDevice,
-  setSelectedOnvifDeviceKey,
+  selectedOnvifDeviceKeys,
+  setSelectedOnvifDeviceKeys,
   setOnvifStreams,
   setOnvifTestResult,
   setIsDiscoveringOnvif,
   setIsResolvingOnvifStreams,
   setIsTestingOnvif,
+  setStagedFeeds,
+  selectedModel,
+  selectedEstablishmentId,
+  selectedEstablishmentName,
+  selectedCaisseId,
+  selectedCaisseName,
+  selectedCaisseHasSavedZone,
+  setSetupStep,
 }: UseDashboardSourceOnboardingArgs) {
   const handleSourceModeChange = useCallback((mode: SourceMode) => {
     setSourceMode(mode);
-    setFeedSource("");
-    if (mode !== "file") {
-      setUploadedFile(null);
-      setQueuedLocalFiles([]);
-      setZonePoints([]);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    }
-    if (mode !== "rtsp") {
-      resetRtspState();
-    }
-    if (mode !== "onvif") {
-      resetOnvifState();
-    }
-  }, [fileInputRef, resetOnvifState, resetRtspState, setFeedSource, setQueuedLocalFiles, setSourceMode, setUploadedFile, setZonePoints]);
+  }, [setSourceMode]);
+
+  const getResolvedOnvifCredentials = useCallback((device: ONVIFDevice): { username: string; password: string } => {
+    const deviceKey = getOnvifDeviceKey(device);
+    return onvifDeviceCredentials[deviceKey] ?? { username: onvifUsername, password: onvifPassword };
+  }, [onvifDeviceCredentials, onvifPassword, onvifUsername]);
+
+  const handleSetOnvifDeviceCredentials = useCallback((device: ONVIFDevice, credentials: { username: string; password: string }) => {
+    const deviceKey = getOnvifDeviceKey(device);
+
+    setOnvifDeviceCredentials((current) => ({
+      ...current,
+      [deviceKey]: credentials,
+    }));
+  }, [setOnvifDeviceCredentials]);
 
   const buildSnapshotLoader = useCallback(async (): Promise<{ frameSrc: string; sourceLabel: string; sourceKind: string }> => {
     let snapshotResult: RTSPSnapshotResult;
@@ -184,7 +210,7 @@ export function useDashboardSourceOnboarding({
   }, [feedName, feedSource, rtspPassword, rtspTransport, rtspUsername, setFeedName, setIsTestingRtsp, setRtspTestResult]);
 
   const handleDiscoverOnvif = useCallback(async () => {
-    const timeoutSeconds = Number.parseFloat(onvifTimeout);
+    const timeoutSeconds = Number.parseFloat(DEFAULT_ONVIF_TIMEOUT);
     if (Number.isNaN(timeoutSeconds) || timeoutSeconds <= 0 || timeoutSeconds > 30) {
       toast.error("Enter an ONVIF discovery timeout between 0 and 30 seconds.");
       return;
@@ -192,7 +218,7 @@ export function useDashboardSourceOnboarding({
 
     setIsDiscoveringOnvif(true);
     setOnvifDevices([]);
-    setSelectedOnvifDeviceKey("");
+    setSelectedOnvifDeviceKeys([]);
     setOnvifStreams([]);
     setOnvifTestResult(null);
     setFeedSource("");
@@ -203,7 +229,7 @@ export function useDashboardSourceOnboarding({
 
       if (devices.length > 0) {
         const firstDevice = devices[0];
-        setSelectedOnvifDeviceKey(getOnvifDeviceKey(firstDevice));
+        setSelectedOnvifDeviceKeys([getOnvifDeviceKey(firstDevice)]);
         if (!feedName.trim()) {
           setFeedName(firstDevice.name);
         }
@@ -214,17 +240,158 @@ export function useDashboardSourceOnboarding({
     } finally {
       setIsDiscoveringOnvif(false);
     }
-  }, [feedName, onvifTimeout, setFeedName, setFeedSource, setIsDiscoveringOnvif, setOnvifDevices, setOnvifStreams, setOnvifTestResult, setSelectedOnvifDeviceKey]);
+  }, [feedName, setFeedName, setFeedSource, setIsDiscoveringOnvif, setOnvifDevices, setOnvifDeviceCredentials, setOnvifStreams, setOnvifTestResult, setSelectedOnvifDeviceKeys]);
 
   const handleSelectOnvifDevice = useCallback((device: ONVIFDevice) => {
-    setSelectedOnvifDeviceKey(getOnvifDeviceKey(device));
+    setSelectedOnvifDeviceKeys([getOnvifDeviceKey(device)]);
     setOnvifStreams([]);
     setOnvifTestResult(null);
     setFeedSource("");
     if (!feedName.trim()) {
       setFeedName(device.name);
     }
-  }, [feedName, setFeedName, setFeedSource, setOnvifStreams, setOnvifTestResult, setSelectedOnvifDeviceKey]);
+  }, [feedName, setFeedName, setFeedSource, setOnvifStreams, setOnvifTestResult, setSelectedOnvifDeviceKeys]);
+
+  const handleToggleOnvifDevice = useCallback((device: ONVIFDevice) => {
+    const deviceKey = getOnvifDeviceKey(device);
+
+    setSelectedOnvifDeviceKeys((current) => {
+      if (current.includes(deviceKey)) {
+        return current.filter((key) => key !== deviceKey);
+      }
+
+      return [...current, deviceKey];
+    });
+
+    setOnvifStreams([]);
+    setOnvifTestResult(null);
+    if (!feedName.trim()) {
+      setFeedName(device.name);
+    }
+  }, [feedName, setFeedName, setOnvifStreams, setOnvifTestResult, setSelectedOnvifDeviceKeys]);
+
+  const handleSelectAllOnvifDevices = useCallback(() => {
+    setSelectedOnvifDeviceKeys(onvifDevices.map((device) => getOnvifDeviceKey(device)));
+    setOnvifStreams([]);
+    setOnvifTestResult(null);
+  }, [onvifDevices, setOnvifStreams, setOnvifTestResult, setSelectedOnvifDeviceKeys]);
+
+  const handleClearOnvifDeviceSelection = useCallback(() => {
+    setSelectedOnvifDeviceKeys([]);
+    setOnvifStreams([]);
+    setOnvifTestResult(null);
+  }, [setOnvifStreams, setOnvifTestResult, setSelectedOnvifDeviceKeys]);
+
+  const handleBulkAddSelectedOnvifDevices = useCallback(async () => {
+    if (selectedOnvifDeviceKeys.length === 0) {
+      toast.error("Select one or more ONVIF cameras first.");
+      return;
+    }
+
+    const selectedDevices = onvifDevices.filter((device) => selectedOnvifDeviceKeys.includes(getOnvifDeviceKey(device)));
+    if (selectedDevices.length === 0) {
+      toast.error("Select one or more ONVIF cameras first.");
+      return;
+    }
+
+    setIsTestingOnvif(true);
+
+    try {
+      const stagedDrafts: StagedFeedDraft[] = [];
+
+      for (const device of selectedDevices) {
+        const { username, password } = getResolvedOnvifCredentials(device);
+        if (password.trim() && !username.trim()) {
+          throw new Error(`Enter a username for ${device.name} before using a password.`);
+        }
+
+        const streams = await resolveOnvifStreams({
+          device,
+          username: username.trim() || undefined,
+          password: password.trim() || undefined,
+        });
+
+        if (streams.length === 0) {
+          throw new Error(`No RTSP streams were resolved for ${device.name}.`);
+        }
+
+        const testResult = await testOnvifCamera({
+          device,
+          username: username.trim() || undefined,
+          password: password.trim() || undefined,
+          transport: onvifTransport,
+        });
+
+        const primaryStream = testResult.tested_stream?.url ?? streams[0]?.url ?? "";
+        if (!primaryStream) {
+          throw new Error(`No RTSP stream could be chosen for ${device.name}.`);
+        }
+
+        const derivedFeedName = feedName.trim()
+          ? selectedDevices.length === 1
+            ? feedName.trim()
+            : `${feedName.trim()} - ${device.name}`
+          : device.name;
+
+        stagedDrafts.push({
+          clientId: createDraftId(),
+          feedName: derivedFeedName,
+          sourceMode: "onvif",
+          source: primaryStream,
+          uploadedFile: null,
+          zonePoints: [],
+          modelSize: selectedModel,
+          establishmentId: selectedEstablishmentId,
+          establishmentName: selectedEstablishmentName,
+          caisseId: selectedCaisseId,
+          caisseName: selectedCaisseName,
+          hasSavedCaisseZone: selectedCaisseHasSavedZone,
+          rtspUsername: onvifUsername.trim(),
+          rtspPassword: onvifPassword.trim(),
+          rtspTransport: onvifTransport,
+          rtspTestResult: null,
+          onvifUsername,
+          onvifPassword,
+          onvifTransport,
+          onvifDevices: [device],
+          selectedOnvifDeviceKey: getOnvifDeviceKey(device),
+          onvifStreams: streams,
+          onvifTestResult: testResult,
+        });
+      }
+
+      setStagedFeeds((current) => [...current, ...stagedDrafts]);
+      setSelectedOnvifDeviceKeys([]);
+      setOnvifStreams([]);
+      setOnvifTestResult(null);
+      setSetupStep("review");
+      toast.success(`Added ${stagedDrafts.length} ONVIF camera${stagedDrafts.length === 1 ? "" : "s"} to the review queue.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to add the selected ONVIF cameras.");
+    } finally {
+      setIsTestingOnvif(false);
+    }
+  }, [
+    feedName,
+    getResolvedOnvifCredentials,
+    onvifDevices,
+    onvifPassword,
+    onvifTransport,
+    onvifUsername,
+    selectedCaisseHasSavedZone,
+    selectedCaisseId,
+    selectedCaisseName,
+    selectedEstablishmentId,
+    selectedEstablishmentName,
+    selectedModel,
+    selectedOnvifDeviceKeys,
+    setIsTestingOnvif,
+    setOnvifDeviceCredentials,
+    setOnvifStreams,
+    setOnvifTestResult,
+    setSelectedOnvifDeviceKeys,
+    setStagedFeeds,
+  ]);
 
   const handleResolveOnvifStreams = useCallback(async () => {
     if (!selectedOnvifDevice) {
@@ -315,11 +482,16 @@ export function useDashboardSourceOnboarding({
 
   return {
     handleSourceModeChange,
+    handleSetOnvifDeviceCredentials,
     buildSnapshotLoader,
     handleTestRtsp,
     handleDiscoverOnvif,
     handleSelectOnvifDevice,
+    handleToggleOnvifDevice,
+    handleSelectAllOnvifDevices,
+    handleClearOnvifDeviceSelection,
     handleResolveOnvifStreams,
     handleTestOnvif,
+    handleBulkAddSelectedOnvifDevices,
   };
 }

@@ -171,13 +171,9 @@ export default function Dashboard() {
     },
     [localFileConfigs],
   );
-
   const {
     setupStep,
     setSetupStep,
-    targetSourceCount,
-    setTargetSourceCount,
-    targetSourceCountValue,
     stagedFeeds,
     setStagedFeeds,
     currentDraftId,
@@ -222,8 +218,6 @@ export default function Dashboard() {
     setRtspTestResult,
     isTestingRtsp,
     setIsTestingRtsp,
-    onvifTimeout,
-    setOnvifTimeout,
     onvifUsername,
     setOnvifUsername,
     onvifPassword,
@@ -232,9 +226,12 @@ export default function Dashboard() {
     setOnvifTransport,
     onvifDevices,
     setOnvifDevices,
+    onvifDeviceCredentials,
+    setOnvifDeviceCredentials,
     selectedOnvifDevice,
     selectedOnvifDeviceKey,
-    setSelectedOnvifDeviceKey,
+    selectedOnvifDeviceKeys,
+    setSelectedOnvifDeviceKeys,
     onvifStreams,
     setOnvifStreams,
     onvifTestResult,
@@ -256,47 +253,6 @@ export default function Dashboard() {
     getStoredLocalFileConfig,
     setQueuedLocalFiles,
     resetLocalFiles,
-  });
-
-  const {
-    handleSourceModeChange,
-    buildSnapshotLoader,
-    handleTestRtsp,
-    handleDiscoverOnvif,
-    handleSelectOnvifDevice,
-    handleResolveOnvifStreams,
-    handleTestOnvif,
-  } = useDashboardSourceOnboarding({
-    sourceMode,
-    setSourceMode,
-    feedSource,
-    setFeedSource,
-    feedName,
-    setFeedName,
-    uploadedFile,
-    setUploadedFile,
-    setQueuedLocalFiles,
-    setZonePoints,
-    fileInputRef,
-    resetRtspState,
-    resetOnvifState,
-    rtspUsername,
-    rtspPassword,
-    rtspTransport,
-    setRtspTestResult,
-    setIsTestingRtsp,
-    onvifTimeout,
-    onvifUsername,
-    onvifPassword,
-    onvifTransport,
-    setOnvifDevices,
-    selectedOnvifDevice,
-    setSelectedOnvifDeviceKey,
-    setOnvifStreams,
-    setOnvifTestResult,
-    setIsDiscoveringOnvif,
-    setIsResolvingOnvifStreams,
-    setIsTestingOnvif,
   });
 
   const {
@@ -351,13 +307,8 @@ export default function Dashboard() {
     },
   });
 
-  const systemHealth = systemHealthQuery.data;
   const establishments = useMemo(() => establishmentsQuery.data ?? [], [establishmentsQuery.data]);
   const caisses = useMemo(() => caissesQuery.data ?? [], [caissesQuery.data]);
-  const emptyState = useMemo(
-    () => !feedsQuery.isLoading && feeds.length === 0,
-    [feeds.length, feedsQuery.isLoading],
-  );
   const selectedEstablishment = useMemo<Establishment | null>(
     () => establishments.find((establishment) => establishment.id === selectedEstablishmentId) ?? null,
     [establishments, selectedEstablishmentId],
@@ -366,6 +317,69 @@ export default function Dashboard() {
     () => caisses.find((caisse) => caisse.id === selectedCaisseId) ?? null,
     [caisses, selectedCaisseId],
   );
+  const {
+    handleSourceModeChange,
+    buildSnapshotLoader,
+    handleTestRtsp,
+    handleDiscoverOnvif,
+    handleSelectOnvifDevice,
+    handleToggleOnvifDevice,
+    handleSelectAllOnvifDevices,
+    handleClearOnvifDeviceSelection,
+    handleSetOnvifDeviceCredentials,
+    handleResolveOnvifStreams,
+    handleTestOnvif,
+    handleBulkAddSelectedOnvifDevices,
+  } = useDashboardSourceOnboarding({
+    sourceMode,
+    setSourceMode,
+    feedSource,
+    setFeedSource,
+    feedName,
+    setFeedName,
+    uploadedFile,
+    setUploadedFile,
+    setQueuedLocalFiles,
+    setZonePoints,
+    fileInputRef,
+    resetRtspState,
+    resetOnvifState,
+    rtspUsername,
+    rtspPassword,
+    rtspTransport,
+    setRtspTestResult,
+    setIsTestingRtsp,
+    onvifUsername,
+    onvifPassword,
+    onvifTransport,
+    setOnvifDevices,
+    onvifDevices,
+    onvifDeviceCredentials,
+    setOnvifDeviceCredentials,
+    selectedOnvifDevice,
+    selectedOnvifDeviceKeys,
+    setSelectedOnvifDeviceKeys,
+    setOnvifStreams,
+    setOnvifTestResult,
+    setIsDiscoveringOnvif,
+    setIsResolvingOnvifStreams,
+    setIsTestingOnvif,
+    setStagedFeeds,
+    selectedModel,
+    selectedEstablishmentId,
+    selectedEstablishmentName: selectedEstablishment?.name ?? null,
+    selectedCaisseId,
+    selectedCaisseName: selectedCaisse?.name ?? null,
+    selectedCaisseHasSavedZone: Boolean(selectedCaisse?.zone),
+    setSetupStep,
+  });
+
+  const systemHealth = systemHealthQuery.data;
+  const emptyState = useMemo(
+    () => !feedsQuery.isLoading && feeds.length === 0,
+    [feeds.length, feedsQuery.isLoading],
+  );
+
   const applyLocalFileSelection = useCallback((file: File | null) => {
     if (!file) {
       setFeedName("");
@@ -482,6 +496,10 @@ export default function Dashboard() {
       return null;
     }
 
+    if (sourceMode === "onvif" && selectedOnvifDeviceKeys.length > 1) {
+      return null;
+    }
+
     if (sourceMode === "onvif" && (!feedSource.trim() || !selectedOnvifDevice || !onvifTestResult?.connected)) {
       return null;
     }
@@ -503,7 +521,7 @@ export default function Dashboard() {
       rtspPassword,
       rtspTransport,
       rtspTestResult,
-      onvifTimeout,
+      onvifTimeout: DEFAULT_ONVIF_TIMEOUT,
       onvifUsername,
       onvifPassword,
       onvifTransport,
@@ -520,7 +538,6 @@ export default function Dashboard() {
     onvifPassword,
     onvifStreams,
     onvifTestResult,
-    onvifTimeout,
     onvifTransport,
     onvifUsername,
     rtspPassword,
@@ -535,6 +552,7 @@ export default function Dashboard() {
     selectedModel,
     selectedOnvifDevice,
     selectedOnvifDeviceKey,
+    selectedOnvifDeviceKeys,
     sourceMode,
     uploadedFile,
     zonePoints,
@@ -606,7 +624,6 @@ export default function Dashboard() {
     stagedFeeds,
     preparedLocalFileDrafts,
     currentReviewDraft,
-    targetSourceCountValue,
     batchLogLevel,
     batchWebhookEnabled,
     allSelectedLocalFiles,
@@ -642,8 +659,8 @@ export default function Dashboard() {
   );
 
   const preparedSourceCount = stagedFeeds.length + preparedLocalFileDrafts.length + (currentReviewDraft ? 1 : 0);
-  const remainingSourceSlots = Math.max(targetSourceCountValue - preparedSourceCount, 0);
-  const canSubmitBatch = preparedSourceCount === targetSourceCountValue;
+  const remainingSourceSlots = 0;
+  const canSubmitBatch = preparedSourceCount > 0;
 
   const closeFeedZoneEditor = useCallback(() => {
     setEditingFeedZone(null);
@@ -689,12 +706,11 @@ export default function Dashboard() {
     setRtspPassword(draft.rtspPassword);
     setRtspTransport(draft.rtspTransport);
     setRtspTestResult(draft.rtspTestResult);
-    setOnvifTimeout(draft.onvifTimeout);
     setOnvifUsername(draft.onvifUsername);
     setOnvifPassword(draft.onvifPassword);
     setOnvifTransport(draft.onvifTransport);
     setOnvifDevices(draft.onvifDevices);
-    setSelectedOnvifDeviceKey(draft.selectedOnvifDeviceKey);
+    setSelectedOnvifDeviceKeys([draft.selectedOnvifDeviceKey]);
     setOnvifStreams(draft.onvifStreams);
     setOnvifTestResult(draft.onvifTestResult);
     setSetupStep("source");
@@ -707,7 +723,6 @@ export default function Dashboard() {
     setOnvifPassword,
     setOnvifStreams,
     setOnvifTestResult,
-    setOnvifTimeout,
     setOnvifTransport,
     setOnvifUsername,
     setQueuedLocalFiles,
@@ -718,7 +733,7 @@ export default function Dashboard() {
     setSelectedCaisseId,
     setSelectedEstablishmentId,
     setSelectedModel,
-    setSelectedOnvifDeviceKey,
+    setSelectedOnvifDeviceKeys,
     setSetupStep,
     setSourceMode,
     setUploadedFile,
@@ -899,11 +914,6 @@ export default function Dashboard() {
 
     setQueuedLocalFiles(nextQueuedLocalFiles);
 
-    const preparedSourceCount = stagedFeeds.length + (nextUploadedFile ? 1 : 0) + nextQueuedLocalFiles.length;
-    if (preparedSourceCount > targetSourceCountValue) {
-      setTargetSourceCount(String(preparedSourceCount));
-    }
-
     if (filesToQueue.length > 0) {
       toast.success(`${filesToQueue.length + (uploadedFile ? 0 : 1)} local video${filesToQueue.length + (uploadedFile ? 0 : 1) === 1 ? "" : "s"} selected. Configure the current file, then the queue will advance automatically.`);
     }
@@ -923,11 +933,6 @@ export default function Dashboard() {
 
   const handleSourceStepSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    if (stagedFeeds.length >= targetSourceCountValue) {
-      toast.error("The batch already contains the target number of sources. Review or edit the staged feeds before adding more.");
-      return;
-    }
 
     if (!feedName.trim()) {
       toast.error("Feed name is required.");
@@ -965,6 +970,10 @@ export default function Dashboard() {
       toast.error("Select a discovered ONVIF camera before continuing.");
       return;
     }
+    if (selectedOnvifDeviceKeys.length > 1) {
+      toast.error("You have multiple ONVIF cameras selected. Use Add Selected Cameras to stage them as a batch.");
+      return;
+    }
     if (!feedSource.trim()) {
       toast.error("Resolve and select an RTSP stream for the ONVIF camera.");
       return;
@@ -988,12 +997,6 @@ export default function Dashboard() {
       return;
     }
 
-    const nextCount = stagedFeeds.length + 1;
-    if (nextCount > targetSourceCountValue) {
-      toast.error(`This batch is configured for ${targetSourceCountValue} source${targetSourceCountValue === 1 ? "" : "s"}. Remove a staged item or increase the target count first.`);
-      return;
-    }
-
     setStagedFeeds((current) => [...current, draft]);
     const preserveOnvifDiscovery = draft.sourceMode === "onvif";
     const nextUploadedFile = draft.sourceMode === "file" ? queuedLocalFiles[0] ?? null : null;
@@ -1004,9 +1007,9 @@ export default function Dashboard() {
       nextUploadedFile,
       nextQueuedLocalFiles,
     });
-    setSetupStep(nextCount >= targetSourceCountValue ? "review" : "source");
+    setSetupStep("review");
     toast.success(`${draft.feedName} added to the staged batch.`);
-  }, [buildCurrentDraft, queuedLocalFiles, resetCurrentDraft, setSetupStep, setStagedFeeds, stagedFeeds.length, targetSourceCountValue]);
+  }, [buildCurrentDraft, queuedLocalFiles, resetCurrentDraft, setSetupStep, setStagedFeeds]);
 
   const handleOpenBatchReview = useCallback(() => {
     if (stagedFeeds.length === 0) {
@@ -1271,10 +1274,10 @@ export default function Dashboard() {
           newCaisseName={newCaisseName}
           newEstablishmentName={newEstablishmentName}
           onvifDevices={onvifDevices}
+          onvifDeviceCredentials={onvifDeviceCredentials}
           onvifPassword={onvifPassword}
           onvifStreams={onvifStreams}
           onvifTestResult={onvifTestResult}
-          onvifTimeout={onvifTimeout}
           onvifTransport={onvifTransport}
           onvifUsername={onvifUsername}
           preparedLocalFileDrafts={preparedLocalFileDrafts}
@@ -1295,6 +1298,12 @@ export default function Dashboard() {
           selectedModel={selectedModel}
           selectedOnvifDevice={selectedOnvifDevice}
           selectedOnvifDeviceKey={selectedOnvifDeviceKey}
+          selectedOnvifDeviceKeys={selectedOnvifDeviceKeys}
+          handleToggleOnvifDevice={handleToggleOnvifDevice}
+          handleSelectAllOnvifDevices={handleSelectAllOnvifDevices}
+          handleClearOnvifDeviceSelection={handleClearOnvifDeviceSelection}
+          handleSetOnvifDeviceCredentials={handleSetOnvifDeviceCredentials}
+          handleBulkAddSelectedOnvifDevices={handleBulkAddSelectedOnvifDevices}
           setBatchLogLevel={setBatchLogLevel}
           setBatchWebhookEnabled={setBatchWebhookEnabled}
           setEditingZonePoints={setEditingZonePoints}
@@ -1307,7 +1316,6 @@ export default function Dashboard() {
           setOnvifPassword={setOnvifPassword}
           setOnvifStreams={setOnvifStreams}
           setOnvifTestResult={setOnvifTestResult}
-          setOnvifTimeout={setOnvifTimeout}
           setOnvifTransport={setOnvifTransport}
           setOnvifUsername={setOnvifUsername}
           setRtspPassword={setRtspPassword}
@@ -1316,15 +1324,12 @@ export default function Dashboard() {
           setRtspUsername={setRtspUsername}
           setSelectedModel={setSelectedModel}
           setSetupStep={setSetupStep}
-          setTargetSourceCount={setTargetSourceCount}
           setZonePoints={setZonePoints}
           setupStep={setupStep}
           sourceKind={sourceMode === "file" ? "Selected file" : sourceMode === "onvif" ? "ONVIF snapshot" : "RTSP preview"}
           sourceLabel={sourceMode === "file" ? uploadedFile?.name ?? "No file selected" : sourceMode === "onvif" ? selectedOnvifDevice ? `${selectedOnvifDevice.name} (${selectedOnvifDevice.ip})` : feedSource : feedSource}
           sourceMode={sourceMode}
           stagedSourceSummaries={stagedSourceSummaries}
-          targetSourceCount={targetSourceCount}
-          targetSourceCountValue={targetSourceCountValue}
           uploadedFile={uploadedFile}
           zonePoints={zonePoints}
         />

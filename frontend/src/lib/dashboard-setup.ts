@@ -39,6 +39,11 @@ export interface StagedFeedDraft {
   onvifTestResult: ONVIFCameraTestResult | null;
 }
 
+export interface OnvifDeviceCredentials {
+  username: string;
+  password: string;
+}
+
 export const DEFAULT_ONVIF_TIMEOUT = "5";
 
 export function formatResolution(result: {

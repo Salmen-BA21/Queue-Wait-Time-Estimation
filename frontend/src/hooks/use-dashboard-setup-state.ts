@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 
 import type { DashboardLocalFileConfig } from "@/hooks/use-dashboard-local-files";
-import { createDraftId, DEFAULT_ONVIF_TIMEOUT, getOnvifDeviceKey } from "@/lib/dashboard-setup";
+import { createDraftId, getOnvifDeviceKey, type OnvifDeviceCredentials } from "@/lib/dashboard-setup";
 import type { SetupStep, SourceMode, StagedFeedDraft } from "@/lib/dashboard-setup";
 import type {
   LogLevel,
@@ -33,7 +33,6 @@ export function useDashboardSetupState({
   resetLocalFiles,
 }: UseDashboardSetupStateArgs) {
   const [setupStep, setSetupStep] = useState<SetupStep>(null);
-  const [targetSourceCount, setTargetSourceCount] = useState("1");
   const [stagedFeeds, setStagedFeeds] = useState<StagedFeedDraft[]>([]);
   const [currentDraftId, setCurrentDraftId] = useState(() => createDraftId());
   const [feedName, setFeedName] = useState("");
@@ -56,12 +55,12 @@ export function useDashboardSetupState({
   const [rtspTransport, setRtspTransport] = useState<RTSPTransport>("tcp");
   const [rtspTestResult, setRtspTestResult] = useState<RTSPConnectionTestResult | null>(null);
   const [isTestingRtsp, setIsTestingRtsp] = useState(false);
-  const [onvifTimeout, setOnvifTimeout] = useState(DEFAULT_ONVIF_TIMEOUT);
   const [onvifUsername, setOnvifUsername] = useState("");
   const [onvifPassword, setOnvifPassword] = useState("");
   const [onvifTransport, setOnvifTransport] = useState<RTSPTransport>("tcp");
   const [onvifDevices, setOnvifDevices] = useState<ONVIFDevice[]>([]);
-  const [selectedOnvifDeviceKey, setSelectedOnvifDeviceKey] = useState("");
+  const [selectedOnvifDeviceKeys, setSelectedOnvifDeviceKeys] = useState<string[]>([]);
+  const [onvifDeviceCredentials, setOnvifDeviceCredentials] = useState<Record<string, OnvifDeviceCredentials>>({});
   const [onvifStreams, setOnvifStreams] = useState<ONVIFStream[]>([]);
   const [onvifTestResult, setOnvifTestResult] = useState<ONVIFCameraTestResult | null>(null);
   const [isDiscoveringOnvif, setIsDiscoveringOnvif] = useState(false);
@@ -69,13 +68,7 @@ export function useDashboardSetupState({
   const [isTestingOnvif, setIsTestingOnvif] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const targetSourceCountValue = useMemo(() => {
-    const parsed = Number.parseInt(targetSourceCount, 10);
-    if (Number.isNaN(parsed) || parsed < 1) {
-      return 1;
-    }
-    return parsed;
-  }, [targetSourceCount]);
+  const selectedOnvifDeviceKey = selectedOnvifDeviceKeys[0] ?? "";
 
   const selectedOnvifDevice = useMemo(
     () => onvifDevices.find((device) => getOnvifDeviceKey(device) === selectedOnvifDeviceKey) ?? null,
@@ -97,8 +90,8 @@ export function useDashboardSetupState({
       return feedSource.trim().length > 0 && rtspTestResult?.connected === true;
     }
 
-    return Boolean(selectedOnvifDevice && feedSource.trim() && onvifTestResult?.connected);
-  }, [feedName, feedSource, onvifTestResult, rtspTestResult, selectedOnvifDevice, sourceMode, uploadedFile]);
+    return Boolean(selectedOnvifDeviceKeys.length === 1 && selectedOnvifDevice && feedSource.trim() && onvifTestResult?.connected);
+  }, [feedName, feedSource, onvifTestResult, rtspTestResult, selectedOnvifDevice, selectedOnvifDeviceKeys.length, sourceMode, uploadedFile]);
 
   const resetRtspState = useCallback(() => {
     setRtspUsername("");
@@ -109,12 +102,12 @@ export function useDashboardSetupState({
   }, []);
 
   const resetOnvifState = useCallback(() => {
-    setOnvifTimeout(DEFAULT_ONVIF_TIMEOUT);
     setOnvifUsername("");
     setOnvifPassword("");
     setOnvifTransport("tcp");
     setOnvifDevices([]);
-    setSelectedOnvifDeviceKey("");
+    setSelectedOnvifDeviceKeys([]);
+    setOnvifDeviceCredentials({});
     setOnvifStreams([]);
     setOnvifTestResult(null);
     setIsDiscoveringOnvif(false);
@@ -154,7 +147,8 @@ export function useDashboardSetupState({
     }
 
     if (preserveOnvifDiscovery) {
-      setSelectedOnvifDeviceKey("");
+      setSelectedOnvifDeviceKeys([]);
+      setOnvifDeviceCredentials({});
       setOnvifStreams([]);
       setOnvifTestResult(null);
       setIsDiscoveringOnvif(false);
@@ -173,7 +167,6 @@ export function useDashboardSetupState({
 
   const resetSetupFlow = useCallback(() => {
     setSetupStep(null);
-    setTargetSourceCount("1");
     setStagedFeeds([]);
     setIsFinalizingSetup(false);
     setBatchLogLevel("INFO");
@@ -189,9 +182,6 @@ export function useDashboardSetupState({
   return {
     setupStep,
     setSetupStep,
-    targetSourceCount,
-    setTargetSourceCount,
-    targetSourceCountValue,
     stagedFeeds,
     setStagedFeeds,
     currentDraftId,
@@ -236,8 +226,6 @@ export function useDashboardSetupState({
     setRtspTestResult,
     isTestingRtsp,
     setIsTestingRtsp,
-    onvifTimeout,
-    setOnvifTimeout,
     onvifUsername,
     setOnvifUsername,
     onvifPassword,
@@ -248,7 +236,10 @@ export function useDashboardSetupState({
     setOnvifDevices,
     selectedOnvifDevice,
     selectedOnvifDeviceKey,
-    setSelectedOnvifDeviceKey,
+    selectedOnvifDeviceKeys,
+    setSelectedOnvifDeviceKeys,
+    onvifDeviceCredentials,
+    setOnvifDeviceCredentials,
     onvifStreams,
     setOnvifStreams,
     onvifTestResult,
