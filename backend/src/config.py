@@ -65,8 +65,6 @@ RTSP_RECONNECT_ATTEMPTS: int = 5
 RTSP_RECONNECT_DELAY_SEC: float = 3.0
 # FFMPEG-based RTSP transport – "tcp" is more reliable over lossy links
 RTSP_TRANSPORT: str = "tcp"  # "tcp" | "udp"
-
-
 # ─── Webhook / n8n Integration ────────────────────────────────
 # Local n8n webhook URL – change if n8n is on different host/port
 N8N_WEBHOOK_URL: str = "http://localhost:5678/webhook/queue-metrics"

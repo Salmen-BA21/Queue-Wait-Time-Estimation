@@ -800,7 +800,10 @@ class MainWindow:
 
                 if not streams:
                     test_result["success"] = False
-                    test_result["error"] = "No RTSP streams found"
+                    test_result["error"] = (
+                        "No RTSP stream could be retrieved from the camera via ONVIF. "
+                        "The camera may not support ONVIF media services or may require different authentication."
+                    )
                     return
 
                 # Test first stream
@@ -894,7 +897,12 @@ class MainWindow:
                     )
 
                     if not streams:
-                        messagebox.showerror("No Streams", "No RTSP streams found for this camera.")
+                        messagebox.showerror(
+                            "No Streams",
+                            "The camera did not provide an RTSP URI through ONVIF, so no stream was added.\n\n"
+                            "This may occur if the camera does not support ONVIF media services or has them disabled.\n\n"
+                            "Try adding the camera manually using the RTSP tab with a known stream URL.",
+                        )
                         return
 
                     # Use first stream

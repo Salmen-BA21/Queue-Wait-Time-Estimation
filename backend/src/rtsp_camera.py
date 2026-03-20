@@ -34,13 +34,14 @@ import select
 import socket
 import time
 import uuid
-from typing import Generator
+from typing import Any, Generator
 from urllib.parse import unquote, urlparse, urlunparse
 from xml.etree import ElementTree as ET
 
 import cv2
 import numpy as np
 import requests
+from requests.auth import HTTPBasicAuth, HTTPDigestAuth
 
 from src.config import (
     RTSP_CONNECTION_TIMEOUT_SEC,
@@ -95,6 +96,357 @@ def _safe_url(url: str) -> str:
 def _apply_rtsp_env(transport: str) -> None:
     """Set OpenCV / FFMPEG environment variables for RTSP transport."""
     os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", f"rtsp_transport;{transport}")
+
+
+
+def _iter_soap_auth_candidates(
+    username: str | None,
+    password: str | None,
+) -> list[HTTPDigestAuth | HTTPBasicAuth | None]:
+    """Return auth candidates for ONVIF SOAP requests.
+
+    Many cameras expect HTTP Digest for ONVIF services, while others still
+    accept basic auth. We try both before giving up.
+    """
+    if not username and not password:
+        return [None]
+
+    auth_username = username or ""
+    auth_password = password or ""
+    return [HTTPDigestAuth(auth_username, auth_password), HTTPBasicAuth(auth_username, auth_password), None]
+
+
+def _soap_post_with_auth_fallback(
+    url: str,
+    *,
+    data: str,
+    headers: dict[str, str],
+    username: str | None = None,
+    password: str | None = None,
+    timeout: float = 10,
+) -> requests.Response | None:
+    """POST a SOAP request using digest/basic/no-auth fallbacks."""
+    last_exc: Exception | None = None
+    for auth in _iter_soap_auth_candidates(username, password):
+        try:
+            response = requests.post(url, data=data, headers=headers, auth=auth, timeout=timeout)
+        except requests.RequestException as exc:
+            last_exc = exc
+            continue
+
+        if response.status_code in {200, 500}:
+            # 500 may still carry a SOAP fault or malformed response; callers
+            # inspect the body and/or status before deciding whether to continue.
+            return response
+
+    if last_exc is not None:
+        logger.warning("SOAP request to %s failed: %s", url, last_exc)
+    return None
+
+
+def _extract_capability_xaddr(response_content: bytes, capability_name: str) -> str | None:
+    """Extract a service XAddr from an ONVIF GetCapabilities response."""
+    try:
+        root = ET.fromstring(response_content)
+    except ET.ParseError:
+        return None
+
+    capability_names = {capability_name, capability_name.lower(), capability_name.upper()}
+
+    for element in root.iter():
+        if not element.tag.endswith("Capabilities"):
+            continue
+
+        for child in list(element):
+            child_name = child.tag.rsplit("}", 1)[-1]
+            if child_name not in capability_names:
+                continue
+
+            for grandchild in list(child):
+                if grandchild.tag.rsplit("}", 1)[-1] == "XAddr" and grandchild.text:
+                    return grandchild.text.strip()
+
+    return None
+
+
+def _extract_service_xaddr_from_services_response(response_content: bytes) -> str | None:
+    """Extract the media service XAddr from an ONVIF GetServices response."""
+    try:
+        root = ET.fromstring(response_content)
+    except ET.ParseError:
+        return None
+
+    for element in root.iter():
+        if element.tag.rsplit("}", 1)[-1] != "Service":
+            continue
+
+        namespace = None
+        xaddr = None
+        for child in list(element):
+            child_name = child.tag.rsplit("}", 1)[-1]
+            if child_name == "Namespace" and child.text:
+                namespace = child.text.strip()
+            elif child_name == "XAddr" and child.text:
+                xaddr = child.text.strip()
+
+        if not namespace or not xaddr:
+            continue
+
+        namespace_lower = namespace.lower()
+        if "media" in namespace_lower:
+            return xaddr
+
+    return None
+
+
+def _discover_media_xaddr_from_device_service(
+    device_service_url: str,
+    *,
+    username: str | None = None,
+    password: str | None = None,
+) -> str | None:
+    """Query the device service for the advertised media endpoint.
+
+    Some cameras do not expose the media XAddr in WS-Discovery ProbeMatch
+    responses but do publish it through the device service capabilities. This
+    helper asks the device service for GetCapabilities and returns the media
+    XAddr when present.
+    """
+    headers = {
+        "Content-Type": "application/soap+xml; charset=utf-8",
+        "SOAPAction": '"http://www.onvif.org/ver10/device/wsdl/GetCapabilities"',
+    }
+    request_body = """<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
+               xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+    <soap:Body>
+        <tds:GetCapabilities>
+            <tds:Category>All</tds:Category>
+        </tds:GetCapabilities>
+    </soap:Body>
+</soap:Envelope>"""
+
+    try:
+        response = _soap_post_with_auth_fallback(
+            device_service_url,
+            data=request_body,
+            headers=headers,
+            username=username,
+            password=password,
+            timeout=10,
+        )
+    except requests.RequestException as exc:
+        logger.warning("Failed to get capabilities from %s: %s", device_service_url, exc)
+        return None
+
+    if response is None:
+        return None
+
+    if response.status_code != 200:
+        logger.warning(
+            "Failed to get capabilities from %s: HTTP %d",
+            device_service_url,
+            response.status_code,
+        )
+        return None
+
+    media_xaddr = _extract_capability_xaddr(response.content, "Media")
+    if media_xaddr:
+        return media_xaddr
+
+    # Media2 is a valid ONVIF media endpoint on newer cameras. We still return
+    # it here so callers can decide whether to use the media2-specific flow.
+    media_xaddr = _extract_capability_xaddr(response.content, "Media2")
+    if media_xaddr:
+        return media_xaddr
+
+    services_headers = {
+        "Content-Type": "application/soap+xml; charset=utf-8",
+        "SOAPAction": '"http://www.onvif.org/ver10/device/wsdl/GetServices"',
+    }
+    services_request_body = """<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
+               xmlns:tds="http://www.onvif.org/ver10/device/wsdl">
+    <soap:Body>
+        <tds:GetServices>
+            <tds:IncludeCapability>true</tds:IncludeCapability>
+        </tds:GetServices>
+    </soap:Body>
+</soap:Envelope>"""
+
+    try:
+        response = _soap_post_with_auth_fallback(
+            device_service_url,
+            data=services_request_body,
+            headers=services_headers,
+            username=username,
+            password=password,
+            timeout=10,
+        )
+    except requests.RequestException as exc:
+        logger.warning("Failed to query device services from %s: %s", device_service_url, exc)
+        return None
+
+    if response is None or response.status_code != 200:
+        return None
+
+    return _extract_service_xaddr_from_services_response(response.content)
+
+
+def _extract_rtsp_uri_from_stream_response(response_content: bytes) -> str | None:
+    """Parse the RTSP URI from an ONVIF GetStreamUri response."""
+    try:
+        root = ET.fromstring(response_content)
+    except ET.ParseError:
+        return None
+
+    for elem in root.iter():
+        if elem.tag.rsplit("}", 1)[-1] != "Uri":
+            continue
+
+        if elem.text:
+            uri = elem.text.strip()
+            if uri.startswith("rtsp://"):
+                return uri
+
+    return None
+
+
+def _query_onvif_media_streams(
+    media_url: str,
+    *,
+    username: str | None = None,
+    password: str | None = None,
+) -> list[str]:
+    """Return RTSP stream URLs advertised by an ONVIF media service."""
+    is_media2 = "ver20" in media_url or "media2" in media_url.lower()
+    media_namespace = (
+        "http://www.onvif.org/ver20/media/wsdl" if is_media2 else "http://www.onvif.org/ver10/media/wsdl"
+    )
+    soap_action_prefix = "http://www.onvif.org/ver20/media/wsdl" if is_media2 else "http://www.onvif.org/ver10/media/wsdl"
+
+    headers = {
+        "Content-Type": "application/soap+xml; charset=utf-8",
+        "SOAPAction": f'"{soap_action_prefix}/GetProfiles"',
+    }
+
+    if is_media2:
+        profiles_soap = f"""<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
+               xmlns:media="{media_namespace}">
+    <soap:Body>
+        <media:GetProfiles/>
+    </soap:Body>
+</soap:Envelope>"""
+    else:
+        profiles_soap = f"""<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
+               xmlns:media="{media_namespace}">
+    <soap:Body>
+        <media:GetProfiles/>
+    </soap:Body>
+</soap:Envelope>"""
+
+    try:
+        response = _soap_post_with_auth_fallback(
+            media_url,
+            data=profiles_soap,
+            headers=headers,
+            username=username,
+            password=password,
+            timeout=10,
+        )
+    except requests.RequestException as exc:
+        logger.warning("Failed to query media service %s: %s", media_url, exc)
+        return []
+
+    if response is None:
+        return []
+
+    if response.status_code != 200:
+        logger.warning("Failed to get profiles from %s: HTTP %d", media_url, response.status_code)
+        return []
+
+    try:
+        root = ET.fromstring(response.content)
+    except ET.ParseError as exc:
+        logger.warning("Failed to parse SOAP response from %s: %s", media_url, exc)
+        return []
+
+    namespaces = {
+        "media": "http://www.onvif.org/ver10/media/wsdl",
+        "media2": "http://www.onvif.org/ver20/media/wsdl",
+    }
+
+    profile_tokens: list[str] = []
+    for profile in root.iter():
+        if profile.tag.rsplit("}", 1)[-1] != "Profiles":
+            continue
+
+        token = profile.attrib.get("token") or profile.attrib.get("_token")
+        if token:
+            profile_tokens.append(token)
+
+    rtsp_urls: list[str] = []
+    for profile_token in profile_tokens:
+        if is_media2:
+            stream_soap = f"""<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
+               xmlns:media="{media_namespace}">
+    <soap:Body>
+        <media:GetStreamUri>
+            <media:Protocol>RTSP</media:Protocol>
+            <media:ProfileToken>{profile_token}</media:ProfileToken>
+        </media:GetStreamUri>
+    </soap:Body>
+</soap:Envelope>"""
+        else:
+            stream_soap = f"""<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
+               xmlns:media="{media_namespace}">
+    <soap:Body>
+        <media:GetStreamUri>
+            <media:StreamSetup>
+                <media:Stream>RTP-Unicast</media:Stream>
+                <media:Transport>
+                    <media:Protocol>RTSP</media:Protocol>
+                </media:Transport>
+            </media:StreamSetup>
+            <media:ProfileToken>{profile_token}</media:ProfileToken>
+        </media:GetStreamUri>
+    </soap:Body>
+</soap:Envelope>"""
+
+        try:
+            stream_response = _soap_post_with_auth_fallback(
+                media_url,
+                data=stream_soap,
+                headers={
+                    "Content-Type": "application/soap+xml; charset=utf-8",
+                    "SOAPAction": f'"{soap_action_prefix}/GetStreamUri"',
+                },
+                timeout=10,
+                username=username,
+                password=password,
+            )
+        except requests.RequestException as exc:
+            logger.warning("Failed to query stream URI from %s: %s", media_url, exc)
+            continue
+
+        if stream_response is None:
+            continue
+
+        if stream_response.status_code != 200:
+            continue
+
+        rtsp_url = _extract_rtsp_uri_from_stream_response(stream_response.content)
+        if rtsp_url:
+            if username and password:
+                rtsp_url = _build_rtsp_url(rtsp_url, username, password)
+            rtsp_urls.append(rtsp_url)
+            logger.info("Found RTSP stream: %s", _safe_url(rtsp_url))
+
+    return rtsp_urls
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -712,54 +1064,16 @@ class RTSPCamera:
         return ONVIFDiscovery.discover_devices(timeout)
 
     @staticmethod
-    def _generate_candidate_rtsp_urls(device: dict) -> list[str]:
-        """Generate candidate RTSP URLs for cameras with no media service.
-
-        Uses common ONVIF and camera manufacturer paths. This fallback is
-        essential for cameras like Digital Watchdog DVRs that don't expose
-        an ONVIF media service but do respond on standard RTSP paths.
-
-        Parameters
-        ----------
-        device : dict
-            Device info from discover_onvif_devices()
-
-        Returns
-        -------
-        list[str]
-            List of candidate RTSP URLs to test.
-        """
-        ip = device['ip']
-        candidates = []
-
-        # Standard ONVIF profile paths
-        for profile in ["profile0", "profile1", "profile2"]:
-            candidates.append(f"rtsp://{ip}:554/{profile}")
-
-        # Generic stream paths
-        for stream in ["stream0", "stream1", "stream2"]:
-            candidates.append(f"rtsp://{ip}:554/{stream}")
-
-        # Live/main stream variants
-        candidates.extend([
-            f"rtsp://{ip}:554/live",
-            f"rtsp://{ip}:554/live/main",
-            f"rtsp://{ip}:554/live/0",
-            f"rtsp://{ip}:554/live/1",
-        ])
-
-        # Fallback to root path
-        candidates.append(f"rtsp://{ip}:554/")
-
-        logger.debug("Generated %d candidate RTSP URLs for fallback testing", len(candidates))
-        return candidates
-
-    @staticmethod
-    def get_rtsp_urls_from_onvif_device(device: dict, username: str | None = None, password: str | None = None) -> list[str]:
+    def get_rtsp_urls_from_onvif_device(
+        device: dict,
+        username: str | None = None,
+        password: str | None = None,
+    ) -> list[str]:
         """Extract RTSP stream URLs from an ONVIF device.
 
         First tries the ONVIF media service. If that fails or is unavailable,
-        tests common RTSP paths to discover working streams.
+        it resolves the media service from the device service capabilities and
+        the device service list.
 
         Parameters
         ----------
@@ -776,101 +1090,39 @@ class RTSPCamera:
             List of RTSP URLs for available streams
         """
         rtsp_urls = []
+        device_service_url = device.get("services", {}).get("device")
 
-        if 'media' in device['services']:
-            media_url = device['services']['media']
+        media_urls: list[str] = []
+        if device.get("services", {}).get("media"):
+            media_urls.append(device["services"]["media"])
 
-            try:
-                # Create SOAP request for GetProfiles
-                auth = (username, password) if username and password else None
-                headers = {
-                    'Content-Type': 'application/soap+xml; charset=utf-8',
-                    'SOAPAction': '"http://www.onvif.org/ver10/media/wsdl/GetProfiles"'
-                }
+        if not media_urls and device_service_url:
+            resolved_media_url = _discover_media_xaddr_from_device_service(
+                device_service_url,
+                username=username,
+                password=password,
+            )
+            if resolved_media_url:
+                media_urls.append(resolved_media_url)
+                logger.info(
+                    "Resolved media service for %s via device capabilities: %s",
+                    device.get("ip", "unknown"),
+                    resolved_media_url,
+                )
 
-                # GetProfiles request
-                profiles_soap = f"""<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
-               xmlns:media="http://www.onvif.org/ver10/media/wsdl">
-    <soap:Body>
-        <media:GetProfiles/>
-    </soap:Body>
-</soap:Envelope>"""
+        for media_url in media_urls:
+            rtsp_urls.extend(
+                url
+                for url in _query_onvif_media_streams(
+                    media_url,
+                    username=username,
+                    password=password,
+                )
+                if url not in rtsp_urls
+            )
 
-                response = requests.post(media_url, data=profiles_soap, headers=headers, auth=auth, timeout=10)
-
-                if response.status_code == 200:
-                    root = ET.fromstring(response.content)
-
-                    # Define namespaces for XPath queries
-                    namespaces = {
-                        'media': 'http://www.onvif.org/ver10/media/wsdl',
-                        'soap': 'http://www.w3.org/2003/05/soap-envelope'
-                    }
-
-                    # Extract profile tokens
-                    profiles = root.findall(".//media:Profiles", namespaces)
-                    for profile in profiles:
-                        profile_token = profile.get('token')
-                        if profile_token:
-                            # GetStreamUri request for this profile
-                            stream_soap = f"""<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
-               xmlns:media="http://www.onvif.org/ver10/media/wsdl">
-    <soap:Body>
-        <media:GetStreamUri>
-            <media:StreamSetup>
-                <media:Stream>RTP-Unicast</media:Stream>
-                <media:Transport>
-                    <media:Protocol>RTSP</media:Protocol>
-                </media:Transport>
-            </media:StreamSetup>
-            <media:ProfileToken>{profile_token}</media:ProfileToken>
-        </media:GetStreamUri>
-    </soap:Body>
-</soap:Envelope>"""
-
-                            stream_response = requests.post(media_url, data=stream_soap, headers=headers, auth=auth, timeout=10)
-
-                            if stream_response.status_code == 200:
-                                stream_root = ET.fromstring(stream_response.content)
-                                uri_elem = stream_root.find(".//media:Uri", namespaces)
-                                if uri_elem is not None and uri_elem.text:
-                                    rtsp_url = uri_elem.text.strip()
-                                    if username and password:
-                                        rtsp_url = _build_rtsp_url(rtsp_url, username, password)
-                                    rtsp_urls.append(rtsp_url)
-                                    logger.info("Found RTSP stream: %s", _safe_url(rtsp_url))
-
-                else:
-                    logger.warning("Failed to get profiles from %s: HTTP %d", media_url, response.status_code)
-
-            except requests.RequestException as e:
-                logger.warning("Failed to query media service %s: %s", media_url, e)
-            except ET.ParseError as e:
-                logger.warning("Failed to parse SOAP response from %s: %s", media_url, e)
-
-        # If ONVIF media service didn't work, or if we got no profiles, test candidate URLs
-        if not rtsp_urls:
-            logger.info("Testing candidate RTSP paths for device %s", device['ip'])
-            candidates = RTSPCamera._generate_candidate_rtsp_urls(device)
-
-            for candidate in candidates:
-                # Build URL with credentials if provided
-                if username or password:
-                    test_url = _build_rtsp_url(candidate, username, password)
-                else:
-                    test_url = candidate
-
-                # Test if this URL works
-                ok, info = RTSPCamera.test_connection(test_url, timeout=3.0)
-                if ok:
-                    rtsp_urls.append(test_url)
-                    logger.info("Candidate RTSP path works: %s", _safe_url(test_url))
-
-                # Return after finding first working stream to avoid timeout
-                if rtsp_urls:
-                    break
+            if rtsp_urls:
+                break
 
         return rtsp_urls
 
