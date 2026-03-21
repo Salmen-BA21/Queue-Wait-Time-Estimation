@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { ModelSelectionDialog } from "@/components/dashboard/ModelSelectionDialog";
 
 describe("ModelSelectionDialog", () => {
-  it("shows a source dropdown when multiple selected sources are available", () => {
+  it("renders the model picker for a single source", () => {
     render(
       <ModelSelectionDialog
         caisseName={null}
@@ -15,21 +15,15 @@ describe("ModelSelectionDialog", () => {
         onConfirm={() => {}}
         onModelChange={() => {}}
         onOpenChange={() => {}}
-        onSelectedSourceChange={() => {}}
         open
         selectedModel="m"
-        selectedSourceKey="file-a"
         sourceMode="file"
-        sourceOptions={[
-          { key: "file-a", label: "checkout-a.mp4" },
-          { key: "file-b", label: "checkout-b.mp4" },
-        ]}
         zonePointCount={4}
       />,
     );
 
-    expect(screen.getByText("Selected sources")).toBeInTheDocument();
-    expect(screen.getByRole("combobox")).toBeInTheDocument();
-    expect(screen.getByText(/assign a different YOLO model to each selected video or stream/i)).toBeInTheDocument();
+    expect(screen.getByText("Choose Model")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.getByText(/Finalize checkout-a/i)).toBeInTheDocument();
   });
 });

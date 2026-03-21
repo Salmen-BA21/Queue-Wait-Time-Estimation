@@ -10,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ZonePoint } from "@/lib/api";
 
 interface PreviewFrameResult {
@@ -22,18 +21,12 @@ interface PreviewFrameResult {
 interface ZoneSelectionDialogProps {
   open: boolean;
   file: File | null;
-  fileOptions?: Array<{
-    key: string;
-    label: string;
-  }>;
-  selectedFileKey?: string;
   sourceLabel?: string;
   sourceKind?: string;
   loadPreviewFrame?: (() => Promise<PreviewFrameResult>) | null;
   feedName: string;
   points: ZonePoint[];
   onPointsChange: (points: ZonePoint[]) => void;
-  onSelectedFileChange?: (fileKey: string) => void;
   onBack: () => void;
   onContinue: () => void;
   onOpenChange: (open: boolean) => void;
@@ -155,15 +148,12 @@ function loadFirstFrame(file: File, signal?: AbortSignal): Promise<string> {
 export function ZoneSelectionDialog({
   open,
   file,
-  fileOptions = [],
-  selectedFileKey,
   sourceLabel,
   sourceKind,
   loadPreviewFrame,
   feedName,
   points,
   onPointsChange,
-  onSelectedFileChange,
   onBack,
   onContinue,
   onOpenChange,
@@ -290,32 +280,13 @@ export function ZoneSelectionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto border-border bg-card sm:max-w-5xl">
         <DialogHeader>
-          <DialogTitle className="text-foreground">Select Queue Zone</DialogTitle>
+          <DialogTitle className="text-foreground">Trace Zone</DialogTitle>
           <DialogDescription className="text-muted-foreground">
             Click around the queue area for {feedName || resolvedSourceLabel || file?.name || "this feed"}. A minimum of 3 points is required.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {fileOptions.length > 1 && onSelectedFileChange && selectedFileKey ? (
-            <div className="grid gap-2 rounded-lg border border-border bg-background/40 p-3 sm:max-w-sm">
-              <span className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground/70">Selected videos</span>
-              <Select onValueChange={onSelectedFileChange} value={selectedFileKey}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a local video" />
-                </SelectTrigger>
-                <SelectContent>
-                  {fileOptions.map((option) => (
-                    <SelectItem key={option.key} value={option.key}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">Switch videos here to load a different frame while keeping each selected video's traced zone.</p>
-            </div>
-          ) : null}
-
           <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-background/40 p-3 text-sm text-muted-foreground">
             <span className="font-medium text-foreground">{resolvedSourceKind}:</span>
             <span className="font-mono text-xs">{resolvedSourceLabel}</span>

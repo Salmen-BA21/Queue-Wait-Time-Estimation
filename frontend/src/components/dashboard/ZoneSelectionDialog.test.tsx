@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ZoneSelectionDialog } from "@/components/dashboard/ZoneSelectionDialog";
 
 describe("ZoneSelectionDialog", () => {
-  it("shows a local-video dropdown when multiple selected videos are available", async () => {
+  it("shows a single local-video preview", async () => {
 
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
       configurable: true,
@@ -15,10 +15,6 @@ describe("ZoneSelectionDialog", () => {
       <ZoneSelectionDialog
         feedName="checkout-a"
         file={null}
-        fileOptions={[
-          { key: "file-a", label: "checkout-a.mp4" },
-          { key: "file-b", label: "checkout-b.mp4" },
-        ]}
         loadPreviewFrame={async () => ({
           frameSrc: "data:image/png;base64,ZmFrZQ==",
           sourceKind: "Selected file",
@@ -28,17 +24,38 @@ describe("ZoneSelectionDialog", () => {
         onContinue={() => {}}
         onOpenChange={() => {}}
         onPointsChange={() => {}}
-        onSelectedFileChange={() => {}}
         open
         points={[]}
-        selectedFileKey="file-a"
       />,
     );
 
-    expect(await screen.findByText("Selected videos")).toBeInTheDocument();
-    expect(screen.getByText(/Switch videos here to load a different frame/i)).toBeInTheDocument();
-    expect(screen.getByRole("combobox")).toBeInTheDocument();
-    expect(screen.getAllByText("checkout-a.mp4").length).toBeGreaterThan(0);
+    expect(await screen.findByText("Trace Zone")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.getByText("checkout-a.mp4")).toBeInTheDocument();
+  });
+
+  it("shows a single ONVIF camera preview", async () => {
+    render(
+      <ZoneSelectionDialog
+        feedName="front-gate"
+        file={null}
+        loadPreviewFrame={async () => ({
+          frameSrc: "data:image/png;base64,ZmFrZQ==",
+          sourceKind: "ONVIF snapshot",
+          sourceLabel: "front-gate",
+        })}
+        onBack={() => {}}
+        onContinue={() => {}}
+        onOpenChange={() => {}}
+        onPointsChange={() => {}}
+        open
+        points={[]}
+      />,
+    );
+
+    expect(await screen.findByText("Trace Zone")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.getByText("front-gate")).toBeInTheDocument();
   });
 
   it("allows retrying when preview loading fails", async () => {

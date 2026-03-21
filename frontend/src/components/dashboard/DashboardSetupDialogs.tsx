@@ -89,6 +89,7 @@ interface DashboardSetupDialogsProps {
   selectedOnvifDeviceKey: string;
   selectedOnvifDeviceKeys: string[];
   handleSelectOnvifDevice: (device: ONVIFDevice) => void;
+  handleSwitchOnvifDevice: (cameraKey: string) => void;
   handleToggleOnvifDevice: (device: ONVIFDevice) => void;
   handleSelectAllOnvifDevices: () => void;
   handleClearOnvifDeviceSelection: () => void;
@@ -208,6 +209,7 @@ export function DashboardSetupDialogs({
   selectedOnvifDeviceKey,
   selectedOnvifDeviceKeys,
   handleSelectOnvifDevice,
+  handleSwitchOnvifDevice,
   handleToggleOnvifDevice,
   handleSelectAllOnvifDevices,
   handleClearOnvifDeviceSelection,
@@ -295,13 +297,13 @@ export function DashboardSetupDialogs({
           <DialogHeader>
             <DialogTitle className="text-foreground">Stage Sources</DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Enter the feed information, select the required videos or camera sources, optionally attach metadata, then continue through zone tracing, model selection, and review.
+              Enter the feed information for one source, optionally attach metadata, then continue through zone tracing, model selection, and review.
             </DialogDescription>
           </DialogHeader>
 
           <form className="space-y-4" onSubmit={handleSourceStepSubmit}>
             <div className="rounded-xl border border-border bg-background/40 p-4 text-xs text-muted-foreground">
-              {preparedSourceCount} source{preparedSourceCount === 1 ? " is" : "s are"} prepared so far. Add as many sources as you need, then review and launch when ready.
+              One source is prepared at a time. Finish this source, then continue to zone tracing and model selection.
             </div>
 
             <div className="space-y-2">
@@ -331,55 +333,25 @@ export function DashboardSetupDialogs({
                     </div>
                   </div>
 
-                  <input accept=".mp4,.avi,.mov,.mkv,video/*" className="hidden" multiple onChange={handleFileChange} ref={fileInputRef} type="file" />
+                  <input accept=".mp4,.avi,.mov,.mkv,video/*" className="hidden" onChange={handleFileChange} ref={fileInputRef} type="file" />
 
                   <div className="flex flex-wrap items-center gap-3">
                     <Button onClick={() => fileInputRef.current?.click()} type="button" variant="outline">
                       <Upload className="mr-2 h-4 w-4" />
-                      Choose Video Files
+                      Choose Video File
                     </Button>
                     <span className="text-sm text-muted-foreground">{getFileLabel(uploadedFile)}</span>
                   </div>
 
-                  <p className="text-xs text-muted-foreground">Local videos are configured one source at a time so each feed can keep its own queue zone and model. You can now select several videos in one click, then the queue will advance after each source is staged.</p>
-                  <p className="text-xs text-muted-foreground">Before opening zone selection, use the queue below to choose which video is active. The active video is the one whose frame will be used for tracing.</p>
+                  <p className="text-xs text-muted-foreground">Local videos are configured one at a time so each feed keeps a single zone and model.</p>
 
-                  {(uploadedFile || queuedLocalFiles.length > 0) && (
-                    <div className="space-y-3 rounded-lg border border-border bg-background/50 p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-foreground">Selected local videos</p>
-                          <p className="text-xs text-muted-foreground">Current file is configured now. Remaining files stay queued for the next passes.</p>
-                        </div>
-                        <Badge variant="outline">{(uploadedFile ? 1 : 0) + queuedLocalFiles.length} selected</Badge>
+                  {uploadedFile && (
+                    <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline">Active video</Badge>
+                        <p className="text-sm font-medium text-foreground">{uploadedFile.name}</p>
                       </div>
-
-                      {uploadedFile && (
-                        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline">Now configuring</Badge>
-                            <p className="text-sm font-medium text-foreground">{uploadedFile.name}</p>
-                          </div>
-                          <p className="mt-1 text-xs text-muted-foreground">{getFileLabel(uploadedFile)}</p>
-                        </div>
-                      )}
-
-                      {queuedLocalFiles.length > 0 && (
-                        <div className="grid gap-2">
-                          {queuedLocalFiles.map((file, index) => (
-                            <div key={getLocalFileKey(file)} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/60 p-3">
-                              <div>
-                                <p className="text-sm font-medium text-foreground">Up next {index + 1}: {file.name}</p>
-                                <p className="text-xs text-muted-foreground">{getFileLabel(file)}</p>
-                              </div>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Button onClick={() => handleActivateQueuedLocalFile(getLocalFileKey(file))} size="sm" type="button" variant="outline">Use This Video Now</Button>
-                                <Button onClick={() => handleRemoveQueuedLocalFile(getLocalFileKey(file))} size="sm" type="button" variant="outline">Remove</Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <p className="mt-1 text-xs text-muted-foreground">{getFileLabel(uploadedFile)}</p>
                     </div>
                   )}
                 </div>
@@ -463,7 +435,7 @@ export function DashboardSetupDialogs({
                     <div className="rounded-lg bg-primary/10 p-2 text-primary"><Search className="h-5 w-5" /></div>
                     <div>
                       <p className="text-sm font-medium text-foreground">Discover ONVIF cameras</p>
-                      <p className="text-xs text-muted-foreground">Discover ONVIF devices, resolve their RTSP streams, then run a backend camera test before choosing the model.</p>
+                      <p className="text-xs text-muted-foreground">Discover one ONVIF device, resolve its RTSP stream, then run a backend camera test before choosing the model.</p>
                     </div>
                   </div>
 
@@ -476,12 +448,11 @@ export function DashboardSetupDialogs({
 
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline">{onvifDevices.length} discovered</Badge>
-                    <Badge variant="outline">{selectedOnvifDeviceKeys.length} selected</Badge>
                     {selectedOnvifDevice && <Badge variant="outline">Active: {selectedOnvifDevice.name}</Badge>}
                   </div>
 
                   <p className="text-xs text-muted-foreground">
-                    Resolve Streams and Test Camera apply to the active camera only. Use the Active badge to see which selected camera is currently being tested.
+                    Resolve Streams and Test Camera apply to the active camera only.
                   </p>
 
                   <div className="space-y-2">
@@ -489,34 +460,19 @@ export function DashboardSetupDialogs({
                       <div className="rounded-lg border border-dashed border-border bg-background/50 p-4 text-sm text-muted-foreground">Discover ONVIF devices on the local network to continue this camera onboarding path.</div>
                     ) : (
                       <div className="space-y-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button onClick={handleSelectAllOnvifDevices} type="button" variant="outline" size="sm">Select all</Button>
-                          <Button onClick={handleClearOnvifDeviceSelection} type="button" variant="outline" size="sm" disabled={selectedOnvifDeviceKeys.length === 0}>Clear selection</Button>
-                          {selectedOnvifDeviceKeys.length > 1 && <Badge variant="outline">Bulk add enabled</Badge>}
-                        </div>
-
-                        <div className="grid max-h-64 gap-2 overflow-y-auto pr-1">
+                        <div className="grid gap-2">
                           {onvifDevices.map((device) => {
                             const deviceKey = getOnvifDeviceKey(device);
-                            const isSelected = selectedOnvifDeviceKeys.includes(deviceKey);
                             const credentialValues = onvifDeviceCredentials[deviceKey] ?? { username: onvifUsername, password: onvifPassword };
                             const safeDeviceKey = deviceKey.replace(/[^a-zA-Z0-9_-]/g, "_");
                             return (
                               <div
                                 key={deviceKey}
-                                className={`rounded-xl border p-3 text-left transition-colors ${isSelected ? "border-primary bg-primary/10" : "border-border bg-background/50 hover:border-primary/40"}`}
+                                className={`rounded-xl border p-3 text-left transition-colors ${selectedOnvifDeviceKey === deviceKey ? "border-primary bg-primary/10" : "border-border bg-background/50 hover:border-primary/40"}`}
                               >
-                                <button
-                                  className="w-full text-left"
-                                  aria-pressed={isSelected}
-                                  onClick={() => handleToggleOnvifDevice(device)}
-                                  type="button"
-                                >
+                                <button className="w-full text-left" onClick={() => handleSelectOnvifDevice(device)} type="button">
                                   <div className="flex items-start justify-between gap-3">
                                     <div className="flex items-start gap-3">
-                                      <span className={`mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border ${isSelected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"}`} aria-hidden="true">
-                                        {isSelected ? "✓" : ""}
-                                      </span>
                                       <div>
                                         <p className="text-sm font-medium text-foreground">{device.name}</p>
                                         <p className="font-mono text-xs text-muted-foreground">{device.ip}</p>
@@ -526,7 +482,7 @@ export function DashboardSetupDialogs({
                                   </div>
                                   <p className="mt-2 text-xs text-muted-foreground">{device.manufacturer} · {device.location} · {Object.keys(device.services).length} services</p>
                                 </button>
-                                {isSelected && (
+                                {selectedOnvifDeviceKey === deviceKey && (
                                   <div className="mt-3 grid gap-3 border-t border-border/60 pt-3 md:grid-cols-2">
                                     <div className="space-y-2">
                                       <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground/70">Testing this camera</p>
@@ -560,12 +516,8 @@ export function DashboardSetupDialogs({
                     )}
                   </div>
 
-                    <div className="rounded-xl border border-dashed border-border bg-background/30 p-3 text-xs text-muted-foreground">
-                      For multiple ONVIF cameras, use the selected cameras as a review queue. The feed name becomes a batch prefix and each selected device is added as its own draft.
-                    </div>
-
                   <div className="rounded-xl border border-dashed border-border bg-background/30 p-3 text-xs text-muted-foreground">
-                    Set credentials inside each selected camera card above. Those values are used when streams are resolved and when the camera is tested.
+                    Set credentials inside the active camera card above. Those values are used when streams are resolved and when the camera is tested.
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-end">
@@ -586,10 +538,6 @@ export function DashboardSetupDialogs({
                     <Button onClick={handleTestOnvif} type="button" variant="outline" disabled={!selectedOnvifDevice || isTestingOnvif || isResolvingOnvifStreams}>
                       {isTestingOnvif ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
                       Test Camera
-                    </Button>
-                    <Button onClick={handleBulkAddSelectedOnvifDevices} type="button" disabled={selectedOnvifDeviceKeys.length === 0 || isTestingOnvif || isResolvingOnvifStreams}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Selected Cameras
                     </Button>
                   </div>
 
@@ -676,50 +624,34 @@ export function DashboardSetupDialogs({
             <div className="space-y-3 rounded-xl border border-border bg-background/40 p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium text-foreground">Selected videos and streams</p>
-                  <p className="text-xs text-muted-foreground">This is the live selection you are building before you continue to zone tracing.</p>
+                  <p className="text-sm font-medium text-foreground">Selected source</p>
+                  <p className="text-xs text-muted-foreground">This is the active source you are building before you continue to zone tracing.</p>
                 </div>
                 <Badge variant="outline">
-                  {sourceMode === "file"
-                    ? `${(uploadedFile ? 1 : 0) + queuedLocalFiles.length} video${(uploadedFile ? 1 : 0) + queuedLocalFiles.length === 1 ? "" : "s"}`
-                    : sourceMode === "rtsp"
-                      ? `${feedSource.trim() ? 1 : 0} stream`
-                      : `${selectedOnvifDeviceKeys.length} camera${selectedOnvifDeviceKeys.length === 1 ? "" : "s"}`}
+                  {sourceMode === "file" ? (uploadedFile ? "1 video" : "0 videos") : sourceMode === "rtsp" ? `${feedSource.trim() ? 1 : 0} stream` : selectedOnvifDevice ? "1 camera" : "0 cameras"}
                 </Badge>
               </div>
 
               <div className="grid gap-2">
                 {sourceMode === "file" ? (
-                  <>
-                    {uploadedFile && (
-                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 p-3">
-                        <div className="min-w-0 space-y-1">
-                          <p className="text-sm font-medium text-foreground">Active MP4</p>
-                          <p className="truncate text-xs text-muted-foreground">{uploadedFile.name}</p>
-                        </div>
-                        <Badge variant="outline">Video</Badge>
+                  uploadedFile ? (
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 p-3">
+                      <div className="min-w-0 space-y-1">
+                        <p className="text-sm font-medium text-foreground">Selected MP4</p>
+                        <p className="truncate text-xs text-muted-foreground">{uploadedFile.name}</p>
                       </div>
-                    )}
-                    {queuedLocalFiles.map((file, index) => (
-                      <div key={getLocalFileKey(file)} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 p-3">
-                        <div className="min-w-0 space-y-1">
-                          <p className="text-sm font-medium text-foreground">Queued video {index + 1}</p>
-                          <p className="truncate text-xs text-muted-foreground">{file.name}</p>
-                        </div>
-                        <Badge variant="outline">Video</Badge>
-                      </div>
-                    ))}
-                    {!uploadedFile && queuedLocalFiles.length === 0 && (
-                      <div className="rounded-lg border border-dashed border-border bg-background/50 p-3 text-xs text-muted-foreground">
-                        Pick one or more local videos to see them listed here.
-                      </div>
-                    )}
-                  </>
+                      <Badge variant="outline">Video</Badge>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-border bg-background/50 p-3 text-xs text-muted-foreground">
+                      Pick one local video to see it listed here.
+                    </div>
+                  )
                 ) : sourceMode === "rtsp" ? (
                   feedSource.trim() ? (
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 p-3">
                       <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium text-foreground">RTSP stream</p>
+                        <p className="text-sm font-medium text-foreground">Selected RTSP stream</p>
                         <p className="truncate text-xs text-muted-foreground">{feedSource.trim()}</p>
                       </div>
                       <Badge variant="outline">Stream</Badge>
@@ -729,21 +661,17 @@ export function DashboardSetupDialogs({
                       Enter an RTSP URL to see the selected stream here.
                     </div>
                   )
-                ) : selectedOnvifDeviceKeys.length > 0 ? (
-                  onvifDevices
-                    .filter((device) => selectedOnvifDeviceKeys.includes(getOnvifDeviceKey(device)))
-                    .map((device) => (
-                      <div key={getOnvifDeviceKey(device)} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 p-3">
-                        <div className="min-w-0 space-y-1">
-                          <p className="text-sm font-medium text-foreground">{device.name}</p>
-                          <p className="truncate text-xs text-muted-foreground">{device.ip} · {device.model}</p>
-                        </div>
-                        <Badge variant="outline">ONVIF</Badge>
-                      </div>
-                    ))
+                ) : selectedOnvifDevice ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 p-3">
+                    <div className="min-w-0 space-y-1">
+                      <p className="text-sm font-medium text-foreground">Selected ONVIF camera</p>
+                      <p className="truncate text-xs text-muted-foreground">{selectedOnvifDevice.name} · {selectedOnvifDevice.ip} · {selectedOnvifDevice.model}</p>
+                    </div>
+                    <Badge variant="outline">ONVIF</Badge>
+                  </div>
                 ) : (
                   <div className="rounded-lg border border-dashed border-border bg-background/50 p-3 text-xs text-muted-foreground">
-                    Discover and select one or more ONVIF cameras to see them listed here.
+                    Discover and select one ONVIF camera to see it listed here.
                   </div>
                 )}
               </div>
@@ -760,16 +688,13 @@ export function DashboardSetupDialogs({
       <ZoneSelectionDialog
         feedName={feedName}
         file={uploadedFile}
-        fileOptions={localZoneVideoOptions}
         loadPreviewFrame={sourceMode === "file" ? null : buildSnapshotLoader}
         onBack={() => setSetupStep("source")}
         onContinue={() => setSetupStep("model")}
         onOpenChange={handleDialogOpenChange}
         onPointsChange={setZonePoints}
-        onSelectedFileChange={handleSelectZoneVideo}
         open={setupStep === "zone"}
         points={zonePoints}
-        selectedFileKey={selectedLocalZoneVideoKey}
         metadataContent={
           <div className="space-y-4 rounded-xl border border-border bg-background/40 p-4">
             <div className="flex items-start justify-between gap-3">
@@ -868,12 +793,9 @@ export function DashboardSetupDialogs({
         onBack={() => setSetupStep("zone")}
         onConfirm={() => setSetupStep("review")}
         onModelChange={setSelectedModel}
-        onSelectedSourceChange={sourceMode === "file" ? handleSelectZoneVideo : undefined}
         onOpenChange={handleDialogOpenChange}
         open={setupStep === "model"}
         selectedModel={selectedModel}
-        selectedSourceKey={sourceMode === "file" ? selectedLocalZoneVideoKey : undefined}
-        sourceOptions={sourceMode === "file" ? localZoneVideoOptions : []}
         sourceMode={sourceMode}
         zonePointCount={zonePoints.length}
       />

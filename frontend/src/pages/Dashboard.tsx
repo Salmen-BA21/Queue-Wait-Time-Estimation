@@ -323,6 +323,7 @@ export default function Dashboard() {
     handleTestRtsp,
     handleDiscoverOnvif,
     handleSelectOnvifDevice,
+    handleSwitchOnvifDevice,
     handleToggleOnvifDevice,
     handleSelectAllOnvifDevices,
     handleClearOnvifDeviceSelection,
@@ -1252,6 +1253,7 @@ export default function Dashboard() {
           handleResolveOnvifStreams={handleResolveOnvifStreams}
           handleSaveEditedZone={() => void handleSaveEditedZone()}
           handleSelectOnvifDevice={handleSelectOnvifDevice}
+          handleSwitchOnvifDevice={handleSwitchOnvifDevice}
           handleSelectZoneVideo={handleSelectZoneVideo}
           handleSourceModeChange={handleSourceModeChange}
           handleSourceStepSubmit={handleSourceStepSubmit}
