@@ -1,0 +1,74 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "path": "queue-metrics",
+        "httpMethod": "POST",
+        "responseMode": "onReceived"
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 260]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "key": "={{$json[\"alert_triggered\"] === true}}",
+              "value": true
+            }
+          ]
+        }
+      },
+      "name": "If Alert",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [480, 260]
+    },
+    {
+      "parameters": {
+        "functionCode": "const d = $json;\nconst text =\n  `ALERT: ${d.alert_reason || d.alert_message || d.alert?.message || 'Queue alert'}\n` +\n  `Type: ${d.alert_type || d.alert?.alert_type}\n` +\n  `Severity: ${d.alert_severity || d.alert?.severity}\n` +\n  `People: ${d.people_in_zone} (threshold: ${d.threshold_value || d.alert?.threshold_value})\n` +\n  `Source: ${d.source}\n` +\n  `Time: ${d.timestamp}`;\n\nreturn [{ json: { text } }];"
+      },
+      "name": "Format Telegram Message",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [600, 260]
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "resource": "message",
+        "chatId": "7698037185",
+        "text": "{{$json.text}}",
+        "parseMode": ""
+      },
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [840, 260]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          { "node": "If Alert", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "If Alert": {
+      "main": [
+        [ { "node": "Format Telegram Message", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Format Telegram Message": {
+      "main": [
+        [ { "node": "Telegram", "type": "main", "index": 0 } ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {}
+}

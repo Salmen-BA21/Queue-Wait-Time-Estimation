@@ -119,19 +119,9 @@ Webhook Input → Parse JSON → Store/Process → Alert (if needed)
 - View incoming data
 - Useful for testing
 
-**3. Google Sheets Node (Data Storage)**
-- Append rows to spreadsheet
-- Track metrics over time
-
-> Setup notes:
-> - Use the **Spreadsheet ID** (from the sheet URL) for the node's `Document ID` field — example: `1JwbwxYyvCGV-1miyzd3X6edgCpMH1zzAQt_AMS7AkvM`.
-> - If you use a **service account**, share the sheet with the service-account email (xxxx@...gserviceaccount.com).
-> - If you use **OAuth** credentials, re-authorize the credential in n8n and ensure the Google account can open the sheet.
-> - Ensure the sheet tab name matches the `Sheet Name` in the node (default: `Queue Metrics`).
-
-**4. Telegram Node (Alerts)**
-- Send notifications on conditions
-- Queue exceeds threshold
+**3. Alerts and Storage**
+- Send notifications on conditions (Telegram recommended for quick setup)
+- Persist metrics locally as CSV using the built-in backup (see `src/csv_logger.py`) if you need historical records
 
 ## Integration with Main Pipeline
 
@@ -166,11 +156,21 @@ while True:
 ## Troubleshooting
 
 ### Webhook Not Connecting
-- Check n8n is running: `http://localhost:5678`
-- Verify webhook path matches config
-- Check firewall/network
+### Processing Nodes
 
-### Payload Errors
+**1. Webhook Node (Trigger)**
+- Receives POST data
+- Converts to JSON
+
+**2. Log/Debug Node (Optional)**
+- View incoming data
+- Useful for testing
+
+**3. Alerts (Telegram / other)**
+- Send notifications on conditions (configure Telegram/Twilio in n8n)
+
+**Storage**
+- The backend already writes CSV backups for metrics; use those for historical records or connect another persistence node if desired.
 - Validate JSON with `python src/webhook.py`
 - Check all required fields present
 - Review logs in n8n
@@ -190,7 +190,7 @@ while True:
 
 1. Set up n8n webhook (5 min)
 2. Test webhook connectivity (5 min)
-3. Add Google Sheets storage
+3. Configure alert channels (Telegram/Twilio)
 4. Add Telegram notifications
 5. Test end-to-end flow
 

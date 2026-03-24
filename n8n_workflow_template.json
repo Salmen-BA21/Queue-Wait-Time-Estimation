@@ -10,99 +10,10 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [250, 300]
-    },
-    {
-      "parameters": {
-        "columns": [
-          {
-            "key": "timestamp",
-            "header": "Timestamp"
-          },
-          {
-            "key": "frame_id",
-            "header": "Frame ID"
-          },
-          {
-            "key": "source",
-            "header": "Source"
-          },
-          {
-            "key": "people_in_zone",
-            "header": "People"
-          },
-          {
-            "key": "arrival_rate",
-            "header": "Arrival Rate"
-          },
-          {
-            "key": "service_rate",
-            "header": "Service Rate"
-          },
-          {
-            "key": "estimated_wait_sec",
-            "header": "Wait (s)"
-          },
-          {
-            "key": "arrival_rate_lower",
-            "header": "Arrival Lower"
-          },
-          {
-            "key": "arrival_rate_upper",
-            "header": "Arrival Upper"
-          },
-          {
-            "key": "service_rate_lower",
-            "header": "Service Lower"
-          },
-          {
-            "key": "service_rate_upper",
-            "header": "Service Upper"
-          },
-          {
-            "key": "wait_time_lower",
-            "header": "Wait Lower (s)"
-          },
-          {
-            "key": "wait_time_upper",
-            "header": "Wait Upper (s)"
-          },
-          {
-            "key": "uncertainty_level",
-            "header": "Uncertainty"
-          },
-          {
-            "key": "queue_stable",
-            "header": "Queue Stable"
-          },
-          {
-            "key": "alert_triggered",
-            "header": "Alert"
-          }
-        ],
-        "mode": "append",
-        "resource": "sheet",
-        "documentId": "1JwbwxYyvCGV-1miyzd3X6edgCpMH1zzAQt_AMS7AkvM",
-        "sheetName": "queue-metrics-processor"
-      },
-      "name": "Google Sheets",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 2,
-      "position": [500, 300]
     }
+    
   ],
-  "connections": {
-    "Webhook": {
-      "main": [
-        [
-          {
-            "node": "Google Sheets",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
-  },
+  "connections": {},
   "active": false,
   "settings": {}
 }

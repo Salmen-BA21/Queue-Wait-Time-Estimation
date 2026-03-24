@@ -29,6 +29,7 @@ from src.config import (
     N8N_WEBHOOK_URL,
     WEBHOOK_ENABLED,
     WEBHOOK_SEND_INTERVAL_SEC,
+    ALERT_DEDUPE_WINDOW_SEC,
 )
 from src.detector import PersonDetector
 from src.queue_analyzer import QueueAnalyzer, QueueMetrics
@@ -245,6 +246,8 @@ def run(cfg: AppConfig) -> None:
         last_webhook_time = time.monotonic()
         last_dashboard_event_time = time.monotonic()
         last_alert_severity_by_type: dict[str, str] = {}
+        # Track last webhook delivery time per alert type to avoid spamming
+        last_alert_webhook_time_by_type: dict[str, float] = {}
         last_queue_stable = True
         frame_count = 0
 
@@ -321,6 +324,31 @@ def run(cfg: AppConfig) -> None:
                     {"alert": _dashboard_alert_payload(alert)},
                 )
                 last_alert_severity_by_type[alert.alert_type.value] = alert.severity.value
+                # Immediately forward alert to webhook (if configured), but respect dedupe window
+                if webhook_client:
+                    now_ts = time.time()
+                    last_sent = last_alert_webhook_time_by_type.get(alert.alert_type.value, 0)
+                    if (now_ts - last_sent) >= ALERT_DEDUPE_WINDOW_SEC:
+                        try:
+                            webhook_client.send_metrics(
+                                metrics=metrics,
+                                frame_id=frame_count,
+                                source=str(cfg.source),
+                                alert_triggered=True,
+                                alert_reason=alert.message,
+                                alert_severity=alert.severity.value,
+                            )
+                            last_alert_webhook_time_by_type[alert.alert_type.value] = now_ts
+                        except Exception as exc:
+                            event_writer.emit(
+                                "system_warning",
+                                {
+                                    "code": "webhook_delivery_failed",
+                                    "message": f"Alert webhook delivery failed: {exc}",
+                                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                                },
+                            )
+                            logger.debug(f"Alert webhook send failed: {exc}")
             last_alert_severity_by_type = {
                 alert_type: severity
                 for alert_type, severity in last_alert_severity_by_type.items()

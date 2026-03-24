@@ -1,6 +1,6 @@
 """
 Local CSV logging for queue metrics.
-Provides backup persistence when n8n/Google Sheets is unavailable.
+Provides backup persistence for metrics and alerts.
 """
 from __future__ import annotations
 

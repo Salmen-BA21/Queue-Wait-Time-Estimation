@@ -72,6 +72,8 @@ WEBHOOK_ENABLED: bool = True  # Set to False to disable webhook sending
 WEBHOOK_TIMEOUT_SEC: float = 5.0
 WEBHOOK_RETRY_COUNT: int = 3
 WEBHOOK_SEND_INTERVAL_SEC: float = 5.0  # Send every N seconds (not every frame)
+# How long to suppress repeated alert webhook deliveries for the same alert type (seconds)
+ALERT_DEDUPE_WINDOW_SEC: int = 300  # 5 minutes
 
 @dataclass
 class AppConfig:

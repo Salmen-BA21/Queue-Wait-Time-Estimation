@@ -139,7 +139,7 @@ Alert Types (if crossed):
 ### Step 8: Data Persistence & External Integration
 ```
 Metrics → CSV File (local backup)
-       → JSON → n8n Webhook → Google Sheets / Telegram / Dashboard
+     → JSON → n8n Webhook → Telegram / Dashboard
 ```
 
 ---
