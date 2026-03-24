@@ -36,6 +36,7 @@ class TestGetAnalysisCommands(unittest.TestCase):
         win.video_paths = [r"C:\videos\cam1.mp4"]
         win.model_size.set("n")
         win.log_level.set("INFO")
+        win.queue_length_warning.set(8)
         win.zone_points_map.clear()
 
         cmds = win.get_analysis_commands()
@@ -46,6 +47,8 @@ class TestGetAnalysisCommands(unittest.TestCase):
         self.assertEqual(cmd[cmd.index("--source") + 1], r"C:\videos\cam1.mp4")
         self.assertIn("--model-size", cmd)
         self.assertEqual(cmd[cmd.index("--model-size") + 1], "n")
+        self.assertIn("--queue-length-warning", cmd)
+        self.assertEqual(cmd[cmd.index("--queue-length-warning") + 1], "8")
         self.assertNotIn("--zone-points", cmd)
         win.root.destroy()
 
@@ -58,6 +61,7 @@ class TestGetAnalysisCommands(unittest.TestCase):
         win.video_paths = [path]
         win.model_size.set("m")
         win.log_level.set("DEBUG")
+        win.queue_length_warning.set(6)
         win.zone_points_map = {path: zone}
 
         cmds = win.get_analysis_commands()
@@ -68,6 +72,7 @@ class TestGetAnalysisCommands(unittest.TestCase):
         raw = cmd[cmd.index("--zone-points") + 1]
         self.assertEqual(json.loads(raw), zone)
         self.assertEqual(cmd[cmd.index("--model-size") + 1], "m")
+        self.assertEqual(cmd[cmd.index("--queue-length-warning") + 1], "6")
         win.root.destroy()
 
     # ── multiple videos, mixed zones ──────────────────────────
@@ -81,6 +86,7 @@ class TestGetAnalysisCommands(unittest.TestCase):
         win.video_paths = [p1, p2, p3]
         win.model_size.set("x (x-large)")
         win.log_level.set("WARNING")
+        win.queue_length_warning.set(4)
         win.zone_points_map = {p1: zone1}  # only first has a zone
 
         cmds = win.get_analysis_commands()
@@ -94,6 +100,7 @@ class TestGetAnalysisCommands(unittest.TestCase):
 
         # Model size extracted correctly ("x" from "x (x-large)")
         self.assertEqual(cmds[0][cmds[0].index("--model-size") + 1], "x")
+        self.assertEqual(cmds[0][cmds[0].index("--queue-length-warning") + 1], "4")
         win.root.destroy()
 
     # ── no videos ─────────────────────────────────────────────

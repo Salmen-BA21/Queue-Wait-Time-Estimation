@@ -1,12 +1,13 @@
 {
+  "name": "Queue Metrics Telegram Alerts",
   "nodes": [
     {
       "parameters": {
         "path": "queue-metrics",
         "httpMethod": "POST",
-        "responseMode": "onReceived"
+        "responseMode": "lastNode"
       },
-      "name": "Webhook",
+      "name": "Receive Queue Metrics",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [240, 260]
@@ -14,59 +15,141 @@
     {
       "parameters": {
         "conditions": {
-          "boolean": [
+          "string": [
             {
-              "key": "={{$json[\"alert_triggered\"] === true}}",
-              "value": true
+              "value1": "={{ $json.headers['x-webhook-secret'] }}",
+              "operation": "equal",
+              "value2": "={{ $vars.WEBHOOK_SECRET }}"
             }
           ]
         }
       },
-      "name": "If Alert",
+      "name": "Validate Webhook Secret",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [480, 260]
+      "position": [460, 260]
     },
     {
       "parameters": {
-        "functionCode": "const d = $json;\nconst text =\n  `ALERT: ${d.alert_reason || d.alert_message || d.alert?.message || 'Queue alert'}\n` +\n  `Type: ${d.alert_type || d.alert?.alert_type}\n` +\n  `Severity: ${d.alert_severity || d.alert?.severity}\n` +\n  `People: ${d.people_in_zone} (threshold: ${d.threshold_value || d.alert?.threshold_value})\n` +\n  `Source: ${d.source}\n` +\n  `Time: ${d.timestamp}`;\n\nreturn [{ json: { text } }];"
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ ($json.body?.alert_triggered ?? false) ? 1 : 0 }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
       },
-      "name": "Format Telegram Message",
+      "name": "Has Alert?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [680, 260]
+    },
+    {
+      "parameters": {
+        "functionCode": "const d = $json.body ?? $json;\nconst escapeMarkdown = (value) => String(value ?? 'n/a').replace(/([_*\\[\\]()`])/g, '\\\\$1');\nconst zone = d.zone_id || d.feed_id || 'unknown';\nconst reason = d.alert_reason || 'Queue length warning';\nconst severity = d.alert_severity || 'warning';\nconst people = d.people_in_zone ?? d.metrics?.people_in_zone ?? 'n/a';\nconst waitTime = d.estimated_wait_sec ?? d.metrics?.wait_time_seconds ?? 'n/a';\nconst waitCi = d.wait_time_lower != null && d.wait_time_upper != null\n  ? `${d.wait_time_lower} - ${d.wait_time_upper}`\n  : (d.uncertainty?.wait_time_ci ? `${d.uncertainty.wait_time_ci[0]} - ${d.uncertainty.wait_time_ci[1]}` : 'n/a');\nconst text = `⚠️ *WARNING* — ${escapeMarkdown(zone)}\n\n` +\n  `📍 *Alert:* ${escapeMarkdown(reason)}\n` +\n  `📊 *Severity:* ${escapeMarkdown(severity)}\n` +\n  `👥 *In Queue:* ${people} people\n` +\n  `⏱ *Wait Time:* ${waitTime}s [CI: ${waitCi}]\n` +\n  `📈 *Uncertainty:* ${escapeMarkdown(d.uncertainty_level ?? d.uncertainty?.level ?? 'n/a')}\n` +\n  `🕐 ${d.timestamp ?? new Date().toISOString()}`;\nreturn [{ json: { message: text, feed_id: d.feed_id || null, zone_id: d.zone_id || null, alert_reason: d.alert_reason || null, alert_severity: severity } }];"
+      },
+      "name": "Format Warning Message",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [600, 260]
+      "position": [900, 260]
     },
     {
       "parameters": {
         "operation": "sendMessage",
         "resource": "message",
-        "chatId": "7698037185",
-        "text": "{{$json.text}}",
-        "parseMode": ""
+        "chatId": "={{ $vars.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
       },
-      "name": "Telegram",
+      "name": "Send Telegram Alert",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1,
-      "position": [840, 260]
+      "position": [1120, 260],
+      "continueOnFail": true,
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram_bot_creds",
+          "name": "Queue Monitor Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "response",
+              "value": "={{ 'Alert processed for ' + ($node[\"Format Warning Message\"].json.feed_id || 'unknown') + ' (' + ($node[\"Format Warning Message\"].json.zone_id || '?') + ')' }}"
+            }
+          ]
+        }
+      },
+      "name": "Acknowledge Alert",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [1320, 260]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "response",
+              "value": "No alerts in payload, acknowledged"
+            }
+          ]
+        }
+      },
+      "name": "Acknowledge No Alert",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [900, 420]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "response",
+              "value": "Unauthorized"
+            }
+          ]
+        }
+      },
+      "name": "Reject Unauthorized",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [680, 420]
     }
   ],
   "connections": {
-    "Webhook": {
-      "main": [
-        [
-          { "node": "If Alert", "type": "main", "index": 0 }
-        ]
-      ]
+    "Receive Queue Metrics": {
+      "main": [[{ "node": "Validate Webhook Secret", "type": "main", "index": 0 }]]
     },
-    "If Alert": {
-      "main": [
-        [ { "node": "Format Telegram Message", "type": "main", "index": 0 } ]
-      ]
+    "Validate Webhook Secret": {
+      "main": [[{ "node": "Has Alert?", "type": "main", "index": 0 }], [{ "node": "Reject Unauthorized", "type": "main", "index": 0 }]]
     },
-    "Format Telegram Message": {
-      "main": [
-        [ { "node": "Telegram", "type": "main", "index": 0 } ]
-      ]
+    "Has Alert?": {
+      "main": [[{ "node": "Format Warning Message", "type": "main", "index": 0 }], [{ "node": "Acknowledge No Alert", "type": "main", "index": 0 }]]
+    },
+    "Format Warning Message": {
+      "main": [[{ "node": "Send Telegram Alert", "type": "main", "index": 0 }]]
+    },
+    "Send Telegram Alert": {
+      "main": [[{ "node": "Acknowledge Alert", "type": "main", "index": 0 }]]
+    },
+    "Acknowledge Alert": {
+      "main": []
+    },
+    "Acknowledge No Alert": {
+      "main": []
+    },
+    "Reject Unauthorized": {
+      "main": []
     }
   },
   "active": false,

@@ -17,7 +17,7 @@ from pydantic import ValidationError
 from backend.app import app
 from src import database
 from src.api.models import AlertModel, BatchFeedDraft, BatchFeedLaunchRequest, QueueMetricsModel, ZonePolygon
-from src.api.runtime import RECOVERED_FEED_MESSAGE, FeedRegistry, FeedStartError, FeedWorkerHandle, WebSocketHub
+from src.api.runtime import FeedRegistry, FeedStartError, FeedWorkerHandle, WebSocketHub
 
 
 class FakeWorkerRunner:
@@ -540,8 +540,8 @@ class TestQueueVisionApi(unittest.TestCase):
         restored = restored_response.json()["data"]
         self.assertEqual(restored["status"], "stopped")
         self.assertIsNone(restored["last_error"])
-        self.assertEqual(restored["last_warning"], RECOVERED_FEED_MESSAGE)
-        self.assertEqual(restored["last_warning_code"], "recovery_required")
+        self.assertIsNone(restored["last_warning"])
+        self.assertIsNone(restored["last_warning_code"])
 
         conn = database.get_connection()
         try:
@@ -1193,8 +1193,8 @@ class TestQueueVisionApi(unittest.TestCase):
             await hub.broadcast_alert_event(feed_id="feed-live", alert=alert)
             await hub.broadcast_system_warning(
                 feed_id="feed-live",
-                code="queue_unstable",
-                message="Queue entered an unstable state.",
+                code="queue_length_warning",
+                message="Queue length warning.",
                 timestamp=datetime.fromisoformat("2026-03-10T12:00:01+00:00"),
             )
 
@@ -1207,7 +1207,7 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertEqual(websocket.payloads[0]["payload"]["feed_id"], "feed-live")
         self.assertEqual(websocket.payloads[0]["payload"]["metrics"]["people_in_zone"], 4)
         self.assertEqual(websocket.payloads[1]["payload"]["alert"]["alert_type"], "queue_backlog")
-        self.assertEqual(websocket.payloads[2]["payload"]["code"], "queue_unstable")
+        self.assertEqual(websocket.payloads[2]["payload"]["code"], "queue_length_warning")
 
     def test_websocket_warning_persists_on_feed_status(self) -> None:
         feed = self.client.post(
@@ -1296,8 +1296,8 @@ class TestQueueVisionApi(unittest.TestCase):
         payload = recovered_feed.json()["data"]
         self.assertEqual(payload["status"], "stopped")
         self.assertIsNone(payload["last_error"])
-        self.assertEqual(payload["last_warning"], RECOVERED_FEED_MESSAGE)
-        self.assertEqual(payload["last_warning_code"], "recovery_required")
+        self.assertIsNone(payload["last_warning"])
+        self.assertIsNone(payload["last_warning_code"])
 
 
 if __name__ == "__main__":

@@ -79,6 +79,7 @@ def _create_current_schema(cursor: sqlite3.Cursor) -> None:
             status TEXT NOT NULL DEFAULT 'created',
             log_level TEXT NOT NULL DEFAULT 'INFO',
             webhook_enabled INTEGER NOT NULL DEFAULT 1,
+            queue_length_warning INTEGER NOT NULL DEFAULT 8,
             rtsp_username TEXT,
             rtsp_password TEXT,
             rtsp_transport TEXT,
@@ -107,6 +108,10 @@ def _migrate_feed_configs_schema(cursor: sqlite3.Cursor) -> None:
     if "webhook_enabled" not in columns:
         cursor.execute(
             "ALTER TABLE feed_configs ADD COLUMN webhook_enabled INTEGER NOT NULL DEFAULT 1"
+        )
+    if "queue_length_warning" not in columns:
+        cursor.execute(
+            "ALTER TABLE feed_configs ADD COLUMN queue_length_warning INTEGER NOT NULL DEFAULT 8"
         )
 
 
@@ -436,6 +441,7 @@ def upsert_feed_config(
     webhook_enabled: bool = True,
     created_at: datetime,
     updated_at: datetime,
+    queue_length_warning: int = 8,
     rtsp_username: Optional[str] = None,
     rtsp_password: Optional[str] = None,
     rtsp_transport: Optional[str] = None,
@@ -459,6 +465,7 @@ def upsert_feed_config(
                 status,
                 log_level,
                 webhook_enabled,
+                queue_length_warning,
                 rtsp_username,
                 rtsp_password,
                 rtsp_transport,
@@ -476,6 +483,7 @@ def upsert_feed_config(
                 status = excluded.status,
                 log_level = excluded.log_level,
                 webhook_enabled = excluded.webhook_enabled,
+                queue_length_warning = excluded.queue_length_warning,
                 rtsp_username = excluded.rtsp_username,
                 rtsp_password = excluded.rtsp_password,
                 rtsp_transport = excluded.rtsp_transport,
@@ -493,6 +501,7 @@ def upsert_feed_config(
                 status,
                 log_level,
                 int(webhook_enabled),
+                queue_length_warning,
                 rtsp_username,
                 rtsp_password,
                 rtsp_transport,
@@ -524,6 +533,7 @@ def get_feed_configs() -> List[Dict[str, Any]]:
                 status,
                 log_level,
                 webhook_enabled,
+                queue_length_warning,
                 rtsp_username,
                 rtsp_password,
                 rtsp_transport,

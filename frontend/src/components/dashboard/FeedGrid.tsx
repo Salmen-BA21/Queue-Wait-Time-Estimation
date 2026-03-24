@@ -4,6 +4,7 @@ import { AlertTriangle, Camera, Loader2, Play, RotateCcw, Square, Trash2, Wifi, 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getFeedSnapshot, resolveApiUrl, type VideoFeed } from "@/lib/api";
 
@@ -31,18 +32,67 @@ function formatRatePerMinute(rate: number): string {
   return `${perMinute >= 10 ? perMinute.toFixed(1) : perMinute.toFixed(2)}/min`;
 }
 
-function getUncertaintyTone(level: string): "default" | "secondary" | "destructive" {
-  if (level === "High") {
-    return "destructive";
-  }
-  if (level === "Medium") {
-    return "secondary";
-  }
-  return "default";
-}
+function FeedThresholdEditor({
+  feed,
+  isSaving,
+  onSave,
+}: {
+  feed: VideoFeed;
+  isSaving: boolean;
+  onSave: (feedId: string, queueLengthWarning: number) => Promise<void>;
+}) {
+  const [warningValue, setWarningValue] = useState(String(feed.queue_length_warning));
+  const [error, setError] = useState<string | null>(null);
 
-function isRecoveryWarning(feed: VideoFeed): boolean {
-  return feed.last_warning_code === "recovery_required";
+  useEffect(() => {
+    setWarningValue(String(feed.queue_length_warning));
+    setError(null);
+  }, [feed.feed_id, feed.queue_length_warning]);
+
+  const handleSave = async () => {
+    const warning = Number.parseInt(warningValue, 10);
+
+    if (!Number.isFinite(warning)) {
+      setError("Enter a whole number for the threshold.");
+      return;
+    }
+
+    if (warning < 0) {
+      setError("Threshold must be zero or greater.");
+      return;
+    }
+
+    setError(null);
+    await onSave(feed.feed_id, warning);
+  };
+
+  return (
+    <div className="mt-3 rounded-lg border border-border bg-background/50 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground/70">Queue thresholds</p>
+          <p className="text-xs text-muted-foreground">Update the per-feed people-in-line limits used by the detector.</p>
+        </div>
+        <Button onClick={handleSave} size="sm" type="button" variant="secondary" disabled={isSaving}>
+          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          Save
+        </Button>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <label className="space-y-1 text-xs text-muted-foreground">
+          <span>Warning</span>
+          <Input
+            min={0}
+            inputMode="numeric"
+            type="number"
+            value={warningValue}
+            onChange={(event) => setWarningValue(event.target.value)}
+          />
+        </label>
+      </div>
+      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+    </div>
+  );
 }
 
 function shouldUseSnapshotTransport(feed: VideoFeed): boolean {
@@ -297,12 +347,16 @@ function FeedGridComponent({
   activeFeedAction,
   onEditZone,
   onFeedAction,
+  onSaveThresholds,
+  isSavingThresholds,
 }: {
   feeds: VideoFeed[];
   emptyState: boolean;
   activeFeedAction: { feedId: string; action: FeedGridAction } | null;
   onEditZone: (feed: VideoFeed) => void;
   onFeedAction: (feed: VideoFeed, action: FeedGridAction) => void;
+  onSaveThresholds: (feedId: string, queueLengthWarning: number) => Promise<void>;
+  isSavingThresholds: boolean;
 }) {
   const [expandedFeedId, setExpandedFeedId] = useState<string | null>(null);
   const expandedFeed = feeds.find((feed) => feed.feed_id === expandedFeedId) ?? null;
@@ -359,17 +413,10 @@ function FeedGridComponent({
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   {feed.last_error && <Badge variant="destructive">Runtime failure</Badge>}
-                  {feed.last_warning && (
-                    <Badge variant="secondary">{isRecoveryWarning(feed) ? "Recovery notice" : "Worker warning"}</Badge>
-                  )}
+                  {feed.last_warning && <Badge variant="secondary">Worker warning</Badge>}
                   {feed.latest_metrics && (
                     <>
-                      <Badge variant={feed.latest_metrics.queue_stable ? "outline" : "destructive"}>
-                        {feed.latest_metrics.queue_stable ? "Stable queue" : "Unstable queue"}
-                      </Badge>
-                      <Badge variant={getUncertaintyTone(feed.latest_metrics.uncertainty_level)}>
-                        {feed.latest_metrics.uncertainty_level} uncertainty
-                      </Badge>
+                      <Badge variant="outline">Live metrics active</Badge>
                     </>
                   )}
                   <Button onClick={() => onEditZone(feed)} size="sm" type="button" variant="outline">
@@ -423,6 +470,7 @@ function FeedGridComponent({
                     <span className="text-xs text-muted-foreground">Worker is initializing...</span>
                   )}
                 </div>
+                <FeedThresholdEditor feed={feed} isSaving={isSavingThresholds} onSave={onSaveThresholds} />
                 {(feed.last_error || feed.last_warning) && (
                   <div className="mt-3 space-y-2">
                     {feed.last_error && (
@@ -437,14 +485,12 @@ function FeedGridComponent({
                       </div>
                     )}
                     {feed.last_warning && (
-                      <div className={`rounded-lg border p-3 ${isRecoveryWarning(feed) ? "border-amber-500/40 bg-amber-500/10" : "border-border bg-background/50"}`}>
+                      <div className="rounded-lg border border-border bg-background/50 p-3">
                         <div className="flex items-start gap-2">
-                          <AlertTriangle className={`mt-0.5 h-4 w-4 ${isRecoveryWarning(feed) ? "text-amber-300" : "text-primary"}`} />
+                          <AlertTriangle className="mt-0.5 h-4 w-4 text-primary" />
                           <div>
-                            <p className={`text-xs font-semibold ${isRecoveryWarning(feed) ? "text-amber-100" : "text-foreground"}`}>
-                              {isRecoveryWarning(feed) ? "Recovery required" : "Worker warning"}
-                            </p>
-                            <p className={`mt-1 text-xs leading-relaxed ${isRecoveryWarning(feed) ? "text-amber-50" : "text-muted-foreground"}`}>{feed.last_warning}</p>
+                            <p className="text-xs font-semibold text-foreground">Worker warning</p>
+                            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{feed.last_warning}</p>
                           </div>
                         </div>
                       </div>

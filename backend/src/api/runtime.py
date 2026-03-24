@@ -59,9 +59,6 @@ UPLOAD_DIR = (BACKEND_DIR / "data" / "uploads").resolve()
 RUNTIME_LOG_DIR = (BACKEND_DIR / "data" / "runtime").resolve()
 DEFAULT_LOG_LEVEL = "INFO"
 DEFAULT_RESIZE_SCALE = 0.5
-RECOVERED_FEED_MESSAGE = "Recovered after backend restart. Start the feed again to resume analysis."
-
-
 class FeedStateError(RuntimeError):
     """Raised when a feed operation is invalid for the current lifecycle state."""
 
@@ -151,6 +148,7 @@ class FeedPersistencePayload(TypedDict):
     status: str
     log_level: str
     webhook_enabled: bool
+    queue_length_warning: int
     created_at: datetime
     updated_at: datetime
     rtsp_username: str | None
@@ -436,6 +434,13 @@ class SubprocessFeedWorkerRunner:
             if record.rtsp_transport:
                 command.extend(["--rtsp-transport", record.rtsp_transport])
 
+        command.extend(
+            [
+                "--queue-length-warning",
+                str(record.queue_length_warning),
+            ]
+        )
+
         if record.establishment_id is not None:
             command.extend(["--establishment-id", str(record.establishment_id)])
         if record.caisse_id is not None:
@@ -459,6 +464,7 @@ class FeedRecord:
     updated_at: datetime
     log_level: LogLevel = "INFO"
     webhook_enabled: bool = True
+    queue_length_warning: int = 8
     rtsp_username: str | None = None
     rtsp_password: str | None = None
     rtsp_transport: Literal["tcp", "udp"] | None = None
@@ -593,6 +599,7 @@ class FeedRegistry:
         zone: ZonePolygon | None = None,
         log_level: LogLevel = "INFO",
         webhook_enabled: bool = True,
+        queue_length_warning: int = 8,
         establishment_id: int | None = None,
         caisse_id: int | None = None,
         rtsp_username: str | None = None,
@@ -607,6 +614,7 @@ class FeedRegistry:
             source=source.strip(),
             log_level=log_level,
             webhook_enabled=webhook_enabled,
+            queue_length_warning=queue_length_warning,
             rtsp_username=rtsp_username.strip() or None if rtsp_username else None,
             rtsp_password=rtsp_password.strip() or None if rtsp_password else None,
             rtsp_transport=rtsp_transport,
@@ -673,6 +681,31 @@ class FeedRegistry:
             )
 
         await self._persist_record(record)
+
+        await self._broadcaster.broadcast_feed_event(action="updated", feed=model)
+        return model
+
+    async def update_thresholds(
+        self,
+        feed_id: str,
+        *,
+        queue_length_warning: int,
+    ) -> VideoFeed | None:
+        async with self._lock:
+            record = self._feeds.get(feed_id)
+            if record is None:
+                return None
+
+            record.queue_length_warning = queue_length_warning
+            record.updated_at = utc_now()
+            model = record.to_model()
+            should_restart = record.worker is not None and self._runner.poll(record.worker) is None
+
+        await self._persist_record(record)
+
+        if should_restart:
+            await self.restart_feed(feed_id)
+            return await self.get_feed(feed_id)
 
         await self._broadcaster.broadcast_feed_event(action="updated", feed=model)
         return model
@@ -1006,6 +1039,7 @@ class FeedRegistry:
             "status": record.status,
             "log_level": record.log_level,
             "webhook_enabled": record.webhook_enabled,
+            "queue_length_warning": record.queue_length_warning,
             "created_at": record.created_at,
             "updated_at": record.updated_at,
             "rtsp_username": record.rtsp_username,
@@ -1037,8 +1071,6 @@ class FeedRegistry:
             if original_status in {"running", "initializing"}:
                 status = "stopped"
                 last_error = None
-                last_warning = RECOVERED_FEED_MESSAGE
-                last_warning_code = "recovery_required"
                 updated_at = recovered_at
 
             record = FeedRecord(
@@ -1051,6 +1083,7 @@ class FeedRegistry:
                 updated_at=updated_at,
                 log_level=cast(LogLevel, persisted.get("log_level") or "INFO"),
                 webhook_enabled=bool(persisted.get("webhook_enabled", True)),
+                queue_length_warning=int(persisted.get("queue_length_warning", 8)),
                 rtsp_username=persisted.get("rtsp_username") if isinstance(persisted.get("rtsp_username"), str) else None,
                 rtsp_password=persisted.get("rtsp_password") if isinstance(persisted.get("rtsp_password"), str) else None,
                 rtsp_transport=persisted.get("rtsp_transport") if persisted.get("rtsp_transport") in {"tcp", "udp"} else None,
@@ -1107,7 +1140,7 @@ class FeedRegistry:
     ) -> None:
         async with self._lock:
             record = self._feeds.get(feed_id)
-            if record is not None and code != "queue_unstable":
+            if record is not None:
                 record.last_warning = message
                 record.last_warning_code = code
 

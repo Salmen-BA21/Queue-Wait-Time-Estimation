@@ -87,6 +87,7 @@ class AppConfig:
     confidence: float = DEFAULT_CONFIDENCE
     tracker_type: str = DEFAULT_TRACKER_TYPE
     resize_scale: float = 1.0
+    queue_length_warning: int = 8
     # RTSP-specific
     rtsp_username: Optional[str] = None
     rtsp_password: Optional[str] = None
@@ -95,6 +96,7 @@ class AppConfig:
     # Metadata tracking (database IDs)
     establishment_id: Optional[int] = None
     caisse_id: Optional[int] = None
+    feed_id: Optional[str] = None
     webhook_enabled: bool = WEBHOOK_ENABLED
     events_file: Optional[str] = None
     headless: bool = False

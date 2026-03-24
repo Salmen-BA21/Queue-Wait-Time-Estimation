@@ -134,23 +134,14 @@ describe("useLiveDashboard", () => {
           feed_id: "feed-1",
           alert: {
             alert_type: "queue_backlog",
-            severity: "critical",
-            message: "Queue exceeded the critical threshold.",
-            threshold_name: "queue_length_critical",
+            severity: "warning",
+            message: "Queue exceeded the warning threshold.",
+            threshold_name: "queue_length_warning",
             current_value: 3,
-            threshold_value: 2,
+            threshold_value: 5,
             frame_id: 8,
             timestamp: "2026-03-10T12:05:00Z",
           },
-        },
-      });
-      socket.emit({
-        event: "system_warning",
-        payload: {
-          feed_id: "feed-1",
-          code: "queue_unstable",
-          message: "Queue entered an unstable state.",
-          timestamp: "2026-03-10T12:05:05Z",
         },
       });
       socket.emit({
@@ -167,11 +158,11 @@ describe("useLiveDashboard", () => {
               service_rate: 0.4,
               wait_time_seconds: 8,
               wait_time_ci: [6, 10],
-              uncertainty_level: "High",
-              queue_stable: false,
+              uncertainty_level: "Low",
+              queue_stable: true,
             },
-            last_warning: "Worker recovered after backend restart.",
-            last_warning_code: "recovery_required",
+              last_warning: "Queue exceeded the warning threshold.",
+              last_warning_code: "queue_length_warning",
           }),
         },
       });
@@ -179,11 +170,10 @@ describe("useLiveDashboard", () => {
 
     await waitFor(() => expect(result.current.feeds[0].latest_metrics?.people_in_zone).toBe(3));
     expect(result.current.feeds[0].status).toBe("running");
-    expect(result.current.feeds[0].last_warning_code).toBe("recovery_required");
+    expect(result.current.feeds[0].last_warning_code).toBe("queue_length_warning");
     expect(result.current.derived.peopleTotal).toBe(3);
     expect(result.current.derived.liveMonitoring.attentionFeedCount).toBe(1);
-    expect(result.current.activity.some((item) => item.message === "Queue entered an unstable state.")).toBe(true);
-    expect(result.current.activity.some((item) => item.message === "Queue exceeded the critical threshold." && item.severity === "critical")).toBe(true);
+    expect(result.current.activity.some((item) => item.message === "Queue exceeded the warning threshold." && item.severity === "warning")).toBe(true);
 
     await act(async () => {
       await result.current.startFeedMutation.mutateAsync("feed-1");

@@ -9,15 +9,36 @@ URL="$N8N_BASE_URL/webhook/$WEBHOOK_PATH"
 echo "Posting test alert to: $URL"
 cat <<EOF > /tmp/n8n_test_payload.json
 {
+  "timestamp": "$(date -Iseconds)",
+  "camera_id": "cam_01",
+  "zone_id": "checkout_lane_3",
+  "feed_id": "cashier_1",
+  "source": "C:/Users/ELITE/Downloads/retail_store.mp4",
+  "people_in_zone": 16,
+  "arrival_rate": 0.15,
+  "service_rate": 0.16,
+  "estimated_wait_sec": 137.4,
+  "arrival_rate_lower": 0.10,
+  "arrival_rate_upper": 0.22,
+  "service_rate_lower": 0.11,
+  "service_rate_upper": 0.23,
+  "wait_time_lower": 110.0,
+  "wait_time_upper": 165.0,
+  "uncertainty_level": "Low",
+  "queue_stable": false,
   "alert_triggered": true,
-  "alert_reason": "Automated test alert: queue exceeded",
-  "alert_type": "threshold",
-  "alert_severity": "critical",
-  "people_in_zone": 9,
-  "threshold_value": 8,
-  "source": "test-script",
-  "timestamp": "$(date -Iseconds)"
+  "alert_reason": "High queue length: 16 people (warning: 8)",
+  "alert_severity": "warning",
+  "system_uptime_sec": 0,
+  "confidence_scores": [],
+  "establishment_name": null,
+  "section_name": null,
+  "employee_name": null
 }
 EOF
-curl -s -X POST "$URL" -H "Content-Type: application/json" --data-binary @/tmp/n8n_test_payload.json | jq || true
+HEADER_ARGS=()
+if [ -n "$WEBHOOK_SECRET" ]; then
+  HEADER_ARGS+=( -H "X-Webhook-Secret: $WEBHOOK_SECRET" )
+fi
+curl -s -X POST "$URL" -H "Content-Type: application/json" "${HEADER_ARGS[@]}" --data-binary @/tmp/n8n_test_payload.json | jq || true
 rm -f /tmp/n8n_test_payload.json

@@ -33,7 +33,7 @@ from src.config import (
 )
 from src.detector import PersonDetector
 from src.queue_analyzer import QueueAnalyzer, QueueMetrics
-from src.threshold_detector import QueueThresholdDetector
+from src.threshold_detector import QueueThresholdDetector, ThresholdConfig
 from src.tracker import ObjectTracker
 from src.utils.drawing import create_annotators, draw_detections, draw_metrics_overlay
 from src.utils.logging_setup import setup_logging
@@ -133,6 +133,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=1.0,
         help="Scale factor to resize the frame (e.g., 0.5 for 50%). (default: 1.0)",
     )
+    parser.add_argument(
+        "--queue-length-warning",
+        type=int,
+        default=8,
+        help="Queue length warning threshold in people. (default: 8)",
+    )
     # ── RTSP-specific ─────────────────────────────────────────────
     parser.add_argument(
         "--rtsp-user",
@@ -173,6 +179,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="Database ID of the checkout/register being monitored (optional).",
+    )
+    parser.add_argument(
+        "--feed-id",
+        type=str,
+        default=None,
+        help="Unique identifier for this source/feed (e.g., cashier_3).",
     )
     parser.add_argument(
         "--disable-webhook",
@@ -236,19 +248,28 @@ def run(cfg: AppConfig) -> None:
             frame_resolution=stream.resolution,
         )
         analyzer = QueueAnalyzer()
-        threshold_detector = QueueThresholdDetector()
+        threshold_detector = QueueThresholdDetector(
+            ThresholdConfig(
+                queue_length_warning=cfg.queue_length_warning,
+            )
+        )
         annotators = create_annotators()
         webhook_client = WebhookClient(N8N_WEBHOOK_URL) if cfg.webhook_enabled else None
         event_writer = DashboardEventWriter(cfg.events_file)
+
+        # Multi-stream identity for webhook payloads; fallback to source string
+        feed_identifier = (
+            str(cfg.feed_id)
+            if cfg.feed_id
+            else (f"caisse_{cfg.caisse_id}" if cfg.caisse_id is not None else str(cfg.source))
+        )
 
         frame_delay = int(1000 / cfg.output_fps) if cfg.output_fps > 0 else 1
         last_log_time = time.monotonic()
         last_webhook_time = time.monotonic()
         last_dashboard_event_time = time.monotonic()
-        last_alert_severity_by_type: dict[str, str] = {}
-        # Track last webhook delivery time per alert type to avoid spamming
-        last_alert_webhook_time_by_type: dict[str, float] = {}
-        last_queue_stable = True
+        last_warning_message: str | None = None
+        last_warning_webhook_time = 0.0
         frame_count = 0
 
         logger.info("Entering main loop. Press 'q' to quit.")
@@ -314,31 +335,29 @@ def run(cfg: AppConfig) -> None:
                 )
                 last_dashboard_event_time = now
 
-            current_alert_types = {alert.alert_type.value for alert in alerts}
             for alert in alerts:
-                previous_severity = last_alert_severity_by_type.get(alert.alert_type.value)
-                if previous_severity == alert.severity.value:
+                if alert.message == last_warning_message:
                     continue
                 event_writer.emit(
                     "alert_fired",
                     {"alert": _dashboard_alert_payload(alert)},
                 )
-                last_alert_severity_by_type[alert.alert_type.value] = alert.severity.value
-                # Immediately forward alert to webhook (if configured), but respect dedupe window
+                last_warning_message = alert.message
+                # Immediately forward the warning to webhook (if configured), but respect dedupe window
                 if webhook_client:
                     now_ts = time.time()
-                    last_sent = last_alert_webhook_time_by_type.get(alert.alert_type.value, 0)
-                    if (now_ts - last_sent) >= ALERT_DEDUPE_WINDOW_SEC:
+                    if (now_ts - last_warning_webhook_time) >= ALERT_DEDUPE_WINDOW_SEC:
                         try:
                             webhook_client.send_metrics(
                                 metrics=metrics,
                                 frame_id=frame_count,
                                 source=str(cfg.source),
+                                feed_id=feed_identifier,
                                 alert_triggered=True,
                                 alert_reason=alert.message,
                                 alert_severity=alert.severity.value,
                             )
-                            last_alert_webhook_time_by_type[alert.alert_type.value] = now_ts
+                            last_warning_webhook_time = now_ts
                         except Exception as exc:
                             event_writer.emit(
                                 "system_warning",
@@ -349,22 +368,6 @@ def run(cfg: AppConfig) -> None:
                                 },
                             )
                             logger.debug(f"Alert webhook send failed: {exc}")
-            last_alert_severity_by_type = {
-                alert_type: severity
-                for alert_type, severity in last_alert_severity_by_type.items()
-                if alert_type in current_alert_types
-            }
-
-            if last_queue_stable and not metrics.queue_stable:
-                event_writer.emit(
-                    "system_warning",
-                    {
-                        "code": "queue_unstable",
-                        "message": "Queue entered an unstable state because service rate is not keeping up with arrivals.",
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    },
-                )
-            last_queue_stable = metrics.queue_stable
 
             if (now - last_log_time) >= cfg.log_interval_sec:
                 _log_metrics(metrics, frame_count)
@@ -377,6 +380,7 @@ def run(cfg: AppConfig) -> None:
                         metrics=metrics,
                         frame_id=frame_count,
                         source=str(cfg.source),
+                        feed_id=feed_identifier,
                     )
                 except Exception as exc:
                     event_writer.emit(
@@ -520,6 +524,7 @@ def main() -> None:
         output_fps=args.output_fps,
         log_interval_sec=args.log_interval_sec,
         resize_scale=args.resize_scale,
+        queue_length_warning=args.queue_length_warning,
         rtsp_username=args.rtsp_user,
         rtsp_password=args.rtsp_pass,
         rtsp_reconnect=args.rtsp_reconnect,

@@ -67,7 +67,7 @@ export interface QueueMetrics {
 
 export interface QueueAlert {
   alert_type: string;
-  severity: "info" | "warning" | "critical";
+  severity: "warning";
   message: string;
   threshold_name: string;
   current_value: number;
@@ -88,10 +88,15 @@ export interface VideoFeed {
   establishment_id: number | null;
   caisse_id: number | null;
   zone: ZonePolygon | null;
+  queue_length_warning: number;
   latest_metrics: QueueMetrics | null;
   last_error: string | null;
   last_warning: string | null;
   last_warning_code: string | null;
+}
+
+export interface QueueThresholdUpdateInput {
+  queue_length_warning: number;
 }
 
 export interface SystemHealth {
@@ -565,6 +570,13 @@ export function updateZone(feedId: string, zone: ZonePolygon): Promise<VideoFeed
   return fetchApi<VideoFeed>(`/api/feeds/${feedId}/zone`, {
     method: "POST",
     body: JSON.stringify({ zone }),
+  });
+}
+
+export function updateFeedThresholds(feedId: string, input: QueueThresholdUpdateInput): Promise<VideoFeed> {
+  return fetchApi<VideoFeed>(`/api/feeds/${feedId}/thresholds`, {
+    method: "POST",
+    body: JSON.stringify(input),
   });
 }
 

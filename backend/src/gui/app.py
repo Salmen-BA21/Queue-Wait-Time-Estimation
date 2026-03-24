@@ -268,6 +268,7 @@ class MainWindow:
         self.model_size = tk.StringVar(value="n")
         self.log_level = tk.StringVar(value="INFO")
         self.webhook_enabled = tk.BooleanVar(value=True)
+        self.queue_length_warning = tk.IntVar(value=8)
 
         # RTSP credentials store: maps source url -> {"username", "password", "transport"}
         self.rtsp_credentials: dict[str, dict] = {}
@@ -1087,6 +1088,18 @@ class MainWindow:
             variable=self.webhook_enabled,
         ).grid(row=2, column=0, columnspan=2, sticky=tk.W, padx=5, pady=8)
 
+        ttk.Label(model_frame, text="Queue Warning Threshold:", font=("Arial", 10)).grid(
+            row=3, column=0, sticky=tk.W, padx=5, pady=8)
+        ttk.Spinbox(
+            model_frame,
+            from_=0,
+            to=999,
+            textvariable=self.queue_length_warning,
+            width=8,
+            font=("Arial", 10),
+            justify=tk.CENTER,
+        ).grid(row=3, column=1, sticky=tk.W, padx=5, pady=8)
+
         # ── Zone selection (per video) ────────────────────────
         zone_frame = ttk.LabelFrame(content_frame, text="Zone Selection (per video)", padding=10)
         zone_frame.pack(fill=tk.X, padx=15, pady=10)
@@ -1406,6 +1419,14 @@ class MainWindow:
                   font=("Arial", 9), foreground="darkgreen").pack(
             anchor=tk.W, padx=20, pady=(0, 10))
 
+        ttk.Label(summary_frame, text="Queue Thresholds:", font=("Arial", 10, "bold")).pack(
+            anchor=tk.W, pady=(5, 2))
+        ttk.Label(
+            summary_frame,
+            text=f"Warning: {self.queue_length_warning.get()} people",
+            font=("Arial", 9), foreground="darkgreen",
+        ).pack(anchor=tk.W, padx=20, pady=(0, 10))
+
         ttk.Label(summary_frame, text="Webhook:", font=("Arial", 10, "bold")).pack(
             anchor=tk.W, pady=(5, 2))
         webhook_summary = (
@@ -1435,10 +1456,13 @@ class MainWindow:
         Each command invokes ``python -m src.main`` with the appropriate
         ``--source``, ``--model-size``, ``--log-level``, and (optionally)
         ``--zone-points`` flags.  RTSP sources also receive ``--rtsp-user``,
-        ``--rtsp-pass``, and ``--rtsp-transport``.
+        ``--rtsp-pass``, ``--rtsp-transport``, and the queue threshold flags.
         """
         model_size = self.model_size.get().split()[0]  # "n (nano ...)" -> "n"
         commands: list[list[str]] = []
+
+        warning_threshold = int(self.queue_length_warning.get())
+
         for path in self.video_paths:
             cmd = [
                 sys.executable, "-m", "src.main",
@@ -1446,6 +1470,7 @@ class MainWindow:
                 "--model-size", model_size,
                 "--log-level", self.log_level.get(),
                 "--resize-scale", "0.5",
+                "--queue-length-warning", str(warning_threshold),
             ]
             pts = self.zone_points_map.get(path)
             if pts:

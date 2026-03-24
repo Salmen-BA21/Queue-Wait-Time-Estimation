@@ -8,6 +8,7 @@ import {
   restartFeed,
   startFeed,
   stopFeed,
+  updateFeedThresholds,
   updateZone,
   VideoFeed,
 } from "@/lib/api";
@@ -76,6 +77,27 @@ export function useLiveDashboard() {
       pushActivity(setActivity, {
         id: `zone-update-${feed.feed_id}`,
         message: `Zone updated for ${feed.name}.`,
+        severity: "info",
+        time: "just now",
+      });
+    },
+  });
+
+  const updateThresholdMutation = useMutation({
+    mutationFn: ({
+      feedId,
+      queueLengthWarning,
+    }: {
+      feedId: string;
+      queueLengthWarning: number;
+    }) => updateFeedThresholds(feedId, {
+      queue_length_warning: queueLengthWarning,
+    }),
+    onSuccess: (feed) => {
+      queryClient.setQueryData<VideoFeed[]>(feedsQueryKey, (current = []) => upsertFeed(current, feed));
+      pushActivity(setActivity, {
+        id: `threshold-update-${feed.feed_id}`,
+        message: `Queue thresholds updated for ${feed.name}.`,
         severity: "info",
         time: "just now",
       });
@@ -161,14 +183,10 @@ export function useLiveDashboard() {
           (feed) =>
             feed.status === "error"
             || Boolean(feed.last_error)
-            || Boolean(feed.last_warning)
-            || feed.latest_metrics?.queue_stable === false
-            || feed.latest_metrics?.uncertainty_level === "High",
+            || Boolean(feed.last_warning),
         ).length,
         feedsWithRuntimeErrors: feeds.filter((feed) => feed.status === "error" || Boolean(feed.last_error)),
         feedsWithRuntimeWarnings: feeds.filter((feed) => Boolean(feed.last_warning)),
-        unstableFeeds: feeds.filter((feed) => feed.latest_metrics?.queue_stable === false),
-        highUncertaintyFeeds: feeds.filter((feed) => feed.latest_metrics?.uncertainty_level === "High"),
       },
       waitChartData: feeds.map((feed) => ({
         name: feed.name,
@@ -192,6 +210,7 @@ export function useLiveDashboard() {
     systemHealthQuery,
     createFeedMutation,
     updateZoneMutation,
+    updateThresholdMutation,
     startFeedMutation,
     stopFeedMutation,
     restartFeedMutation,

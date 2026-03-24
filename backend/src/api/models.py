@@ -15,7 +15,7 @@ RTSPTransport = Literal["tcp", "udp"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 BatchLaunchMode = Literal["save_only", "create_and_start"]
 BatchLaunchItemStatus = Literal["created", "started", "failed"]
-AlertSeverity = Literal["info", "warning", "critical"]
+AlertSeverity = Literal["warning"]
 
 T = TypeVar("T")
 
@@ -144,10 +144,23 @@ class VideoFeed(BaseModel):
     establishment_id: int | None = None
     caisse_id: int | None = None
     zone: ZonePolygon | None = None
+    queue_length_warning: int = Field(default=8, ge=0)
     latest_metrics: QueueMetricsModel | None = None
     last_error: str | None = None
     last_warning: str | None = None
     last_warning_code: str | None = None
+
+
+class QueueThresholdConfig(BaseModel):
+    """Per-feed queue length thresholds used by the worker and dashboard."""
+
+    queue_length_warning: int = Field(default=8, ge=0)
+
+
+class QueueThresholdUpdateRequest(BaseModel):
+    """Payload used to update a feed's queue thresholds."""
+
+    queue_length_warning: int = Field(ge=0)
 
 
 class CreateFeedRequest(BaseModel):

@@ -37,6 +37,7 @@ from src.api.models import (
     RTSPConnectionTestResult,
     RTSPSnapshotRequest,
     RTSPSnapshotResult,
+    QueueThresholdUpdateRequest,
     SystemHealth,
     UploadVideoResponse,
     VideoFeed,
@@ -669,6 +670,17 @@ async def update_feed_zone(feed_id: str, request: ZoneUpdateRequest) -> ApiRespo
     if feed is None:
         raise HTTPException(status_code=404, detail="Feed not found.")
     return ApiResponse(data=feed, message="Zone updated successfully.")
+
+
+@app.post("/api/feeds/{feed_id}/thresholds", response_model=ApiResponse[VideoFeed])
+async def update_feed_thresholds(feed_id: str, request: QueueThresholdUpdateRequest) -> ApiResponse[VideoFeed]:
+    feed = await get_registry().update_thresholds(
+        feed_id,
+        queue_length_warning=request.queue_length_warning,
+    )
+    if feed is None:
+        raise HTTPException(status_code=404, detail="Feed not found.")
+    return ApiResponse(data=feed, message="Feed thresholds updated successfully.")
 
 
 @app.get("/api/system/health", response_model=ApiResponse[SystemHealth])

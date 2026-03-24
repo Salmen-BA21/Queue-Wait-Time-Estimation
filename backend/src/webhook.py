@@ -24,6 +24,7 @@ class QueuePayload:
     timestamp: float  # Unix timestamp
     frame_id: int
     source: str  # e.g., "webcam", "retail_store.mp4"
+    feed_id: str  # Unique source identifier (e.g., cashier_3, cam_02)
     
     # Core metrics
     people_in_zone: int
@@ -69,16 +70,19 @@ class QueuePayload:
         metrics,  # QueueMetrics object
         frame_id: int,
         source: str,
+        feed_id: str | None = None,
         alert_triggered: bool = False,
         alert_reason: str = "",
         alert_severity: str = "info",
         confidence_scores: list[float] | None = None,
     ) -> QueuePayload:
         """Create payload from QueueMetrics object."""
+        feed_identity = feed_id if feed_id is not None else source
         return cls(
             timestamp=time.time(),
             frame_id=frame_id,
             source=source,
+            feed_id=feed_identity,
             people_in_zone=metrics.people_in_zone,
             arrival_rate=metrics.arrival_rate,
             service_rate=metrics.service_rate,
@@ -103,6 +107,7 @@ EXAMPLE_PAYLOAD = {
     "timestamp": 1708294800.123,
     "frame_id": 1500,
     "source": "retail_store.mp4",
+    "feed_id": "cashier_1",
     "people_in_zone": 4,
     "arrival_rate": 0.133,
     "service_rate": 0.050,
@@ -129,7 +134,7 @@ EXAMPLE_PAYLOAD = {
 def validate_payload(payload: dict) -> bool:
     """Validate payload structure before sending."""
     required_fields = {
-        "timestamp", "frame_id", "source", "people_in_zone",
+        "timestamp", "frame_id", "source", "feed_id", "people_in_zone",
         "arrival_rate", "service_rate", "estimated_wait_sec",
         "uncertainty_level", "queue_stable", "alert_triggered"
     }

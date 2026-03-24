@@ -74,18 +74,6 @@ import {
 
 const UNASSIGNED_SELECT_VALUE = "__unassigned__";
 
-function formatWaitTime(waitTimeSeconds: number): string {
-  if (waitTimeSeconds < 60) {
-    return `${waitTimeSeconds.toFixed(1)}s`;
-  }
-  return `${(waitTimeSeconds / 60).toFixed(1)}m`;
-}
-
-function formatRatePerMinute(rate: number): string {
-  const perMinute = rate * 60;
-  return `${perMinute >= 10 ? perMinute.toFixed(1) : perMinute.toFixed(2)}/min`;
-}
-
 function getFileLabel(file: File | null): string {
   if (!file) {
     return "No video selected yet";
@@ -255,6 +243,7 @@ export default function Dashboard() {
     resetLocalFiles,
   });
 
+  const liveDashboard = useLiveDashboard();
   const {
     feeds,
     feedsQuery,
@@ -266,7 +255,13 @@ export default function Dashboard() {
     deleteFeedMutation,
     activity,
     derived,
-  } = useLiveDashboard();
+  } = liveDashboard;
+  const updateThresholdMutation = liveDashboard.updateThresholdMutation ?? {
+    isPending: false,
+    mutateAsync: async () => {
+      throw new Error("Threshold editing is unavailable in the current dashboard state.");
+    },
+  };
   const batchLaunchMutation = useMutation({
     mutationFn: launchFeedBatch,
     onSuccess: async () => {
@@ -433,32 +428,6 @@ export default function Dashboard() {
         id: `warning-${feed.feed_id}`,
         title: feed.name,
         detail: feed.last_warning,
-        tone: "warning",
-      });
-    }
-
-    for (const feed of derived.liveMonitoring.unstableFeeds) {
-      if (seenFeedIds.has(feed.feed_id) || !feed.latest_metrics) {
-        continue;
-      }
-      seenFeedIds.add(feed.feed_id);
-      items.push({
-        id: `unstable-${feed.feed_id}`,
-        title: feed.name,
-        detail: `Queue is unstable. Arrival ${formatRatePerMinute(feed.latest_metrics.arrival_rate)} exceeds service ${formatRatePerMinute(feed.latest_metrics.service_rate)}.`,
-        tone: "warning",
-      });
-    }
-
-    for (const feed of derived.liveMonitoring.highUncertaintyFeeds) {
-      if (seenFeedIds.has(feed.feed_id) || !feed.latest_metrics) {
-        continue;
-      }
-      seenFeedIds.add(feed.feed_id);
-      items.push({
-        id: `uncertainty-${feed.feed_id}`,
-        title: feed.name,
-        detail: `High uncertainty on live estimates. Queue size ${feed.latest_metrics.people_in_zone}, wait ${feed.latest_metrics.wait_time_seconds === null ? "pending" : formatWaitTime(feed.latest_metrics.wait_time_seconds)}.`,
         tone: "warning",
       });
     }
@@ -1164,6 +1133,13 @@ export default function Dashboard() {
                 activeFeedAction={activeFeedAction}
                 onEditZone={openFeedZoneEditor}
                 onFeedAction={handleFeedAction}
+                onSaveThresholds={async (feedId, queueLengthWarning) => {
+                  await updateThresholdMutation.mutateAsync({
+                    feedId,
+                    queueLengthWarning,
+                  });
+                }}
+                isSavingThresholds={updateThresholdMutation.isPending}
               />
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

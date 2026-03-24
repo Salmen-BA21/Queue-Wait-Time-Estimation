@@ -24,7 +24,8 @@ N8N_BASE_URL=http://localhost:5678 ./scripts/test_n8n_send_alert.sh
 ```
 
 What the scripts do:
-- POST a JSON payload with `alert_triggered=true` to the webhook path `/webhook/queue-metrics`.
+- POST a flat JSON payload that matches the backend webhook contract, including `alert_triggered=true`, `alert_reason`, and `alert_severity=warning`, to `/webhook/queue-metrics`.
+- If `WEBHOOK_SECRET` is set, the scripts send it as `X-Webhook-Secret`.
 - The n8n workflow should evaluate `If Alert` as true and call the Telegram node.
 - Check the n8n Executions UI for node outputs and check your Telegram chat for the message.
 
