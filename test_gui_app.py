@@ -23,7 +23,7 @@ class TestGetAnalysisCommands(unittest.TestCase):
 
     def _make_window(self):
         """Create a MainWindow without showing it."""
-        from src.gui.app import MainWindow
+        from backend.src.gui.app import MainWindow
 
         win = MainWindow()
         win.root.withdraw()

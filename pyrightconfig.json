@@ -1,0 +1,12 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.10",
+  "extraPaths": [
+    "backend"
+  ],
+  "include": [
+    "backend/src",
+    "backend/tests"
+  ]
+}

@@ -687,10 +687,10 @@ class MainWindow:
         self.root.update_idletasks()
 
         try:
-            from src.rtsp_camera import RTSPCamera
-
             # Discover cameras
-            self.discovered_cameras = RTSPCamera.discover_onvif_devices(timeout=5.0)
+            from src.onvif_client import discover_onvif_devices
+
+            self.discovered_cameras = discover_onvif_devices(timeout=5.0)
 
             if not self.discovered_cameras:
                 self.onvif_status_var.set("❌ No IP cameras found")
@@ -788,19 +788,21 @@ class MainWindow:
 
         def test_connection():
             try:
+                from src.onvif_client import get_rtsp_urls_from_onvif_device
                 from src.rtsp_camera import RTSPCamera
 
                 username = username_var.get().strip() or None
                 password = password_var.get().strip() or None
 
                 # Get RTSP streams
-                streams = RTSPCamera.get_rtsp_urls_from_onvif_device(
-                    camera, username=username, password=password
-                )
+                streams = get_rtsp_urls_from_onvif_device(camera, username=username, password=password)
 
                 if not streams:
                     test_result["success"] = False
-                    test_result["error"] = "No RTSP streams found"
+                    test_result["error"] = (
+                        "No RTSP stream could be retrieved from the camera via ONVIF. "
+                        "The camera may not support ONVIF media services or may require different authentication."
+                    )
                     return
 
                 # Test first stream
@@ -879,22 +881,25 @@ class MainWindow:
             password_var = tk.StringVar()
             ttk.Entry(cred_dialog, textvariable=password_var, show="*", font=("Arial", 9)).pack(fill=tk.X, padx=20, pady=(0, 15))
 
-            credentials = {"username": None, "password": None, "rtsp_url": None}
+            credentials: dict[str, str | None] = {"username": None, "password": None, "rtsp_url": None}
 
             def add_camera():
                 try:
-                    from src.rtsp_camera import RTSPCamera
+                    from src.onvif_client import get_rtsp_urls_from_onvif_device
 
                     username = username_var.get().strip() or None
                     password = password_var.get().strip() or None
 
                     # Get RTSP streams
-                    streams = RTSPCamera.get_rtsp_urls_from_onvif_device(
-                        camera, username=username, password=password
-                    )
+                    streams = get_rtsp_urls_from_onvif_device(camera, username=username, password=password)
 
                     if not streams:
-                        messagebox.showerror("No Streams", "No RTSP streams found for this camera.")
+                        messagebox.showerror(
+                            "No Streams",
+                            "The camera did not provide an RTSP URI through ONVIF, so no stream was added.\n\n"
+                            "This may occur if the camera does not support ONVIF media services or has them disabled.\n\n"
+                            "Try adding the camera manually using the RTSP tab with a known stream URL.",
+                        )
                         return
 
                     # Use first stream

@@ -70,6 +70,45 @@ def _create_current_schema(cursor: sqlite3.Cursor) -> None:
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS feed_configs (
+            feed_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            source TEXT NOT NULL,
+            model_size TEXT NOT NULL DEFAULT 'n',
+            status TEXT NOT NULL DEFAULT 'created',
+            log_level TEXT NOT NULL DEFAULT 'INFO',
+            webhook_enabled INTEGER NOT NULL DEFAULT 1,
+            rtsp_username TEXT,
+            rtsp_password TEXT,
+            rtsp_transport TEXT,
+            establishment_id INTEGER,
+            caisse_id INTEGER,
+            zone_points_json TEXT,
+            last_error TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (establishment_id) REFERENCES establishments (id) ON DELETE SET NULL,
+            FOREIGN KEY (caisse_id) REFERENCES caisses (id) ON DELETE SET NULL
+        )
+    """)
+
+
+def _migrate_feed_configs_schema(cursor: sqlite3.Cursor) -> None:
+    """Add newly required feed config columns for existing databases."""
+    if not _table_exists(cursor, "feed_configs"):
+        return
+
+    columns = _get_table_columns(cursor, "feed_configs")
+    if "log_level" not in columns:
+        cursor.execute(
+            "ALTER TABLE feed_configs ADD COLUMN log_level TEXT NOT NULL DEFAULT 'INFO'"
+        )
+    if "webhook_enabled" not in columns:
+        cursor.execute(
+            "ALTER TABLE feed_configs ADD COLUMN webhook_enabled INTEGER NOT NULL DEFAULT 1"
+        )
+
 
 def _migrate_legacy_sections_to_caisses(cursor: sqlite3.Cursor) -> None:
     """Copy legacy section rows into the caisse table when needed."""
@@ -132,6 +171,7 @@ def init_db() -> None:
 
     cursor.execute("PRAGMA foreign_keys = OFF")
     _create_current_schema(cursor)
+    _migrate_feed_configs_schema(cursor)
     _migrate_legacy_sections_to_caisses(cursor)
     _migrate_legacy_video_sessions(cursor)
     cursor.execute("PRAGMA foreign_keys = ON")
@@ -361,6 +401,161 @@ def end_video_session(session_id: int) -> None:
             "UPDATE video_sessions SET end_time = ? WHERE id = ?",
             (datetime.now(), session_id)
         )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def end_open_video_sessions() -> int:
+    """Close any sessions left open by a previous backend process."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE video_sessions SET end_time = ? WHERE end_time IS NULL",
+            (datetime.now(),)
+        )
+        conn.commit()
+        return cast(int, cursor.rowcount)
+    finally:
+        conn.close()
+
+
+# ============================================================================
+# FEED CONFIG OPERATIONS
+# ============================================================================
+
+def upsert_feed_config(
+    *,
+    feed_id: str,
+    name: str,
+    source: str,
+    model_size: str,
+    status: str,
+    log_level: str = "INFO",
+    webhook_enabled: bool = True,
+    created_at: datetime,
+    updated_at: datetime,
+    rtsp_username: Optional[str] = None,
+    rtsp_password: Optional[str] = None,
+    rtsp_transport: Optional[str] = None,
+    establishment_id: Optional[int] = None,
+    caisse_id: Optional[int] = None,
+    zone_points: Optional[List[List[float]]] = None,
+    last_error: Optional[str] = None,
+) -> None:
+    """Create or update a persisted feed configuration."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        zone_json = json.dumps(zone_points) if zone_points else None
+        cursor.execute(
+            """
+            INSERT INTO feed_configs (
+                feed_id,
+                name,
+                source,
+                model_size,
+                status,
+                log_level,
+                webhook_enabled,
+                rtsp_username,
+                rtsp_password,
+                rtsp_transport,
+                establishment_id,
+                caisse_id,
+                zone_points_json,
+                last_error,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(feed_id) DO UPDATE SET
+                name = excluded.name,
+                source = excluded.source,
+                model_size = excluded.model_size,
+                status = excluded.status,
+                log_level = excluded.log_level,
+                webhook_enabled = excluded.webhook_enabled,
+                rtsp_username = excluded.rtsp_username,
+                rtsp_password = excluded.rtsp_password,
+                rtsp_transport = excluded.rtsp_transport,
+                establishment_id = excluded.establishment_id,
+                caisse_id = excluded.caisse_id,
+                zone_points_json = excluded.zone_points_json,
+                last_error = excluded.last_error,
+                updated_at = excluded.updated_at
+            """,
+            (
+                feed_id,
+                name,
+                source,
+                model_size,
+                status,
+                log_level,
+                int(webhook_enabled),
+                rtsp_username,
+                rtsp_password,
+                rtsp_transport,
+                establishment_id,
+                caisse_id,
+                zone_json,
+                last_error,
+                created_at.isoformat(),
+                updated_at.isoformat(),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_feed_configs() -> List[Dict[str, Any]]:
+    """Return all persisted feed configurations in creation order."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT
+                feed_id,
+                name,
+                source,
+                model_size,
+                status,
+                log_level,
+                webhook_enabled,
+                rtsp_username,
+                rtsp_password,
+                rtsp_transport,
+                establishment_id,
+                caisse_id,
+                zone_points_json,
+                last_error,
+                created_at,
+                updated_at
+            FROM feed_configs
+            ORDER BY created_at, feed_id
+            """
+        )
+        feed_configs = []
+        for row in cursor.fetchall():
+            feed = dict(row)
+            if feed["zone_points_json"]:
+                feed["zone_points"] = json.loads(feed["zone_points_json"])
+            else:
+                feed["zone_points"] = None
+            feed_configs.append(feed)
+        return feed_configs
+    finally:
+        conn.close()
+
+
+def delete_feed_config(feed_id: str) -> None:
+    """Delete a persisted feed configuration."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM feed_configs WHERE feed_id = ?", (feed_id,))
         conn.commit()
     finally:
         conn.close()

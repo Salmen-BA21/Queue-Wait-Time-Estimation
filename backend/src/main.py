@@ -14,9 +14,12 @@ import argparse
 import json
 import logging
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 
 import cv2
 import numpy as np
+import supervision as sv
 
 from src.config import (
     AppConfig,
@@ -29,6 +32,7 @@ from src.config import (
 )
 from src.detector import PersonDetector
 from src.queue_analyzer import QueueAnalyzer, QueueMetrics
+from src.threshold_detector import QueueThresholdDetector
 from src.tracker import ObjectTracker
 from src.utils.drawing import create_annotators, draw_detections, draw_metrics_overlay
 from src.utils.logging_setup import setup_logging
@@ -37,6 +41,29 @@ from src.webhook_client import WebhookClient
 from src.zone_manager import ZoneManager
 
 logger: logging.Logger  # assigned in main()
+
+
+class DashboardEventWriter:
+    """Writes line-delimited dashboard events for the API runtime to tail."""
+
+    def __init__(self, path: str | None) -> None:
+        self._stream = None
+        if path:
+            event_path = Path(path)
+            event_path.parent.mkdir(parents=True, exist_ok=True)
+            self._stream = event_path.open("a", encoding="utf-8", buffering=1)
+
+    def emit(self, event: str, payload: dict[str, object]) -> None:
+        if self._stream is None:
+            return
+
+        record = {"event": event, "payload": payload}
+        self._stream.write(json.dumps(record) + "\n")
+        self._stream.flush()
+
+    def close(self) -> None:
+        if self._stream is not None and not self._stream.closed:
+            self._stream.close()
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -140,6 +167,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--register-id",
+        "--caisse-id",
         dest="caisse_id",
         type=int,
         default=None,
@@ -149,6 +177,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--disable-webhook",
         action="store_true",
         help="Disable sending queue metrics to the configured webhook endpoint.",
+    )
+    parser.add_argument(
+        "--events-file",
+        type=str,
+        default=None,
+        help="Optional JSONL file used to stream structured dashboard events back to the API runtime.",
+    )
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="Run without opening any GUI windows (cv2.imshow). (default: False)",
     )
     return parser
 
@@ -196,12 +235,17 @@ def run(cfg: AppConfig) -> None:
             frame_resolution=stream.resolution,
         )
         analyzer = QueueAnalyzer()
+        threshold_detector = QueueThresholdDetector()
         annotators = create_annotators()
         webhook_client = WebhookClient(N8N_WEBHOOK_URL) if cfg.webhook_enabled else None
+        event_writer = DashboardEventWriter(cfg.events_file)
 
         frame_delay = int(1000 / cfg.output_fps) if cfg.output_fps > 0 else 1
         last_log_time = time.monotonic()
         last_webhook_time = time.monotonic()
+        last_dashboard_event_time = time.monotonic()
+        last_alert_severity_by_type: dict[str, str] = {}
+        last_queue_stable = True
         frame_count = 0
 
         logger.info("Entering main loop. Press 'q' to quit.")
@@ -223,26 +267,77 @@ def run(cfg: AppConfig) -> None:
                 in_zone_mask=in_zone,
                 tracker_ids=detections.tracker_id,
             )
+            event_timestamp = time.time()
+            alerts = threshold_detector.check_metrics(
+                people_in_zone=metrics.people_in_zone,
+                estimated_wait_sec=metrics.estimated_wait_sec,
+                arrival_rate=metrics.arrival_rate,
+                service_rate=metrics.service_rate,
+                uncertainty_level=metrics.uncertainty_level,
+                queue_stable=metrics.queue_stable,
+                frame_id=frame_count,
+                timestamp=event_timestamp,
+            )
 
             # 5. Draw
-            labels = _build_labels(detections, in_zone)
-            frame = draw_detections(frame, detections, annotators, labels)
-            frame = zone_mgr.annotate(frame)
-            frame = draw_metrics_overlay(frame, _metrics_dict(metrics))
+            if not cfg.headless:
+                labels = _build_labels(detections, in_zone)
+                frame = draw_detections(frame, detections, annotators, labels)
+                frame = zone_mgr.annotate(frame)
+                frame = draw_metrics_overlay(frame, _metrics_dict(metrics))
 
-            # Resize frame if scale != 1.0
-            if cfg.resize_scale != 1.0:
-                frame = cv2.resize(frame, (0, 0), fx=cfg.resize_scale, fy=cfg.resize_scale)
+                # Resize frame if scale != 1.0
+                if cfg.resize_scale != 1.0:
+                    frame = cv2.resize(frame, (0, 0), fx=cfg.resize_scale, fy=cfg.resize_scale)
 
-            # 6. Show
-            cv2.imshow(WINDOW_NAME, frame)
-            key = cv2.waitKey(frame_delay) & 0xFF
-            if key == ord("q"):
-                logger.info("Quit requested by user.")
-                break
+                # 6. Show
+                cv2.imshow(WINDOW_NAME, frame)
+                key = cv2.waitKey(frame_delay) & 0xFF
+                if key == ord("q"):
+                    logger.info("Quit requested by user.")
+                    break
+            else:
+                # Still check for break conditions/events from the input
+                # or just use sleep to match the frame relay speed if needed,
+                # though headless usually runs as fast as the source permits.
+                pass
 
             # 7. Periodic logging & webhook sending
             now = time.monotonic()
+            if (now - last_dashboard_event_time) >= 1.0:
+                event_writer.emit(
+                    "metrics_update",
+                    {"metrics": _dashboard_metrics_payload(metrics, event_timestamp, detections)},
+                )
+                last_dashboard_event_time = now
+
+            current_alert_types = {alert.alert_type.value for alert in alerts}
+            for alert in alerts:
+                previous_severity = last_alert_severity_by_type.get(alert.alert_type.value)
+                if previous_severity == alert.severity.value:
+                    continue
+                event_writer.emit(
+                    "alert_fired",
+                    {"alert": _dashboard_alert_payload(alert)},
+                )
+                last_alert_severity_by_type[alert.alert_type.value] = alert.severity.value
+            last_alert_severity_by_type = {
+                alert_type: severity
+                for alert_type, severity in last_alert_severity_by_type.items()
+                if alert_type in current_alert_types
+            }
+
+            if last_queue_stable and not metrics.queue_stable:
+                event_writer.emit(
+                    "system_warning",
+                    {
+                        "code": "queue_unstable",
+                        "message": "Queue entered an unstable state because service rate is not keeping up with arrivals.",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    },
+                )
+            last_queue_stable = metrics.queue_stable
+
             if (now - last_log_time) >= cfg.log_interval_sec:
                 _log_metrics(metrics, frame_count)
                 last_log_time = now
@@ -256,9 +351,18 @@ def run(cfg: AppConfig) -> None:
                         source=str(cfg.source),
                     )
                 except Exception as exc:
+                    event_writer.emit(
+                        "system_warning",
+                        {
+                            "code": "webhook_delivery_failed",
+                            "message": f"Webhook delivery failed: {exc}",
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        },
+                    )
                     logger.debug(f"Webhook send failed: {exc}")
                 last_webhook_time = now
 
+        event_writer.close()
     cv2.destroyAllWindows()
     logger.info("Pipeline finished. Processed %d frames.", frame_count)
 
@@ -316,6 +420,56 @@ def _log_metrics(m: QueueMetrics, frame_count: int) -> None:
     )
 
 
+def _dashboard_metrics_payload(
+    m: QueueMetrics,
+    timestamp: float,
+    detections: sv.Detections | None = None,
+) -> dict[str, object]:
+    """Convert runtime metrics into the frontend websocket contract."""
+    wait_time_seconds: float | None = m.estimated_wait_sec if m.queue_stable else None
+    wait_time_ci: list[float] | None = [m.wait_time_lower, m.wait_time_upper] if m.queue_stable else None
+
+    # Convert supervision detections (xyxy) to nested list for JSON
+    # Each detection is [x1, y1, x2, y2, confidence, class_id, tracker_id]
+    det_list: list[list[float]] | None = None
+    if detections is not None:
+        det_list = []
+        for i, box in enumerate(detections.xyxy):
+            row = [
+                float(box[0]), float(box[1]), float(box[2]), float(box[3]),
+                float(detections.confidence[i]) if detections.confidence is not None else 1.0,
+                float(detections.class_id[i]) if detections.class_id is not None else 0.0,
+                float(detections.tracker_id[i]) if detections.tracker_id is not None else -1.0,
+            ]
+            det_list.append(row)
+
+    return {
+        "timestamp": timestamp,
+        "people_in_zone": m.people_in_zone,
+        "arrival_rate": m.arrival_rate,
+        "service_rate": m.service_rate,
+        "wait_time_seconds": wait_time_seconds,
+        "wait_time_ci": wait_time_ci,
+        "uncertainty_level": m.uncertainty_level,
+        "queue_stable": m.queue_stable,
+        "detections": det_list,
+    }
+
+
+def _dashboard_alert_payload(alert) -> dict[str, object]:  # noqa: ANN001
+    """Convert threshold alerts into the frontend websocket contract."""
+    return {
+        "alert_type": alert.alert_type.value,
+        "severity": alert.severity.value,
+        "message": alert.message,
+        "threshold_name": alert.threshold_name,
+        "current_value": alert.current_value,
+        "threshold_value": alert.threshold_value,
+        "frame_id": alert.frame_id,
+        "timestamp": datetime.fromtimestamp(alert.timestamp, tz=timezone.utc).isoformat(),
+    }
+
+
 # ═══════════════════════════════════════════════════════════════
 # Entry point
 # ═══════════════════════════════════════════════════════════════
@@ -345,6 +499,8 @@ def main() -> None:
         establishment_id=args.establishment_id,
         caisse_id=args.caisse_id,
         webhook_enabled=WEBHOOK_ENABLED and not args.disable_webhook,
+        events_file=args.events_file,
+        headless=args.headless,
     )
 
     logger.info("Configuration: %s", cfg)

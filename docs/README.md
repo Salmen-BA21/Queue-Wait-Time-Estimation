@@ -21,6 +21,7 @@ Sprint-specific planning and execution documentation:
 Project progress and status tracking:
 - **PROGRESS.md** – Overall project progress report with sprint completion status
 - **STATUS_REPORT.md** – Status updates on specific issues/fixes
+- **WEB_APP_GUI_PARITY_PLAN.md** – Remaining work to bring the web app to full desktop GUI feature parity
 
 ### 🔹 `/daily-logs/`
 Daily development logs (legacy filenames may still use "Phase"):
@@ -38,9 +39,40 @@ Legacy phase documents are archived to preserve history. New updates should be w
 - **Getting Started?** → Start with `agent-guide/INDEX.md`
 - **Implementing the Web Frontend?** → See `design/README.md` then `design/DESIGN_SPEC.md`
 - **Tracking Progress?** → See `tracking/PROGRESS.md`
+- **Planning GUI-to-Web parity?** → See `tracking/WEB_APP_GUI_PARITY_PLAN.md`
 - **Understanding a Sprint?** → Check `sprints/` or `daily-logs/`
 - **Checking Recent Work?** → See `tracking/STATUS_REPORT.md` or latest in `daily-logs/`
+
+- **Backend API:** The backend BFF REST API and websocket (`/ws/metrics`) are implemented in `backend/src/api/`. Frontend developers should consume these endpoints; frontend API client work remains.
 
 ---
 
 *Last organized: February 27, 2026*
+
+## Development — Running locally
+
+Follow these steps to launch the development backend and frontend on a developer machine.
+
+- **Backend (Windows PowerShell)**:
+	- Create a virtual environment (only once):
+		- `python -m venv .venv`
+	- Activate the environment:
+		- PowerShell: `.venv\Scripts\Activate.ps1`
+	- Install dependencies:
+		- `pip install -r requirements.txt`
+	- Start the FastAPI development server (auto-reload):
+		- `uvicorn backend.app:app --reload --host 127.0.0.1 --port 8000`
+	- The backend API will be available at `http://127.0.0.1:8000` and the OpenAPI UI at `http://127.0.0.1:8000/docs`.
+
+- **Frontend (Windows PowerShell / any shell)**:
+	- Change into the frontend folder:
+		- `cd frontend`
+	- Install node dependencies (only once or after package changes):
+		- `npm install`
+	- Start the Vite dev server:
+		- `npm run dev`
+	- By default Vite serves the app on `http://localhost:5173`. The frontend is configured to allow CORS from common dev origins.
+
+- **Notes**:
+	- If you prefer a different frontend port, set the `PORT` environment variable before running `npm run dev`.
+	- If running the backend on a remote machine, update the frontend API base URL to point to the backend host and ensure CORS and network access are permitted.

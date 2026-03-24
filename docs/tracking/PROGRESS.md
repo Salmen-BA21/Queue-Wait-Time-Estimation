@@ -130,12 +130,12 @@ This report assesses the completion status of each sprint based on the project s
 - ✅ React Router setup for page navigation
 - ✅ Testing framework configured (Vitest)
 - ✅ TypeScript full type safety throughout
-- ⏳ API client implementation (pending)
-- ⏳ Backend REST API endpoints creation (pending)
-- ⏳ Real-time metrics integration (pending)
+⏳ API client implementation (frontend) — pending (frontend needs to consume existing backend BFF)
+✅ Backend BFF REST API endpoints implemented (`backend/src/api/`) — feeds, uploads, RTSP/ONVIF tests, snapshots, and `/ws/metrics`
+⏳ Real-time metrics integration (frontend wiring pending)
 
 ### Sprint 8 – Final Testing & Evaluation
-**Status: PARTIALLY COMPLETED**  
+**Current Focus:** Frontend integration (implement API client and wire dashboard to existing backend BFF) and Telegram bot completion  
 - ✅ Basic testing scripts created  
 - ✅ STATUS_REPORT.md documenting fixes and architecture  
 - ✅ Some scenario testing done  
@@ -168,7 +168,7 @@ This report assesses the completion status of each sprint based on the project s
 
 ## 🎯 Next Immediate Tasks
 
-1. **Connect Frontend to Backend API:** Build API client in React and create REST endpoints in Python (`backend/src/api/`)
+1. **Connect Frontend to Backend API:** Implement the frontend API client to consume the existing backend BFF endpoints (`/api/*`) and the `/ws/metrics` websocket feed.
 2. **Complete Dashboard Integration:** Wire real-time metrics from backend to frontend Dashboard
 3. **Telegram Bot Setup:** Complete Sprint 5 by implementing Telegram bot with n8n
 4. **Frontend Testing:** Add E2E tests for page flows and API communication
@@ -200,5 +200,8 @@ This report assesses the completion status of each sprint based on the project s
 - Mar 4: All 7 pages implemented in React + TypeScript with 55+ UI components
 - Mar 5: RTSP camera support added with authentication and connection testing
 - Mar 5: GUI enhanced with RTSP camera management interface
+
+**Local test run (development environment):**
+- 67 passed, 2 warnings (pytest) — verified on developer machine
 
 *This report was updated as of March 5, 2026.*

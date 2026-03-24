@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800">
+  <rect width="100%" height="100%" fill="#f8f9fa" />
+  <rect x="100" y="160" width="220" height="140" fill="none" stroke="#ff5252" stroke-width="4" />
+  <text x="210" y="150" font-size="18" text-anchor="middle" fill="#ff5252">ID: 12</text>
+  <rect x="360" y="200" width="200" height="120" fill="none" stroke="#4caf50" stroke-width="4" />
+  <text x="460" y="190" font-size="18" text-anchor="middle" fill="#4caf50">ID: 7</text>
+  <text x="600" y="60" font-size="22" text-anchor="middle">Sample Frame (placeholder)</text>
+</svg>

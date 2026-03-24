@@ -13,20 +13,22 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'backend'
 def test_ip_camera_discovery_import():
     """Test that IP camera discovery can be imported."""
     try:
+        from src.onvif_client import discover_onvif_devices, get_rtsp_urls_from_onvif_device
         from src.rtsp_camera import RTSPCamera
+
         print("✅ RTSPCamera import successful")
 
         # Check if discovery method exists
-        if hasattr(RTSPCamera, 'discover_onvif_devices'):
-            print("✅ discover_onvif_devices method exists")
+        if callable(discover_onvif_devices):
+            print("✅ discover_onvif_devices function exists")
         else:
-            print("❌ discover_onvif_devices method missing")
+            print("❌ discover_onvif_devices function missing")
             return False
 
-        if hasattr(RTSPCamera, 'get_rtsp_urls_from_onvif_device'):
-            print("✅ get_rtsp_urls_from_onvif_device method exists")
+        if callable(get_rtsp_urls_from_onvif_device):
+            print("✅ get_rtsp_urls_from_onvif_device function exists")
         else:
-            print("❌ get_rtsp_urls_from_onvif_device method missing")
+            print("❌ get_rtsp_urls_from_onvif_device function missing")
             return False
 
         return True

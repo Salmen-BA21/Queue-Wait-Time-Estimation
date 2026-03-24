@@ -28,8 +28,7 @@
 ---
 
 ## 🎯 Next Immediate Tasks
-
-1. **Connect Frontend to Backend API:** Implement API client in React app and create REST endpoints in Python (`backend/src/api/`)
+1. **Connect Frontend to Backend API:** Frontend API client remains to be implemented; the backend BFF REST endpoints are already implemented in `backend/src/api/` (feeds, uploads, RTSP/ONVIF tests and `/ws/metrics`).
 2. **Complete Dashboard Integration:** Wire up real-time metrics from backend to frontend Dashboard page
 3. **Telegram Bot Setup:** Complete Sprint 5 by implementing Telegram bot integration with n8n
 4. **Frontend Testing:** Add integration tests for page flows and API communication
