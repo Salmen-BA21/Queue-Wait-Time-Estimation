@@ -3,8 +3,8 @@ param(
     [string]$WebhookPath = "queue-metrics",
     [int]$Rounds = 30,
     [int]$DelaySeconds = 1,
-    [int]$PostDelaySeconds = 0,
-    [int]$AlertCooldownSeconds = 0,
+    [int]$PostDelaySeconds = 120,
+    [int]$AlertCooldownSeconds = 120,
     [bool]$IncludeSecret = $true
 )
 
