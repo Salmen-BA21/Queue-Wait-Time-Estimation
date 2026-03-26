@@ -1,6 +1,14 @@
 param(
     [string]$N8nBaseUrl = $null,
-    [string]$WebhookPath = "queue-metrics"
+    [string]$WebhookPath = "queue-metrics",
+    [bool]$AlertTriggered = $true,
+    [string]$AlertSeverity = "warning",
+    [string]$AlertReason = "High queue length: 16 people (warning: 8)",
+    [int]$PeopleInZone = 16,
+    [double]$ArrivalRate = 0.15,
+    [double]$ServiceRate = 0.16,
+    [double]$EstimatedWaitSec = 137.4,
+    [bool]$IncludeSecret = $true
 )
 if ($null -eq $N8nBaseUrl -or [string]::IsNullOrWhiteSpace($N8nBaseUrl)) {
     $N8nBaseUrl = $env:N8N_BASE_URL
@@ -13,16 +21,37 @@ if ($N8nBaseUrl -notmatch '^https?://') {
 }
 $url = "$N8nBaseUrl/webhook/$WebhookPath"
 Write-Host "Posting test alert to: $url"
+
+if (-not $AlertTriggered) {
+    $PeopleInZone = 3
+    $ArrivalRate = 0.05
+    $ServiceRate = 0.10
+    $EstimatedWaitSec = 5.0
+    $AlertSeverity = "info"
+    $AlertReason = "No active alert"
+}
+
+$alerts = @()
+if ($AlertTriggered) {
+    $alerts = @(@{
+        type = if ($AlertSeverity -eq "critical") { "WAIT_TIME_CRITICAL" } else { "WAIT_TIME_WARNING" }
+        severity = $AlertSeverity
+        message = $AlertReason
+        value = $EstimatedWaitSec
+        threshold = if ($AlertSeverity -eq "critical") { 120 } else { 60 }
+    })
+}
+
 $body = @{
     timestamp = (Get-Date).ToString("o")
     camera_id = "cam_01"
     zone_id = "checkout_lane_3"
     feed_id = "cashier_1"
     source = "C:/Users/ELITE/Downloads/retail_store.mp4"
-    people_in_zone = 16
-    arrival_rate = 0.15
-    service_rate = 0.16
-    estimated_wait_sec = 137.4
+    people_in_zone = $PeopleInZone
+    arrival_rate = $ArrivalRate
+    service_rate = $ServiceRate
+    estimated_wait_sec = $EstimatedWaitSec
     arrival_rate_lower = 0.10
     arrival_rate_upper = 0.22
     service_rate_lower = 0.11
@@ -30,10 +59,11 @@ $body = @{
     wait_time_lower = 110.0
     wait_time_upper = 165.0
     uncertainty_level = "Low"
-    queue_stable = $false
-    alert_triggered = $true
-    alert_reason = "High queue length: 16 people (warning: 8)"
-    alert_severity = "warning"
+    queue_stable = -not $AlertTriggered
+    alert_triggered = $AlertTriggered
+    alert_reason = $AlertReason
+    alert_severity = $AlertSeverity
+    alerts = $alerts
     system_uptime_sec = 0
     confidence_scores = @()
     establishment_name = $null
@@ -42,7 +72,7 @@ $body = @{
 } | ConvertTo-Json -Depth 5
 try {
     $headers = @{}
-    if ($env:WEBHOOK_SECRET) {
+    if ($IncludeSecret -and $env:WEBHOOK_SECRET) {
         $headers['X-Webhook-Secret'] = $env:WEBHOOK_SECRET
     }
     $invokeParams = @{

@@ -34,7 +34,7 @@
         "conditions": {
           "number": [
             {
-              "value1": "={{ ($json.body?.alert_triggered ?? false) ? 1 : 0 }}",
+              "value1": "={{ (($json.body?.alerts?.length ?? 0) > 0 || ($json.body?.alert_triggered ?? false)) ? 1 : 0 }}",
               "operation": "larger",
               "value2": 0
             }
@@ -48,12 +48,38 @@
     },
     {
       "parameters": {
-        "functionCode": "const d = $json.body ?? $json;\nconst escapeMarkdown = (value) => String(value ?? 'n/a').replace(/([_*\\[\\]()`])/g, '\\\\$1');\nconst zone = d.zone_id || d.feed_id || 'unknown';\nconst reason = d.alert_reason || 'Queue length warning';\nconst severity = d.alert_severity || 'warning';\nconst people = d.people_in_zone ?? d.metrics?.people_in_zone ?? 'n/a';\nconst waitTime = d.estimated_wait_sec ?? d.metrics?.wait_time_seconds ?? 'n/a';\nconst waitCi = d.wait_time_lower != null && d.wait_time_upper != null\n  ? `${d.wait_time_lower} - ${d.wait_time_upper}`\n  : (d.uncertainty?.wait_time_ci ? `${d.uncertainty.wait_time_ci[0]} - ${d.uncertainty.wait_time_ci[1]}` : 'n/a');\nconst text = `⚠️ *WARNING* — ${escapeMarkdown(zone)}\n\n` +\n  `📍 *Alert:* ${escapeMarkdown(reason)}\n` +\n  `📊 *Severity:* ${escapeMarkdown(severity)}\n` +\n  `👥 *In Queue:* ${people} people\n` +\n  `⏱ *Wait Time:* ${waitTime}s [CI: ${waitCi}]\n` +\n  `📈 *Uncertainty:* ${escapeMarkdown(d.uncertainty_level ?? d.uncertainty?.level ?? 'n/a')}\n` +\n  `🕐 ${d.timestamp ?? new Date().toISOString()}`;\nreturn [{ json: { message: text, feed_id: d.feed_id || null, zone_id: d.zone_id || null, alert_reason: d.alert_reason || null, alert_severity: severity } }];"
+        "functionCode": "const d = $json.body ?? $json;\nconst alerts = Array.isArray(d.alerts) ? d.alerts.filter(Boolean) : [];\nconst fallbackAlert = (d.alert_triggered || d.alert_reason || d.alert_severity)\n  ? [{\n      type: d.alert_type ?? 'ALERT',\n      severity: d.alert_severity ?? 'warning',\n      message: d.alert_reason ?? 'Queue alert',\n      value: d.estimated_wait_sec ?? d.metrics?.wait_time_seconds ?? null,\n      threshold: null,\n    }]\n  : [];\nconst effectiveAlerts = alerts.length > 0 ? alerts : fallbackAlert;\nconst primaryAlert = effectiveAlerts[0] ?? null;\nconst alertType = primaryAlert?.type ?? 'ALERT';\nconst severity = primaryAlert?.severity ?? d.alert_severity ?? 'warning';\nconst zoneId = d.zone_id ?? d.feed_id ?? 'unknown';\nconst cooldownSeconds = 120;\nconst now = Date.now();\nconst staticData = getWorkflowStaticData('global');\nstaticData.alertCooldowns ??= {};\nconst cooldownKey = `${zoneId}:${alertType}:${severity}`;\nconst lastSentAt = staticData.alertCooldowns[cooldownKey] ?? 0;\nconst shouldSendTelegram = !lastSentAt || (now - lastSentAt) >= cooldownSeconds * 1000;\nconst cooldownRemainingSeconds = shouldSendTelegram ? 0 : Math.max(0, Math.ceil((cooldownSeconds * 1000 - (now - lastSentAt)) / 1000));\nif (shouldSendTelegram) {\n  staticData.alertCooldowns[cooldownKey] = now;\n}\nreturn [{ json: { ...d, alerts: effectiveAlerts, primary_alert: primaryAlert, alert_type: alertType, alert_severity: severity, send_telegram: shouldSendTelegram, cooldown_seconds: cooldownSeconds, cooldown_remaining_seconds: cooldownRemainingSeconds, cooldown_key: cooldownKey } }];"
+      },
+      "name": "Check Alert Cooldown",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [900, 260]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.send_telegram ? 1 : 0 }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "name": "Cooldown Passed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1120, 260]
+    },
+    {
+      "parameters": {
+        "functionCode": "const d = $json.body ?? $json;\nconst escapeMarkdown = (value) => String(value ?? 'n/a').replace(/([_*\\[\\]()`])/g, '\\$1');\nconst alert = d.primary_alert ?? (Array.isArray(d.alerts) && d.alerts.length > 0 ? d.alerts[0] : null) ?? { type: d.alert_type ?? 'ALERT', severity: d.alert_severity ?? 'warning', message: d.alert_reason ?? 'Queue alert', value: d.estimated_wait_sec ?? d.metrics?.wait_time_seconds ?? null, threshold: null };\nconst zone = d.zone_id || d.feed_id || 'unknown';\nconst prefix = String(alert.severity ?? d.alert_severity ?? 'warning').toLowerCase() === 'critical' ? '🚨 *CRITICAL ALERT*' : '⚠️ *WARNING*';\nconst reason = alert.message || d.alert_reason || 'Queue length warning';\nconst severity = alert.severity || d.alert_severity || 'warning';\nconst people = d.people_in_zone ?? d.metrics?.people_in_zone ?? 'n/a';\nconst waitTime = alert.value ?? d.estimated_wait_sec ?? d.metrics?.wait_time_seconds ?? 'n/a';\nconst waitCi = d.wait_time_lower != null && d.wait_time_upper != null\n  ? `${d.wait_time_lower} - ${d.wait_time_upper}`\n  : (d.uncertainty?.wait_time_ci ? `${d.uncertainty.wait_time_ci[0]} - ${d.uncertainty.wait_time_ci[1]}` : 'n/a');\nconst alertSummary = Array.isArray(d.alerts) && d.alerts.length > 1\n  ? '\\n' + `🧾 *Alerts:* ${d.alerts.map((item) => `${escapeMarkdown(item.type)} (${escapeMarkdown(item.severity)})`).join(', ')}`\n  : '';\nconst text = `${prefix} — ${escapeMarkdown(zone)}\n\n` +\n  `📍 *Alert:* ${escapeMarkdown(reason)}\n` +\n  `📊 *Severity:* ${escapeMarkdown(severity)}\n` +\n  `👥 *In Queue:* ${people} people\n` +\n  `⏱ *Wait Time:* ${waitTime}s [CI: ${waitCi}]${alertSummary}\n` +\n  `📈 *Uncertainty:* ${escapeMarkdown(d.uncertainty_level ?? d.uncertainty?.level ?? 'n/a')}\n` +\n  `🕐 ${d.timestamp ?? new Date().toISOString()}`;\nreturn [{ json: { message: text, feed_id: d.feed_id || null, zone_id: d.zone_id || null, alert_reason: reason, alert_severity: severity, alerts_count: Array.isArray(d.alerts) ? d.alerts.length : 0 } }];"
       },
       "name": "Format Warning Message",
       "type": "n8n-nodes-base.function",
       "typeVersion": 1,
-      "position": [900, 260]
+      "position": [1340, 260]
     },
     {
       "parameters": {
@@ -68,7 +94,7 @@
       "name": "Send Telegram Alert",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1,
-      "position": [1120, 260],
+      "position": [1560, 260],
       "continueOnFail": true,
       "credentials": {
         "telegramApi": {
@@ -91,7 +117,23 @@
       "name": "Acknowledge Alert",
       "type": "n8n-nodes-base.set",
       "typeVersion": 1,
-      "position": [1320, 260]
+      "position": [1780, 260]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "response",
+              "value": "={{ 'Alert suppressed for ' + ($json.zone_id || $json.feed_id || 'unknown') + ' due to cooldown (' + $json.cooldown_remaining_seconds + 's remaining)' }}"
+            }
+          ]
+        }
+      },
+      "name": "Cooldown Acknowledged",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [1340, 420]
     },
     {
       "parameters": {
@@ -111,17 +153,12 @@
     },
     {
       "parameters": {
-        "values": {
-          "string": [
-            {
-              "name": "response",
-              "value": "Unauthorized"
-            }
-          ]
-        }
+        "respondWith": "json",
+        "responseCode": 401,
+        "responseBody": "{ \"error\": \"Unauthorized\" }"
       },
       "name": "Reject Unauthorized",
-      "type": "n8n-nodes-base.set",
+      "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [680, 420]
     }
@@ -134,7 +171,13 @@
       "main": [[{ "node": "Has Alert?", "type": "main", "index": 0 }], [{ "node": "Reject Unauthorized", "type": "main", "index": 0 }]]
     },
     "Has Alert?": {
-      "main": [[{ "node": "Format Warning Message", "type": "main", "index": 0 }], [{ "node": "Acknowledge No Alert", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Check Alert Cooldown", "type": "main", "index": 0 }], [{ "node": "Acknowledge No Alert", "type": "main", "index": 0 }]]
+    },
+    "Check Alert Cooldown": {
+      "main": [[{ "node": "Cooldown Passed?", "type": "main", "index": 0 }]]
+    },
+    "Cooldown Passed?": {
+      "main": [[{ "node": "Format Warning Message", "type": "main", "index": 0 }], [{ "node": "Cooldown Acknowledged", "type": "main", "index": 0 }]]
     },
     "Format Warning Message": {
       "main": [[{ "node": "Send Telegram Alert", "type": "main", "index": 0 }]]
@@ -143,6 +186,9 @@
       "main": [[{ "node": "Acknowledge Alert", "type": "main", "index": 0 }]]
     },
     "Acknowledge Alert": {
+      "main": []
+    },
+    "Cooldown Acknowledged": {
       "main": []
     },
     "Acknowledge No Alert": {

@@ -2,7 +2,10 @@ param(
     [string]$N8nBaseUrl = $null,
     [string]$WebhookPath = "queue-metrics",
     [int]$Rounds = 30,
-    [int]$DelaySeconds = 1
+    [int]$DelaySeconds = 1,
+    [int]$PostDelaySeconds = 0,
+    [int]$AlertCooldownSeconds = 0,
+    [bool]$IncludeSecret = $true
 )
 
 if (-not $N8nBaseUrl) {
@@ -20,6 +23,8 @@ Write-Host "Starting multi-feed test:
   URL: $url
   Rounds: $Rounds
   Delay(s): $DelaySeconds
+    Post delay(s): $PostDelaySeconds
+    Alert cooldown(s): $AlertCooldownSeconds
   Feeds: $($feeds -join ', ')"
 
 for ($i=1; $i -le $Rounds; $i++) {
@@ -61,8 +66,29 @@ for ($i=1; $i -le $Rounds; $i++) {
         $jsonBody = $payload | ConvertTo-Json -Depth 10
 
         try {
-            $resp = Invoke-RestMethod -Uri $url -Method Post -Body $jsonBody -ContentType 'application/json' -ErrorAction Stop
+            $invokeParams = @{
+                Uri = $url
+                Method = 'Post'
+                Body = $jsonBody
+                ContentType = 'application/json'
+                ErrorAction = 'Stop'
+            }
+            if ($IncludeSecret -and $env:WEBHOOK_SECRET) {
+                $invokeParams['Headers'] = @{ 'X-Webhook-Secret' = $env:WEBHOOK_SECRET }
+            }
+
+            $resp = Invoke-RestMethod @invokeParams
             Write-Host "[$i,$feed] OK: $(if ($resp -is [string]) { $resp } else { $resp | ConvertTo-Json -Depth 5 })"
+
+            if ($PostDelaySeconds -gt 0) {
+                Write-Host "[$i,$feed] Waiting $PostDelaySeconds seconds before the next payload."
+                Start-Sleep -Seconds $PostDelaySeconds
+            }
+
+            if ($AlertCooldownSeconds -gt 0 -and $alerts.Count -gt 0) {
+                Write-Host "[$i,$feed] Alert cooldown active, sleeping $AlertCooldownSeconds seconds before the next alert burst."
+                Start-Sleep -Seconds $AlertCooldownSeconds
+            }
         } catch {
             Write-Host "[$i,$feed] ERROR: $_" -ForegroundColor Red
         }

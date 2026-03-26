@@ -9,10 +9,10 @@ URL="$N8N_BASE_URL/rest/executions?limit=1"
 echo "Querying n8n executions: $URL"
 AUTH_HEADER=()
 if [ -n "$N8N_API_KEY" ]; then
-  AUTH_HEADER=( -H "Authorization: Bearer $N8N_API_KEY" )
+  AUTH_HEADER=( -H "X-N8N-API-KEY: $N8N_API_KEY" )
 fi
 # Try to fetch and print the first execution
-RESP=$(curl -s "${AUTH_HEADER[@]/#/}" -X GET "$URL")
+RESP=$(curl -s "${AUTH_HEADER[@]}" -X GET "$URL")
 if [ -z "$RESP" ]; then
   echo "No response from n8n." >&2
   exit 1
