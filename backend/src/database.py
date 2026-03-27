@@ -475,7 +475,7 @@ def upsert_feed_config(
                 last_error,
                 created_at,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(feed_id) DO UPDATE SET
                 name = excluded.name,
                 source = excluded.source,

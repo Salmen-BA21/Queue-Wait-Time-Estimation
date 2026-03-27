@@ -37,10 +37,28 @@ function getLaunchSuccessMessage(result: BatchFeedLaunchResult, launchAfterCreat
     : `Batch saved successfully: ${result.summary.created} source${result.summary.created === 1 ? "" : "s"} created.`;
 }
 
-function getLaunchFailureMessage(result: BatchFeedLaunchResult, launchAfterCreate: boolean): string {
-  return launchAfterCreate
-    ? `${result.summary.started} source${result.summary.started === 1 ? "" : "s"} started, ${result.summary.failed} failed. Failed drafts remain staged for correction.`
-    : `${result.summary.created} source${result.summary.created === 1 ? "" : "s"} saved, ${result.summary.failed} failed. Failed drafts remain staged for correction.`;
+function getLaunchFailureMessage(
+  result: BatchFeedLaunchResult,
+  launchAfterCreate: boolean,
+  recoveredDraftCount: number,
+  firstFailureReason: string | null,
+): string {
+  const summaryPrefix = launchAfterCreate
+    ? `${result.summary.started} source${result.summary.started === 1 ? "" : "s"} started, ${result.summary.failed} failed.`
+    : `${result.summary.created} source${result.summary.created === 1 ? "" : "s"} saved, ${result.summary.failed} failed.`;
+
+  if (recoveredDraftCount > 0) {
+    if (firstFailureReason) {
+      return `${summaryPrefix} Failed drafts remain staged for correction. First error: ${firstFailureReason}`;
+    }
+    return `${summaryPrefix} Failed drafts remain staged for correction.`;
+  }
+
+  if (firstFailureReason) {
+    return `${summaryPrefix} No recoverable draft was found in the setup form. First error: ${firstFailureReason}`;
+  }
+
+  return `${summaryPrefix} No recoverable draft was found in the setup form.`;
 }
 
 async function prepareBatchFeeds(drafts: StagedFeedDraft[]): Promise<ApiBatchFeedDraft[]> {
@@ -125,6 +143,8 @@ function recoverFailedDrafts({
   applyLocalFileSelection(nextActiveLocalFile);
   setCurrentDraftId(createDraftId());
   setSetupStep("review");
+
+  return failedCameraDrafts.length + failedLocalFiles.length;
 }
 
 export function useDashboardBatchSubmission({
@@ -169,7 +189,7 @@ export function useDashboardBatchSubmission({
 
       const failedIds = new Set(result.results.filter((item) => item.status === "failed").map((item) => item.client_id));
       if (failedIds.size > 0) {
-        recoverFailedDrafts({
+        const recoveredDraftCount = recoverFailedDrafts({
           drafts,
           failedIds,
           allSelectedLocalFiles,
@@ -182,7 +202,8 @@ export function useDashboardBatchSubmission({
           createLocalFileDraftId,
           isLocalFileDraftId,
         });
-        toast.error(getLaunchFailureMessage(result, launchAfterCreate));
+        const firstFailureReason = result.results.find((item) => item.status === "failed")?.error ?? null;
+        toast.error(getLaunchFailureMessage(result, launchAfterCreate, recoveredDraftCount, firstFailureReason));
         return;
       }
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import mimetypes
+import os
 import sqlite3
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -59,6 +60,26 @@ from src.database import (
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 UPLOAD_DIR = BACKEND_DIR / "data" / "uploads"
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv"}
+
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+]
+DEFAULT_CORS_ORIGIN_REGEX = (
+    r"https?://(localhost|127\.0\.0\.1|10(?:\.\d{1,3}){3}|"
+    r"192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(:\d+)?$"
+)
+
+
+def parse_csv_env(value: str | None) -> list[str]:
+    """Parse a comma-separated environment variable into a list of values."""
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
 
 
 def build_upload_preview_path(file_path: Path) -> str:
@@ -161,17 +182,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+cors_origins = parse_csv_env(os.getenv("QUEUEVISION_CORS_ORIGINS")) or DEFAULT_CORS_ORIGINS
+cors_origin_regex = os.getenv("QUEUEVISION_CORS_ORIGIN_REGEX") or DEFAULT_CORS_ORIGIN_REGEX
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:8080",
-        "http://127.0.0.1:8080",
-    ],
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_origins=cors_origins,
+    allow_origin_regex=cors_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
