@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { getFeedSnapshot, resolveApiUrl, type VideoFeed } from "@/lib/api";
+import { getFeedMjpegStreamUrl, getFeedSnapshot, resolveApiUrl, type VideoFeed } from "@/lib/api";
 
 export type FeedGridAction = "start" | "stop" | "restart" | "delete";
 
@@ -119,56 +119,61 @@ function FeedTransportSurface({
 }) {
   const [playbackFailed, setPlaybackFailed] = useState(false);
   const [videoDims, setVideoDims] = useState<{ width: number; height: number } | null>(null);
-  const [liveFrameUrl, setLiveFrameUrl] = useState<string | null>(null);
+  const [fallbackFrameUrl, setFallbackFrameUrl] = useState<string | null>(null);
+  const [streamAttempt, setStreamAttempt] = useState(0);
+  const [streamErrorCount, setStreamErrorCount] = useState(0);
   const usesSnapshotTransport = shouldUseSnapshotTransport(feed);
 
   useEffect(() => {
     setPlaybackFailed(false);
-  }, [feed.preview_path]);
+  }, [feed.feed_id, feed.preview_path]);
 
   const transportActive = uiStatus !== "offline" && !isStopping;
+  const shouldUseMjpegStream = usesSnapshotTransport
+    && transportActive
+    && (feed.status === "running" || feed.status === "initializing");
+  const streamUrl = shouldUseMjpegStream
+    ? `${getFeedMjpegStreamUrl(feed.feed_id)}?attempt=${streamAttempt}`
+    : null;
 
   useEffect(() => {
-    let cancelled = false;
-    let inFlight = false;
-
-    if (!usesSnapshotTransport || !transportActive || (feed.status !== "running" && feed.status !== "initializing")) {
-      setLiveFrameUrl(null);
+    if (!shouldUseMjpegStream) {
+      setStreamAttempt(0);
+      setStreamErrorCount(0);
+      setFallbackFrameUrl(null);
       return;
     }
 
-    const refreshSnapshot = async () => {
-      if (inFlight || cancelled) {
-        return;
-      }
+    if (streamErrorCount === 0) {
+      return;
+    }
 
-      inFlight = true;
-      try {
-        const snapshot = await getFeedSnapshot(feed.feed_id);
-        if (!cancelled && snapshot.captured && snapshot.image_data_url) {
-          setLiveFrameUrl(snapshot.image_data_url);
-        }
-      } catch {
-        // Keep the last known frame or fallback preview without interrupting the feed card.
-      } finally {
-        inFlight = false;
-      }
-    };
-
-    void refreshSnapshot();
-    const intervalId = window.setInterval(() => {
-      void refreshSnapshot();
-    }, 800);
+    const retryDelayMs = Math.min(15_000, 1_000 * 2 ** Math.max(streamErrorCount - 1, 0));
+    const retryId = window.setTimeout(() => {
+      setPlaybackFailed(false);
+      setStreamAttempt((attempt) => attempt + 1);
+    }, retryDelayMs);
 
     return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
+      window.clearTimeout(retryId);
     };
-  }, [feed.feed_id, feed.status, transportActive, usesSnapshotTransport]);
+  }, [shouldUseMjpegStream, streamErrorCount]);
+
+  const captureSnapshotFallback = async () => {
+    try {
+      const snapshot = await getFeedSnapshot(feed.feed_id);
+      if (snapshot.captured && snapshot.image_data_url) {
+        setFallbackFrameUrl(snapshot.image_data_url);
+      }
+    } catch {
+      // Keep the current fallback state when one-shot snapshot capture fails.
+    }
+  };
 
   const previewUrl = feed.preview_path ? resolveApiUrl(feed.preview_path) : null;
-  const showLiveFrame = usesSnapshotTransport && transportActive && Boolean(liveFrameUrl) && !playbackFailed;
-  const showPreview = transportActive && !showLiveFrame && Boolean(previewUrl) && !playbackFailed;
+  const showLiveFrame = Boolean(streamUrl) && !playbackFailed;
+  const showFallbackFrame = !showLiveFrame && transportActive && Boolean(fallbackFrameUrl);
+  const showPreview = transportActive && !showLiveFrame && !showFallbackFrame && Boolean(previewUrl) && !playbackFailed;
   const zonePoints = feed.zone?.points ?? [];
   const zonePolygonPoints = videoDims
     ? zonePoints
@@ -197,12 +202,72 @@ function FeedTransportSurface({
       {showLiveFrame ? (
         <>
           <img
-            key={liveFrameUrl}
+            key={streamUrl}
             className="h-full w-full object-cover"
-            src={liveFrameUrl ?? undefined}
+            src={streamUrl ?? undefined}
             alt={`${feed.name} live frame`}
+            onLoad={(event) => {
+              setPlaybackFailed(false);
+              setStreamErrorCount(0);
+              setFallbackFrameUrl(null);
+              onImageLoad(event);
+            }}
+            onError={() => {
+              setPlaybackFailed(true);
+              setStreamErrorCount((count) => count + 1);
+              void captureSnapshotFallback();
+            }}
+          />
+          {/* Tracking overlays (zone polygon + person boxes) */}
+          {videoDims && (zonePolygonPoints || (uiStatus === "online" && detections?.length)) && (
+            <svg
+              className="absolute inset-0 h-full w-full pointer-events-none"
+              viewBox={`0 0 ${videoDims.width} ${videoDims.height}`}
+              preserveAspectRatio="xMidYMid slice"
+            >
+              {zonePolygonPoints && (
+                <>
+                  <polygon
+                    points={zonePolygonPoints}
+                    className="fill-cyan-400/10 stroke-cyan-300"
+                    strokeWidth={3}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <polyline
+                    points={zonePolygonPoints}
+                    className="stroke-cyan-100/70"
+                    strokeWidth={1}
+                    fill="none"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </>
+              )}
+
+              {uiStatus === "online" && detections?.map((det, idx) => {
+                const [x1, y1, x2, y2] = det;
+                return (
+                  <rect
+                    key={idx}
+                    x={x1}
+                    y={y1}
+                    width={x2 - x1}
+                    height={y2 - y1}
+                    className="fill-primary/10 stroke-primary stroke-[2]"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                );
+              })}
+            </svg>
+          )}
+        </>
+      ) : showFallbackFrame ? (
+        <>
+          <img
+            className="h-full w-full object-cover"
+            src={fallbackFrameUrl ?? undefined}
+            alt={`${feed.name} fallback frame`}
             onLoad={onImageLoad}
-            onError={() => setPlaybackFailed(true)}
+            onError={() => setFallbackFrameUrl(null)}
           />
           {/* Tracking overlays (zone polygon + person boxes) */}
           {videoDims && (zonePolygonPoints || (uiStatus === "online" && detections?.length)) && (

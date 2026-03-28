@@ -8,6 +8,8 @@ import json
 import os
 import subprocess
 import sys
+import threading
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -59,12 +61,38 @@ UPLOAD_DIR = (BACKEND_DIR / "data" / "uploads").resolve()
 RUNTIME_LOG_DIR = (BACKEND_DIR / "data" / "runtime").resolve()
 DEFAULT_LOG_LEVEL = "INFO"
 DEFAULT_RESIZE_SCALE = 0.5
+
+
 class FeedStateError(RuntimeError):
     """Raised when a feed operation is invalid for the current lifecycle state."""
 
 
 class FeedStartError(RuntimeError):
     """Raised when the runtime cannot launch a worker for a feed."""
+
+
+def _build_authenticated_rtsp_source(
+    source: str,
+    username: str | None,
+    password: str | None,
+) -> str:
+    """Embed optional credentials in an RTSP URL for OpenCV capture."""
+    if not (username or password):
+        return source
+
+    parsed = urlparse(source)
+    hostname = parsed.hostname
+    if hostname is None:
+        return source
+
+    netloc = hostname
+    if parsed.port is not None:
+        netloc = f"{netloc}:{parsed.port}"
+
+    user_part = username or ""
+    pass_part = f":{password}" if password else ""
+    netloc = f"{user_part}{pass_part}@{netloc}"
+    return urlunparse(parsed._replace(netloc=netloc))
 
 
 def build_preview_path(source: str) -> str | None:
@@ -241,6 +269,253 @@ def _capture_rtsp_source_snapshot(
         password=password,
         transport=transport,
     )
+
+
+@dataclass
+class FeedFrameStreamState:
+    """Tracks one buffered MJPEG stream source shared across subscribers."""
+
+    feed_id: str
+    source: str
+    username: str | None
+    password: str | None
+    transport: Literal["tcp", "udp"]
+    subscribers: int = 0
+    latest_frame: bytes | None = None
+    frame_index: int = 0
+    width: int | None = None
+    height: int | None = None
+    last_error: str | None = None
+    stop_event: threading.Event = field(default_factory=threading.Event, repr=False)
+    condition: threading.Condition = field(default_factory=threading.Condition, repr=False)
+    worker: threading.Thread | None = field(default=None, repr=False)
+
+
+class FeedFrameStreamManager:
+    """Maintains one persistent frame buffer loop per feed for MJPEG streaming."""
+
+    def __init__(self, *, jpeg_quality: int = 80) -> None:
+        self._jpeg_quality = jpeg_quality
+        self._states: dict[str, FeedFrameStreamState] = {}
+        self._lock = asyncio.Lock()
+
+    async def subscribe(
+        self,
+        *,
+        feed_id: str,
+        source: str,
+        username: str | None,
+        password: str | None,
+        transport: Literal["tcp", "udp"],
+    ) -> None:
+        stale_state: FeedFrameStreamState | None = None
+
+        async with self._lock:
+            state = self._states.get(feed_id)
+            if state is not None and (
+                state.source != source
+                or state.username != username
+                or state.password != password
+                or state.transport != transport
+            ):
+                stale_state = state
+                state = None
+
+            if state is None:
+                state = FeedFrameStreamState(
+                    feed_id=feed_id,
+                    source=source,
+                    username=username,
+                    password=password,
+                    transport=transport,
+                )
+                self._states[feed_id] = state
+
+            state.subscribers += 1
+            should_start = state.worker is None or not state.worker.is_alive()
+
+        if stale_state is not None:
+            await asyncio.to_thread(self._stop_state, stale_state)
+
+        if should_start:
+            await asyncio.to_thread(self._start_state_worker, state)
+
+    async def unsubscribe(self, feed_id: str) -> None:
+        state_to_stop: FeedFrameStreamState | None = None
+
+        async with self._lock:
+            state = self._states.get(feed_id)
+            if state is None:
+                return
+
+            state.subscribers = max(0, state.subscribers - 1)
+            if state.subscribers == 0:
+                state_to_stop = self._states.pop(feed_id, None)
+
+        if state_to_stop is not None:
+            await asyncio.to_thread(self._stop_state, state_to_stop)
+
+    async def terminate(self, feed_id: str) -> None:
+        state_to_stop: FeedFrameStreamState | None = None
+
+        async with self._lock:
+            state_to_stop = self._states.pop(feed_id, None)
+
+        if state_to_stop is not None:
+            await asyncio.to_thread(self._stop_state, state_to_stop)
+
+    async def clear(self) -> None:
+        async with self._lock:
+            states = list(self._states.values())
+            self._states.clear()
+
+        for state in states:
+            await asyncio.to_thread(self._stop_state, state)
+
+    async def wait_for_next_frame(
+        self,
+        feed_id: str,
+        *,
+        after_frame_index: int,
+        timeout_seconds: float = 1.0,
+    ) -> tuple[int, bytes] | None:
+        async with self._lock:
+            state = self._states.get(feed_id)
+
+        if state is None:
+            return None
+
+        return await asyncio.to_thread(
+            self._wait_for_next_frame_sync,
+            state,
+            after_frame_index,
+            timeout_seconds,
+        )
+
+    def _start_state_worker(self, state: FeedFrameStreamState) -> None:
+        if state.worker is not None and state.worker.is_alive():
+            return
+
+        state.stop_event.clear()
+        state.worker = threading.Thread(
+            target=self._capture_loop,
+            args=(state,),
+            name=f"feed-stream-{state.feed_id}",
+            daemon=True,
+        )
+        state.worker.start()
+
+    def _stop_state(self, state: FeedFrameStreamState) -> None:
+        state.stop_event.set()
+        with state.condition:
+            state.condition.notify_all()
+
+        worker = state.worker
+        if worker is not None and worker.is_alive():
+            worker.join(timeout=1.5)
+
+        state.worker = None
+
+    def _wait_for_next_frame_sync(
+        self,
+        state: FeedFrameStreamState,
+        after_frame_index: int,
+        timeout_seconds: float,
+    ) -> tuple[int, bytes] | None:
+        deadline = time.monotonic() + max(timeout_seconds, 0.01)
+
+        with state.condition:
+            while not state.stop_event.is_set():
+                if state.latest_frame is not None and state.frame_index > after_frame_index:
+                    return state.frame_index, state.latest_frame
+
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return None
+
+                state.condition.wait(timeout=remaining)
+
+        return None
+
+    def _open_capture(self, state: FeedFrameStreamState):
+        import cv2
+
+        source = state.source
+        if source.lower().startswith("rtsp://"):
+            os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", f"rtsp_transport;{state.transport}")
+            capture_source = _build_authenticated_rtsp_source(
+                source,
+                state.username,
+                state.password,
+            )
+            capture = cv2.VideoCapture(capture_source, cv2.CAP_FFMPEG)
+            capture.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 5_000)
+            capture.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 5_000)
+            return capture
+
+        capture_source: str | int = int(source) if source.isdigit() else source
+        return cv2.VideoCapture(capture_source)
+
+    def _capture_loop(self, state: FeedFrameStreamState) -> None:
+        try:
+            import cv2
+        except ModuleNotFoundError:
+            with state.condition:
+                state.last_error = "OpenCV is required for MJPEG streaming."
+                state.stop_event.set()
+                state.condition.notify_all()
+            return
+
+        capture = self._open_capture(state)
+        failure_count = 0
+        is_rtsp_source = state.source.lower().startswith("rtsp://")
+
+        try:
+            while not state.stop_event.is_set():
+                if not capture.isOpened():
+                    failure_count += 1
+                    time.sleep(0.2)
+                    capture.release()
+                    capture = self._open_capture(state)
+                    continue
+
+                ok, frame = capture.read()
+                if not ok or frame is None:
+                    failure_count += 1
+
+                    if is_rtsp_source and failure_count >= 10:
+                        capture.release()
+                        capture = self._open_capture(state)
+                        failure_count = 0
+                    elif not is_rtsp_source:
+                        capture.set(cv2.CAP_PROP_POS_FRAMES, 0)
+
+                    time.sleep(0.05)
+                    continue
+
+                failure_count = 0
+                encoded_ok, buffer = cv2.imencode(
+                    ".jpg",
+                    frame,
+                    [int(cv2.IMWRITE_JPEG_QUALITY), self._jpeg_quality],
+                )
+                if not encoded_ok:
+                    time.sleep(0.01)
+                    continue
+
+                frame_height, frame_width = frame.shape[:2]
+
+                with state.condition:
+                    state.latest_frame = buffer.tobytes()
+                    state.frame_index += 1
+                    state.width = frame_width
+                    state.height = frame_height
+                    state.last_error = None
+                    state.condition.notify_all()
+        finally:
+            capture.release()
+            with state.condition:
+                state.condition.notify_all()
 
 
 @dataclass
@@ -523,6 +798,7 @@ class FeedRegistry:
     def __init__(self, broadcaster: WebSocketHub, runner: FeedWorkerRunner | None = None) -> None:
         self._broadcaster = broadcaster
         self._runner = runner or SubprocessFeedWorkerRunner()
+        self._frame_streams = FeedFrameStreamManager()
         self._feeds: dict[str, FeedRecord] = {}
         self._lock = asyncio.Lock()
         self._load_persisted_feeds()
@@ -605,6 +881,7 @@ class FeedRegistry:
         if removed is None:
             return False
 
+        await self._frame_streams.terminate(feed_id)
         await asyncio.to_thread(delete_feed_config, feed_id)
 
         await self._broadcaster.broadcast_feed_event(action="deleted", feed_id=feed_id)
@@ -757,6 +1034,7 @@ class FeedRegistry:
             await asyncio.to_thread(self._runner.close, handle)
             if session_id is not None:
                 await asyncio.to_thread(end_video_session, session_id)
+            await self._frame_streams.terminate(feed_id)
         except Exception as exc:
             message = f"Failed to stop feed worker: {exc}"
             await self._mark_feed_error(feed_id, message)
@@ -944,6 +1222,45 @@ class FeedRegistry:
             error=info.get("error") if not ok else None,
         )
 
+    async def subscribe_feed_stream(self, feed_id: str) -> Literal["ok", "not_found", "not_running"]:
+        async with self._lock:
+            record = self._feeds.get(feed_id)
+            if record is None:
+                return "not_found"
+
+            if record.status not in {"running", "initializing"}:
+                return "not_running"
+
+            source = record.source
+            username = record.rtsp_username
+            password = record.rtsp_password
+            transport: Literal["tcp", "udp"] = record.rtsp_transport or "tcp"
+
+        await self._frame_streams.subscribe(
+            feed_id=feed_id,
+            source=source,
+            username=username,
+            password=password,
+            transport=transport,
+        )
+        return "ok"
+
+    async def unsubscribe_feed_stream(self, feed_id: str) -> None:
+        await self._frame_streams.unsubscribe(feed_id)
+
+    async def next_feed_stream_frame(
+        self,
+        feed_id: str,
+        *,
+        after_frame_index: int,
+        timeout_seconds: float = 1.0,
+    ) -> tuple[int, bytes] | None:
+        return await self._frame_streams.wait_for_next_frame(
+            feed_id,
+            after_frame_index=after_frame_index,
+            timeout_seconds=timeout_seconds,
+        )
+
     async def clear(self) -> None:
         async with self._lock:
             feed_ids = list(self._feeds.keys())
@@ -956,6 +1273,8 @@ class FeedRegistry:
 
         async with self._lock:
             self._feeds.clear()
+
+        await self._frame_streams.clear()
 
     def _load_saved_zone(self, caisse_id: int | None) -> ZonePolygon | None:
         if caisse_id is None:
@@ -1210,6 +1529,8 @@ class FeedRegistry:
 
             if session_id is not None:
                 await asyncio.to_thread(end_video_session, session_id)
+
+            await self._frame_streams.terminate(feed_id)
 
             await self._broadcaster.broadcast_feed_event(action="updated", feed=model)
             return

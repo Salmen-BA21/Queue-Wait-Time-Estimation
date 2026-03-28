@@ -530,6 +530,10 @@ export function getFeedSnapshot(feedId: string): Promise<FeedSnapshotResult> {
   return fetchApi<FeedSnapshotResult>(`/api/feeds/${feedId}/snapshot`);
 }
 
+export function getFeedMjpegStreamUrl(feedId: string): string {
+  return buildUrl(`/api/feeds/${feedId}/stream`);
+}
+
 export function discoverOnvifDevices(input?: ONVIFDiscoveryInput): Promise<ONVIFDevice[]> {
   return fetchApi<ONVIFDevice[]>("/api/sources/onvif/discover", {
     method: "POST",

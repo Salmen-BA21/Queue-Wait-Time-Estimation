@@ -9,7 +9,7 @@ import unittest
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -503,6 +503,62 @@ class TestQueueVisionApi(unittest.TestCase):
         response = self.client.get("/api/feeds/missing-feed/snapshot")
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["detail"], "Feed not found.")
+
+    def test_feed_stream_returns_not_found_for_missing_feed(self) -> None:
+        response = self.client.get("/api/feeds/missing-feed/stream")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Feed not found.")
+
+    def test_feed_stream_requires_running_feed(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "Camera Stream",
+                "source": "rtsp://192.168.1.96/live/main",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        stream_response = self.client.get(f"/api/feeds/{feed['feed_id']}/stream")
+        self.assertEqual(stream_response.status_code, 409)
+        self.assertEqual(stream_response.json()["detail"], "Feed must be running before opening the stream.")
+
+    def test_feed_stream_yields_mjpeg_chunks(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "Camera Stream",
+                "source": "rtsp://192.168.1.97/live/main",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        registry = app.state.registry
+        subscribe_mock = AsyncMock(return_value="ok")
+        next_frame_mock = AsyncMock(side_effect=[(1, b"jpeg-frame-bytes"), StopAsyncIteration()])
+        unsubscribe_mock = AsyncMock(return_value=None)
+
+        with patch.object(registry, "subscribe_feed_stream", subscribe_mock), patch.object(
+            registry,
+            "next_feed_stream_frame",
+            next_frame_mock,
+        ), patch.object(registry, "unsubscribe_feed_stream", unsubscribe_mock):
+            with self.client.stream("GET", f"/api/feeds/{feed['feed_id']}/stream") as stream_response:
+                self.assertEqual(stream_response.status_code, 200)
+                self.assertEqual(
+                    stream_response.headers["content-type"],
+                    "multipart/x-mixed-replace; boundary=frame",
+                )
+                chunk = next(stream_response.iter_bytes())
+
+        self.assertIn(b"--frame", chunk)
+        self.assertIn(b"Content-Type: image/jpeg", chunk)
+        self.assertIn(b"jpeg-frame-bytes", chunk)
+        subscribe_mock.assert_awaited_once_with(feed["feed_id"])
+        next_frame_mock.assert_awaited()
+        unsubscribe_mock.assert_awaited_once_with(feed["feed_id"])
 
     def test_feed_config_persists_across_registry_restart(self) -> None:
         created_response = self.client.post(

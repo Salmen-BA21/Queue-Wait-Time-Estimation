@@ -25,6 +25,19 @@ WebSocket: `/ws/metrics`
 - `DELETE /api/feeds/{feed_id}` — delete a feed
 - `POST /api/feeds/{feed_id}/zone` — update feed zone
 - `GET /api/feeds/{feed_id}/snapshot` — capture feed snapshot (returns `FeedSnapshotResult`)
+- `GET /api/feeds/{feed_id}/stream` — MJPEG live stream (`multipart/x-mixed-replace; boundary=frame`) for running feeds
+
+### MJPEG stream behavior
+
+- Intended for live RTSP/webcam cards in the dashboard.
+- Endpoint returns:
+  - `404` when feed does not exist
+  - `409` when feed exists but is not running/initializing
+  - `200` streaming response when feed is active
+- Client transport recommendation:
+  - Use stream endpoint for steady-state live rendering.
+  - Fall back to `GET /api/feeds/{feed_id}/snapshot` on transient stream error.
+  - Keep snapshot endpoint for zone-editor workflows.
 
 - `POST /api/upload` or `POST /api/uploads/video`
   - Upload video file (multipart). Returns `preview_path` usable by frontend for playback.

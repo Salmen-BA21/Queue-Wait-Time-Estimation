@@ -14,7 +14,7 @@ from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
 from src import __version__
 from src.api.models import (
@@ -627,6 +627,58 @@ async def get_feed_snapshot(feed_id: str) -> ApiResponse[FeedSnapshotResult]:
     return ApiResponse(
         data=snapshot,
         message="Feed snapshot captured successfully." if snapshot.captured else "Feed snapshot capture failed.",
+    )
+
+
+@app.get("/api/feeds/{feed_id}/stream")
+async def stream_feed(feed_id: str) -> StreamingResponse:
+    registry = get_registry()
+    stream_status = await registry.subscribe_feed_stream(feed_id)
+    if stream_status == "not_found":
+        raise HTTPException(status_code=404, detail="Feed not found.")
+    if stream_status == "not_running":
+        raise HTTPException(status_code=409, detail="Feed must be running before opening the stream.")
+
+    async def iter_mjpeg():
+        last_frame_index = 0
+        try:
+            while True:
+                try:
+                    frame = await registry.next_feed_stream_frame(
+                        feed_id,
+                        after_frame_index=last_frame_index,
+                        timeout_seconds=1.5,
+                    )
+                except StopAsyncIteration:
+                    break
+
+                if frame is None:
+                    feed = await registry.get_feed(feed_id)
+                    if feed is None or feed.status not in {"running", "initializing"}:
+                        break
+                    await asyncio.sleep(0.05)
+                    continue
+
+                last_frame_index, jpeg_bytes = frame
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n"
+                    + f"Content-Length: {len(jpeg_bytes)}\r\n\r\n".encode("ascii")
+                    + jpeg_bytes
+                    + b"\r\n"
+                )
+        finally:
+            await registry.unsubscribe_feed_stream(feed_id)
+
+    return StreamingResponse(
+        iter_mjpeg(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 
