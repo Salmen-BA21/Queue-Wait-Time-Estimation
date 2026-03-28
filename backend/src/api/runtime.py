@@ -176,57 +176,6 @@ def _read_log_tail(log_path: Path | None, max_lines: int = 10) -> str | None:
     return " | ".join(tail)
 
 
-def _resolve_source_dimensions(source: str) -> tuple[int, int]:
-    """Open the source long enough to resolve frame dimensions for zone conversion."""
-    try:
-        import cv2
-    except ModuleNotFoundError as exc:
-        raise FeedStartError(
-            "OpenCV is required to convert normalized zones into worker pixel coordinates."
-        ) from exc
-
-    capture_source: str | int = int(source) if source.isdigit() else source
-    capture = cv2.VideoCapture(capture_source)
-
-    if not capture.isOpened():
-        raise FeedStartError(
-            f"Unable to open source '{source}' to resolve zone coordinates."
-        )
-
-    try:
-        width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-        if width > 0 and height > 0:
-            return width, height
-
-        ok, frame = capture.read()
-        if not ok or frame is None:
-            raise FeedStartError(
-                f"Unable to read a frame from source '{source}' to resolve zone coordinates."
-            )
-
-        frame_height, frame_width = frame.shape[:2]
-        return frame_width, frame_height
-    finally:
-        capture.release()
-
-
-def denormalize_zone_points(source: str, zone: ZonePolygon) -> list[list[int]]:
-    """Convert normalized zone points into the pixel coordinates expected by src.main."""
-    frame_width, frame_height = _resolve_source_dimensions(source)
-    max_x = max(frame_width - 1, 0)
-    max_y = max(frame_height - 1, 0)
-
-    points: list[list[int]] = []
-    for point in zone.points:
-        pixel_x = min(max(int(round(point.x * frame_width)), 0), max_x)
-        pixel_y = min(max(int(round(point.y * frame_height)), 0), max_y)
-        points.append([pixel_x, pixel_y])
-
-    return points
-
-
 def _capture_video_source_snapshot(source: str, jpeg_quality: int = 90) -> tuple[bool, dict]:
     """Capture a JPEG snapshot from a local file path or numeric capture source."""
     try:
@@ -422,9 +371,7 @@ class SubprocessFeedWorkerRunner:
         ]
 
         if record.zone is not None:
-            command.extend(
-                ["--zone-points", json.dumps(denormalize_zone_points(record.source, record.zone))]
-            )
+            command.extend(["--zone-points", json.dumps(serialize_zone_points(record.zone))])
 
         if record.source.lower().startswith("rtsp://"):
             if record.rtsp_username:

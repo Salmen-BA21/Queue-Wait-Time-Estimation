@@ -12,7 +12,6 @@ import type {
   ONVIFCameraTestResult,
   ONVIFDevice,
   ONVIFStream,
-  RTSPConnectionTestResult,
   VideoFeed,
 } from "@/lib/api";
 import {
@@ -22,7 +21,6 @@ import {
   listEstablishments,
   resolveOnvifStreams,
   testOnvifCamera,
-  testRtspConnection,
   uploadVideo,
 } from "@/lib/api";
 import { useLiveDashboard } from "@/hooks/use-live-dashboard";
@@ -42,7 +40,6 @@ vi.mock("@/lib/api", async () => {
     listEstablishments: vi.fn(),
     resolveOnvifStreams: vi.fn(),
     testOnvifCamera: vi.fn(),
-    testRtspConnection: vi.fn(),
     uploadVideo: vi.fn(),
   };
 });
@@ -259,15 +256,6 @@ describe("Dashboard integration", () => {
       fps: 25,
       error: null,
     } satisfies ONVIFCameraTestResult);
-    vi.mocked(testRtspConnection).mockResolvedValue({
-      connected: true,
-      transport: "tcp",
-      resolution: "1920x1080",
-      width: 1920,
-      height: 1080,
-      fps: 25,
-      error: null,
-    } satisfies RTSPConnectionTestResult);
     vi.mocked(uploadVideo).mockResolvedValue({
       file_name: "queue.mp4",
       file_path: "/tmp/queue.mp4",
@@ -293,7 +281,7 @@ describe("Dashboard integration", () => {
     vi.clearAllMocks();
   });
 
-  it("stages an RTSP source and launches the batch with shared runtime settings", async () => {
+  it("uploads a local video and launches the batch with shared runtime settings", async () => {
     mockDashboardState([]);
     await openBatchSetup();
     fireEvent.change(screen.getByLabelText("Feed name"), { target: { value: "Checkout Upload" } });
@@ -331,7 +319,7 @@ describe("Dashboard integration", () => {
         }),
       ],
     });
-  });
+  }, 15000);
 
   it("uses per-camera ONVIF credentials when resolving and testing a selected camera", async () => {
     mockDashboardState([]);
@@ -373,6 +361,7 @@ describe("Dashboard integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Discover Cameras" }));
 
     await screen.findByRole("button", { name: /Front Gate/ });
+    fireEvent.change(screen.getByLabelText("Feed name"), { target: { value: "Front Gate Batch" } });
     const usernameField = await screen.findByLabelText("Username for Front Gate");
     const passwordField = await screen.findByLabelText("Password for Front Gate");
     fireEvent.change(usernameField, { target: { value: "front-user" } });
@@ -389,7 +378,40 @@ describe("Dashboard integration", () => {
     expect(testOnvifCamera).toHaveBeenCalledWith(
       expect.objectContaining({ username: "front-user", password: "front-pass" }),
     );
-  });
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue to Zone" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Continue to Model" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm Model" }));
+    fireEvent.click(await screen.findByRole("switch"));
+    fireEvent.click(screen.getByRole("button", { name: "Create and Start Batch" }));
+
+    await waitFor(() => expect(launchFeedBatch).toHaveBeenCalledTimes(1));
+    expect(launchFeedBatch).toHaveBeenCalledWith({
+      launch_mode: "create_and_start",
+      runtime: {
+        log_level: "INFO",
+        webhook_enabled: false,
+      },
+      feeds: [
+        expect.objectContaining({
+          client_id: expect.any(String),
+          name: "Front Gate Batch",
+          source: "rtsp://192.168.1.30/stream/main",
+          model_size: "m",
+          rtsp_username: "front-user",
+          rtsp_password: "front-pass",
+          rtsp_transport: "tcp",
+          zone: {
+            points: [
+              { x: 0.1, y: 0.1 },
+              { x: 0.5, y: 0.2 },
+              { x: 0.4, y: 0.7 },
+            ],
+          },
+        }),
+      ],
+    });
+  }, 15000);
 
   it("routes edit-zone, remove, and restart actions through the live dashboard mutations", async () => {
     const dashboardState = mockDashboardState([createFeedRecord()]);

@@ -35,7 +35,6 @@ import type {
   ONVIFCameraTestResult,
   ONVIFDevice,
   ONVIFStream,
-  RTSPConnectionTestResult,
   RTSPTransport,
   VideoFeed,
   ZonePoint,
@@ -44,19 +43,11 @@ import { formatResolution, getOnvifDeviceKey, type OnvifDeviceCredentials, type 
 
 const UNASSIGNED_SELECT_VALUE = "__unassigned__";
 
-export interface StagedSourceSummary {
-  clientId: string;
-  feedName: string;
-  sourceLabel: string;
-  sourceMode: SourceMode;
-}
-
 interface DashboardSetupDialogsProps {
   setupStep: SetupStep;
   setSetupStep: (step: SetupStep) => void;
   handleDialogOpenChange: (open: boolean) => void;
   handleSourceStepSubmit: FormEventHandler<HTMLFormElement>;
-  preparedSourceCount: number;
   feedName: string;
   setFeedName: Dispatch<SetStateAction<string>>;
   sourceMode: SourceMode;
@@ -71,16 +62,6 @@ interface DashboardSetupDialogsProps {
   handleRemoveQueuedLocalFile: (fileKey: string) => void;
   feedSource: string;
   setFeedSource: Dispatch<SetStateAction<string>>;
-  rtspUsername: string;
-  setRtspUsername: Dispatch<SetStateAction<string>>;
-  rtspPassword: string;
-  setRtspPassword: Dispatch<SetStateAction<string>>;
-  rtspTransport: RTSPTransport;
-  setRtspTransport: Dispatch<SetStateAction<RTSPTransport>>;
-  rtspTestResult: RTSPConnectionTestResult | null;
-  setRtspTestResult: Dispatch<SetStateAction<RTSPConnectionTestResult | null>>;
-  isTestingRtsp: boolean;
-  handleTestRtsp: () => void;
   handleDiscoverOnvif: () => void;
   isDiscoveringOnvif: boolean;
   onvifDevices: ONVIFDevice[];
@@ -109,9 +90,7 @@ interface DashboardSetupDialogsProps {
   setOnvifStreams: Dispatch<SetStateAction<ONVIFStream[]>>;
   onvifTestResult: ONVIFCameraTestResult | null;
   setOnvifTestResult: Dispatch<SetStateAction<ONVIFCameraTestResult | null>>;
-  stagedSourceSummaries: StagedSourceSummary[];
   preparedLocalFileDrafts: StagedFeedDraft[];
-  remainingSourceSlots: number;
   canContinueSourceStep: boolean;
   isTestingCameraSource: boolean;
   resetSetupFlow: () => void;
@@ -155,7 +134,6 @@ interface DashboardSetupDialogsProps {
   handleEditStagedFeed: (clientId: string) => void;
   handleFinalizeBatch: (launchAfterCreate: boolean) => void;
   handleRemoveStagedFeed: (clientId: string) => void;
-  handleStageCurrentDraft: () => void;
   batchWebhookEnabled: boolean;
   setBatchWebhookEnabled: Dispatch<SetStateAction<boolean>>;
   isCreateEstablishmentDialogOpen: boolean;
@@ -176,7 +154,6 @@ export function DashboardSetupDialogs({
   setSetupStep,
   handleDialogOpenChange,
   handleSourceStepSubmit,
-  preparedSourceCount,
   feedName,
   setFeedName,
   sourceMode,
@@ -191,16 +168,6 @@ export function DashboardSetupDialogs({
   handleRemoveQueuedLocalFile,
   feedSource,
   setFeedSource,
-  rtspUsername,
-  setRtspUsername,
-  rtspPassword,
-  setRtspPassword,
-  rtspTransport,
-  setRtspTransport,
-  rtspTestResult,
-  setRtspTestResult,
-  isTestingRtsp,
-  handleTestRtsp,
   handleDiscoverOnvif,
   isDiscoveringOnvif,
   onvifDevices,
@@ -229,9 +196,7 @@ export function DashboardSetupDialogs({
   setOnvifStreams,
   onvifTestResult,
   setOnvifTestResult,
-  stagedSourceSummaries,
   preparedLocalFileDrafts,
-  remainingSourceSlots,
   canContinueSourceStep,
   isTestingCameraSource,
   resetSetupFlow,
@@ -275,7 +240,6 @@ export function DashboardSetupDialogs({
   handleEditStagedFeed,
   handleFinalizeBatch,
   handleRemoveStagedFeed,
-  handleStageCurrentDraft,
   batchWebhookEnabled,
   setBatchWebhookEnabled,
   isCreateEstablishmentDialogOpen,
@@ -314,9 +278,8 @@ export function DashboardSetupDialogs({
             <Tabs className="space-y-4" onValueChange={(value) => handleSourceModeChange(value as SourceMode)} value={sourceMode}>
               <div className="space-y-2">
                 <span className="text-sm font-medium text-foreground">Source type</span>
-                <TabsList className="grid h-auto w-full grid-cols-3 gap-1 bg-muted/60 p-1">
+                <TabsList className="grid h-auto w-full grid-cols-2 gap-1 bg-muted/60 p-1">
                   <TabsTrigger className="py-2" value="file">Local MP4</TabsTrigger>
-                  <TabsTrigger className="py-2" value="rtsp">RTSP Camera</TabsTrigger>
                   <TabsTrigger className="py-2" value="onvif">ONVIF Discovery</TabsTrigger>
                 </TabsList>
               </div>
@@ -353,78 +316,6 @@ export function DashboardSetupDialogs({
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">{getFileLabel(uploadedFile)}</p>
                     </div>
-                  )}
-                </div>
-              </TabsContent>
-
-              <TabsContent className="mt-0" value="rtsp">
-                <div className="space-y-4 rounded-xl border border-border bg-background/40 p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-lg bg-primary/10 p-2 text-primary"><Camera className="h-5 w-5" /></div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Manual RTSP onboarding</p>
-                      <p className="text-xs text-muted-foreground">Match the desktop GUI flow by validating the camera URL, credentials, and transport before the feed is registered.</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-foreground" htmlFor="feed-source">RTSP URL</Label>
-                    <Input
-                      id="feed-source"
-                      onChange={(event) => {
-                        setFeedSource(event.target.value);
-                        setRtspTestResult(null);
-                      }}
-                      placeholder="rtsp://192.168.1.10:554/live/main"
-                      required={sourceMode === "rtsp"}
-                      value={feedSource}
-                    />
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label className="text-foreground" htmlFor="rtsp-username">Username</Label>
-                      <Input id="rtsp-username" onChange={(event) => { setRtspUsername(event.target.value); setRtspTestResult(null); }} placeholder="admin" value={rtspUsername} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-foreground" htmlFor="rtsp-password">Password</Label>
-                      <Input id="rtsp-password" onChange={(event) => { setRtspPassword(event.target.value); setRtspTestResult(null); }} placeholder="Optional" type="password" value={rtspPassword} />
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-                    <div className="space-y-2">
-                      <Label className="text-foreground">Transport</Label>
-                      <Select onValueChange={(value) => { setRtspTransport(value as RTSPTransport); setRtspTestResult(null); }} value={rtspTransport}>
-                        <SelectTrigger><SelectValue placeholder="Select RTSP transport" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="tcp">TCP</SelectItem>
-                          <SelectItem value="udp">UDP</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button onClick={handleTestRtsp} type="button" variant="outline" disabled={isTestingRtsp}>
-                      {isTestingRtsp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                      Test Connection
-                    </Button>
-                  </div>
-
-                  {rtspTestResult ? (
-                    <div className={`rounded-lg border p-3 ${rtspTestResult.connected ? "border-emerald-500/40 bg-emerald-500/10" : "border-destructive/40 bg-destructive/10"}`}>
-                      <div className="flex items-start gap-2">
-                        {rtspTestResult.connected ? <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-400" /> : <AlertTriangle className="mt-0.5 h-4 w-4 text-destructive" />}
-                        <div className="space-y-1 text-sm">
-                          <p className="font-medium text-foreground">{rtspTestResult.connected ? "Connection successful" : "Connection failed"}</p>
-                          {rtspTestResult.connected ? (
-                            <p className="text-muted-foreground">{formatResolution(rtspTestResult)} at {(rtspTestResult.fps ?? 0).toFixed(1)} FPS via {rtspTestResult.transport.toUpperCase()}.</p>
-                          ) : (
-                            <p className="text-muted-foreground">{rtspTestResult.error ?? "The backend could not open this RTSP stream."}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">Run the RTSP test before continuing. This keeps the web onboarding flow aligned with the desktop GUI.</p>
                   )}
                 </div>
               </TabsContent>
@@ -524,7 +415,7 @@ export function DashboardSetupDialogs({
                     <div className="space-y-2">
                       <Label className="text-foreground">Transport</Label>
                       <Select onValueChange={(value) => { setOnvifTransport(value as RTSPTransport); setOnvifTestResult(null); }} value={onvifTransport}>
-                        <SelectTrigger><SelectValue placeholder="Select RTSP transport" /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder="Select transport" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="tcp">TCP</SelectItem>
                           <SelectItem value="udp">UDP</SelectItem>
@@ -571,7 +462,7 @@ export function DashboardSetupDialogs({
                       </div>
                     </div>
                   ) : (
-                    <p className="text-xs text-muted-foreground">Resolve streams to inspect available RTSP URLs, then run the ONVIF camera test before continuing.</p>
+                    <p className="text-xs text-muted-foreground">Resolve streams to inspect the available camera URLs, then run the ONVIF camera test before continuing.</p>
                   )}
                 </div>
               </TabsContent>
@@ -580,58 +471,10 @@ export function DashboardSetupDialogs({
             <div className="rounded-lg border border-border bg-background/50 p-3 text-xs text-muted-foreground">
               {sourceMode === "file"
                 ? "Step 1 uploads the source file into the backend workflow. Step 2 lets you draw the queue polygon on the video frame. Step 3 selects the model size."
-                : sourceMode === "rtsp"
-                  ? "Manual RTSP now mirrors the GUI preflight workflow: provide credentials, choose transport, validate the stream, capture a camera snapshot, define the queue polygon, then continue to model selection."
-                  : "ONVIF onboarding now covers device discovery, stream resolution, backend camera testing, and snapshot-based zone selection before model choice."}
+                : "ONVIF onboarding now covers device discovery, stream resolution, backend camera testing, and snapshot-based zone selection before model choice."}
             </div>
 
-            {(stagedSourceSummaries.length > 0 || preparedLocalFileDrafts.length > 0) && (
-              <div className="space-y-3 rounded-xl border border-border bg-background/40 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Configured sources</p>
-                    <p className="text-xs text-muted-foreground">These are the sources currently prepared for zone tracing, model assignment, and review.</p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">{preparedSourceCount} prepared</Badge>
-                    <Badge variant="outline">{remainingSourceSlots} remaining</Badge>
-                  </div>
-                </div>
-
-                <div className="grid gap-2">
-                  {stagedSourceSummaries.map((draft) => (
-                    <div key={draft.clientId} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 p-3">
-                      <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium text-foreground">{draft.feedName}</p>
-                        <p className="truncate text-xs text-muted-foreground">{draft.sourceLabel}</p>
-                      </div>
-                      <Badge variant="outline">{draft.sourceMode === "file" ? "Video" : draft.sourceMode === "onvif" ? "ONVIF" : "RTSP"}</Badge>
-                    </div>
-                  ))}
-                  {preparedLocalFileDrafts.map((draft) => (
-                    <div key={draft.clientId} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 p-3">
-                      <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium text-foreground">{draft.feedName}</p>
-                        <p className="truncate text-xs text-muted-foreground">{draft.uploadedFile?.name ?? "Selected local video"}</p>
-                      </div>
-                      <Badge variant="outline">YOLO {draft.modelSize.toUpperCase()}</Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <div className="space-y-3 rounded-xl border border-border bg-background/40 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Selected source</p>
-                  <p className="text-xs text-muted-foreground">This is the active source you are building before you continue to zone tracing.</p>
-                </div>
-                <Badge variant="outline">
-                  {sourceMode === "file" ? (uploadedFile ? "1 video" : "0 videos") : sourceMode === "rtsp" ? `${feedSource.trim() ? 1 : 0} stream` : selectedOnvifDevice ? "1 camera" : "0 cameras"}
-                </Badge>
-              </div>
-
               <div className="grid gap-2">
                 {sourceMode === "file" ? (
                   uploadedFile ? (
@@ -645,20 +488,6 @@ export function DashboardSetupDialogs({
                   ) : (
                     <div className="rounded-lg border border-dashed border-border bg-background/50 p-3 text-xs text-muted-foreground">
                       Pick one local video to see it listed here.
-                    </div>
-                  )
-                ) : sourceMode === "rtsp" ? (
-                  feedSource.trim() ? (
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background/50 p-3">
-                      <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium text-foreground">Selected RTSP stream</p>
-                        <p className="truncate text-xs text-muted-foreground">{feedSource.trim()}</p>
-                      </div>
-                      <Badge variant="outline">Stream</Badge>
-                    </div>
-                  ) : (
-                    <div className="rounded-lg border border-dashed border-border bg-background/50 p-3 text-xs text-muted-foreground">
-                      Enter an RTSP URL to see the selected stream here.
                     </div>
                   )
                 ) : selectedOnvifDevice ? (
@@ -811,11 +640,8 @@ export function DashboardSetupDialogs({
         onLogLevelChange={setBatchLogLevel}
         onOpenChange={handleDialogOpenChange}
         onRemoveItem={handleRemoveStagedFeed}
-        onSave={() => void handleFinalizeBatch(false)}
-        onStageCurrent={() => void handleStageCurrentDraft()}
         onWebhookEnabledChange={setBatchWebhookEnabled}
         open={setupStep === "review"}
-        stageButtonLabel="Add Current Source"
         webhookEnabled={batchWebhookEnabled}
       />
 

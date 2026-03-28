@@ -10,12 +10,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { ModelSize } from "@/lib/api";
+import type { SourceMode } from "@/lib/dashboard-setup";
 import { cn } from "@/lib/utils";
 
 interface ModelSelectionDialogProps {
   open: boolean;
   feedName: string;
-  sourceMode: "rtsp" | "file" | "onvif";
+  sourceMode: SourceMode;
   zonePointCount: number;
   establishmentName?: string | null;
   caisseName?: string | null;
@@ -100,7 +101,7 @@ export function ModelSelectionDialog({
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground/70">Source Type</p>
               <p className="mt-1 font-medium text-foreground">
-                {sourceMode === "file" ? "Uploaded video" : sourceMode === "onvif" ? "ONVIF camera" : "RTSP camera"}
+                {sourceMode === "file" ? "Uploaded video" : "ONVIF camera"}
               </p>
             </div>
             <div>

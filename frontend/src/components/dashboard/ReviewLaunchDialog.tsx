@@ -1,4 +1,4 @@
-import { Camera, Pencil, Play, Save, Store, Trash2, Video } from "lucide-react";
+import { Camera, Pencil, Play, Store, Trash2, Video } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,11 +14,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import type { LogLevel, ModelSize } from "@/lib/api";
+import type { SourceMode } from "@/lib/dashboard-setup";
 
 export interface ReviewLaunchItem {
   clientId: string;
   feedName: string;
-  sourceMode: "rtsp" | "file" | "onvif";
+  sourceMode: SourceMode;
   sourceLabel: string;
   sourceDetail: string;
   modelSize: ModelSize;
@@ -36,14 +37,11 @@ interface ReviewLaunchDialogProps {
   logLevel: LogLevel;
   webhookEnabled: boolean;
   isSubmitting: boolean;
-  stageButtonLabel?: string;
   onBack: () => void;
   onLogLevelChange: (value: LogLevel) => void;
   onWebhookEnabledChange: (enabled: boolean) => void;
-  onStageCurrent?: () => void;
   onEditItem: (clientId: string) => void;
   onRemoveItem: (clientId: string) => void;
-  onSave: () => void;
   onLaunch: () => void;
   onOpenChange: (open: boolean) => void;
 }
@@ -52,10 +50,7 @@ function getSourceModeLabel(sourceMode: ReviewLaunchItem["sourceMode"]): string 
   if (sourceMode === "file") {
     return "Uploaded video";
   }
-  if (sourceMode === "onvif") {
-    return "ONVIF camera";
-  }
-  return "RTSP camera";
+  return "ONVIF camera";
 }
 
 export function ReviewLaunchDialog({
@@ -65,14 +60,11 @@ export function ReviewLaunchDialog({
   logLevel,
   webhookEnabled,
   isSubmitting,
-  stageButtonLabel = "Add To Batch",
   onBack,
   onLogLevelChange,
   onWebhookEnabledChange,
-  onStageCurrent,
   onEditItem,
   onRemoveItem,
-  onSave,
   onLaunch,
   onOpenChange,
 }: ReviewLaunchDialogProps) {
@@ -86,7 +78,7 @@ export function ReviewLaunchDialog({
         <DialogHeader>
           <DialogTitle className="text-foreground">Review and Launch</DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Review the staged sources, edit or remove individual drafts, then save or launch the full batch from one place.
+            Review the staged sources, edit or remove individual drafts, then launch the full batch from one place.
           </DialogDescription>
         </DialogHeader>
 
@@ -258,11 +250,11 @@ export function ReviewLaunchDialog({
           </div>
 
           <div className="rounded-lg border border-border bg-background/50 p-3 text-xs text-muted-foreground">
-            Saving keeps every batch item in the dashboard with status `created`. Launching immediately creates each feed and then starts its analysis worker, matching the desktop multi-source review step more closely.
+            Launching creates each feed and then starts its analysis worker, matching the desktop multi-source review step more closely.
           </div>
           {!canSubmitBatch && (
             <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-100">
-              Add at least one staged source before saving or launching the batch.
+              Add at least one staged source before launching the batch.
             </div>
           )}
         </div>
@@ -270,16 +262,6 @@ export function ReviewLaunchDialog({
         <DialogFooter>
           <Button onClick={onBack} type="button" variant="outline" disabled={isSubmitting}>
             Back
-          </Button>
-          {onStageCurrent && currentDraft && (
-            <Button onClick={onStageCurrent} type="button" variant="outline" disabled={isSubmitting}>
-              <Save className="mr-2 h-4 w-4" />
-              {stageButtonLabel}
-            </Button>
-          )}
-          <Button onClick={onSave} type="button" variant="outline" disabled={isSubmitting || !canSubmitBatch || items.length === 0}>
-            <Save className="mr-2 h-4 w-4" />
-            {isSubmitting ? "Saving..." : "Save Batch"}
           </Button>
           <Button onClick={onLaunch} type="button" disabled={isSubmitting || !canSubmitBatch || items.length === 0}>
             <Play className="mr-2 h-4 w-4" />

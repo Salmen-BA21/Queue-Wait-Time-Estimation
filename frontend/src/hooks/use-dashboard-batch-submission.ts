@@ -84,24 +84,9 @@ async function prepareBatchFeeds(drafts: StagedFeedDraft[]): Promise<ApiBatchFee
       establishment_id: draft.establishmentId,
       caisse_id: draft.caisseId,
       zone: draft.zonePoints.length >= 3 ? { points: draft.zonePoints } : null,
-      rtsp_username:
-        draft.sourceMode === "rtsp"
-          ? draft.rtspUsername.trim() || null
-          : draft.sourceMode === "onvif"
-            ? draft.onvifUsername.trim() || null
-            : null,
-      rtsp_password:
-        draft.sourceMode === "rtsp"
-          ? draft.rtspPassword.trim() || null
-          : draft.sourceMode === "onvif"
-            ? draft.onvifPassword.trim() || null
-            : null,
-      rtsp_transport:
-        draft.sourceMode === "rtsp"
-          ? draft.rtspTransport
-          : draft.sourceMode === "onvif"
-            ? draft.onvifTransport
-            : null,
+        rtsp_username: draft.sourceMode === "onvif" ? draft.onvifUsername.trim() || null : null,
+        rtsp_password: draft.sourceMode === "onvif" ? draft.onvifPassword.trim() || null : null,
+        rtsp_transport: draft.sourceMode === "onvif" ? draft.onvifTransport : null,
     });
   }
 

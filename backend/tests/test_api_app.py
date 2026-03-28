@@ -17,7 +17,7 @@ from pydantic import ValidationError
 from backend.app import app
 from src import database
 from src.api.models import AlertModel, BatchFeedDraft, BatchFeedLaunchRequest, QueueMetricsModel, ZonePolygon
-from src.api.runtime import FeedRegistry, FeedStartError, FeedWorkerHandle, WebSocketHub
+from src.api.runtime import FeedRegistry, FeedStartError, FeedWorkerHandle, SubprocessFeedWorkerRunner, WebSocketHub
 
 
 class FakeWorkerRunner:
@@ -422,6 +422,40 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertEqual(started["rtsp_username"], "operator")
         self.assertEqual(started["rtsp_password"], "topsecret")
         self.assertEqual(started["rtsp_transport"], "udp")
+
+    def test_batch_launch_serializes_zone_and_rtsp_credentials(self) -> None:
+        zone = ZonePolygon.model_validate(
+            {
+                "points": [
+                    {"x": 0.1, "y": 0.2},
+                    {"x": 0.7, "y": 0.2},
+                    {"x": 0.7, "y": 0.8},
+                ]
+            }
+        )
+        feed = asyncio.run(
+            app.state.registry.create_feed(
+                name="Zoned Secure Camera",
+                source="rtsp://192.168.1.95/live/main",
+                zone=zone,
+                rtsp_username="viewer",
+                rtsp_password="secret",
+                rtsp_transport="udp",
+            )
+        )
+
+        record = app.state.registry._feeds[feed.feed_id]
+        runner = SubprocessFeedWorkerRunner()
+
+        command = runner._build_command(record, Path("dummy.events.jsonl"))
+
+        self.assertIn("--zone-points", command)
+        self.assertIn("--rtsp-user", command)
+        self.assertIn("viewer", command)
+        self.assertIn("--rtsp-pass", command)
+        self.assertIn("secret", command)
+        self.assertIn("--rtsp-transport", command)
+        self.assertIn("udp", command)
 
     def test_feed_snapshot_uses_saved_rtsp_credentials(self) -> None:
         response = self.client.post(

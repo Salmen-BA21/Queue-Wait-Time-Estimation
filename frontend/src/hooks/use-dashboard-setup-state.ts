@@ -86,10 +86,6 @@ export function useDashboardSetupState({
       return uploadedFile !== null;
     }
 
-    if (sourceMode === "rtsp") {
-      return feedSource.trim().length > 0 && rtspTestResult?.connected === true;
-    }
-
     return Boolean(selectedOnvifDeviceKeys.length === 1 && selectedOnvifDevice && feedSource.trim() && onvifTestResult?.connected);
   }, [feedName, feedSource, onvifTestResult, rtspTestResult, selectedOnvifDevice, selectedOnvifDeviceKeys.length, sourceMode, uploadedFile]);
 
@@ -139,18 +135,9 @@ export function useDashboardSetupState({
       setFeedName(nextFileConfig?.feedName ?? suggestedFeedName);
     }
 
-    if (preserveSourceMode && sourceMode === "rtsp") {
-      setRtspTestResult(null);
-      setIsTestingRtsp(false);
-    } else {
-      resetRtspState();
-    }
+    resetRtspState();
 
     if (preserveOnvifDiscovery) {
-      setSelectedOnvifDeviceKeys([]);
-      setOnvifDeviceCredentials({});
-      setOnvifStreams([]);
-      setOnvifTestResult(null);
       setIsDiscoveringOnvif(false);
       setIsResolvingOnvifStreams(false);
       setIsTestingOnvif(false);

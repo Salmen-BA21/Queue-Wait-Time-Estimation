@@ -9,7 +9,7 @@ import type {
 } from "@/lib/api";
 
 export type SetupStep = "source" | "zone" | "model" | "review" | null;
-export type SourceMode = "rtsp" | "file" | "onvif";
+export type SourceMode = "file" | "onvif";
 export type FeedAction = "start" | "stop" | "restart" | "delete";
 
 export interface StagedFeedDraft {
@@ -96,7 +96,7 @@ export function getDraftSourceLabel(draft: StagedFeedDraft): string {
     return device ? `${device.name} (${device.ip})` : draft.source || "No ONVIF camera selected";
   }
 
-  return draft.source.trim() || "No RTSP URL provided";
+  return draft.source.trim() || "Resolve a stream from the selected ONVIF camera";
 }
 
 export function getDraftSourceDetail(draft: StagedFeedDraft): string {
@@ -104,13 +104,6 @@ export function getDraftSourceDetail(draft: StagedFeedDraft): string {
     return draft.uploadedFile
       ? `The file will be uploaded to the backend and the ${draft.zonePoints.length}-point queue zone will be saved before launch.`
       : "Choose a local video file before reviewing the configuration.";
-  }
-
-  if (draft.sourceMode === "rtsp") {
-    if (draft.rtspTestResult?.connected) {
-      return `${formatResolution(draft.rtspTestResult)} at ${(draft.rtspTestResult.fps ?? 0).toFixed(1)} FPS via ${draft.rtspTransport.toUpperCase()}.`;
-    }
-    return `Manual RTSP source using ${draft.rtspTransport.toUpperCase()} transport.`;
   }
 
   if (draft.onvifTestResult?.connected) {

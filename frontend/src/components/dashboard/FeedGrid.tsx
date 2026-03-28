@@ -369,7 +369,7 @@ function FeedGridComponent({
           <Camera className="mx-auto h-10 w-10 text-primary/50" />
           <p className="mt-3 text-sm font-medium text-foreground">No feeds configured yet</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Upload an MP4, validate an RTSP camera, or discover an ONVIF source to start the queue workflow.
+            Upload an MP4 or discover an ONVIF source to start the queue workflow.
           </p>
         </div>
       )}
