@@ -116,6 +116,28 @@ The migration is additive and keeps existing flows intact.
 - `/ws/metrics` contract is unchanged.
 - Existing feed CRUD/start/stop/restart APIs are unchanged.
 
+## Low-Latency Tuning (Implemented)
+
+To reduce web overlay delay and make tracking feel closer to GUI behavior, event cadence was increased:
+
+- Worker dashboard event emit interval:
+  - from `1.0s` to `0.1s`
+  - constant: `DASHBOARD_EVENT_EMIT_INTERVAL_SEC` in `backend/src/config.py`
+- API runtime event-file poll interval:
+  - from `0.25s` to `0.05s`
+  - constant: `DASHBOARD_EVENT_POLL_INTERVAL_SEC` in `backend/src/config.py`
+
+Effect:
+
+- Faster propagation of `metrics_update` events (including `detections`) to `/ws/metrics`.
+- Lower visual lag between MJPEG video frames and detection overlays in the dashboard.
+
+Changed files for this tuning:
+
+- `backend/src/config.py`
+- `backend/src/main.py`
+- `backend/src/api/runtime.py`
+
 ## Validation Run
 
 Validated during implementation:

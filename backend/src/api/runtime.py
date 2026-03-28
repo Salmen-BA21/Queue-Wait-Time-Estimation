@@ -54,6 +54,7 @@ from src.database import (
     upsert_feed_config,
     update_caisse_zone_points,
 )
+from src.config import DASHBOARD_EVENT_POLL_INTERVAL_SEC
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -1499,7 +1500,7 @@ class FeedRegistry:
             await self._drain_worker_events(feed_id, handle)
             exit_code = await asyncio.to_thread(self._runner.poll, handle)
             if exit_code is None:
-                await asyncio.sleep(0.25)
+                await asyncio.sleep(DASHBOARD_EVENT_POLL_INTERVAL_SEC)
                 continue
 
             await self._drain_worker_events(feed_id, handle)

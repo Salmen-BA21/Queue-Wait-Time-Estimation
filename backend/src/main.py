@@ -25,6 +25,7 @@ from src.config import (
     AppConfig,
     DEFAULT_LOG_INTERVAL_SEC,
     DEFAULT_OUTPUT_FPS,
+    DASHBOARD_EVENT_EMIT_INTERVAL_SEC,
     WINDOW_NAME,
     N8N_WEBHOOK_URL,
     WEBHOOK_ENABLED,
@@ -328,7 +329,7 @@ def run(cfg: AppConfig) -> None:
 
             # 7. Periodic logging & webhook sending
             now = time.monotonic()
-            if (now - last_dashboard_event_time) >= 1.0:
+            if (now - last_dashboard_event_time) >= DASHBOARD_EVENT_EMIT_INTERVAL_SEC:
                 event_writer.emit(
                     "metrics_update",
                     {"metrics": _dashboard_metrics_payload(metrics, event_timestamp, detections)},

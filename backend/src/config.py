@@ -54,6 +54,11 @@ MIN_EVENTS_FOR_RATE: int = 2       # min events to compute a rate
 DEFAULT_OUTPUT_FPS: int = 0
 DEFAULT_LOG_INTERVAL_SEC: float = 5.0
 WINDOW_NAME: str = "Queue Estimation"
+# Dashboard low-latency controls
+# Emit metrics/update events frequently so web overlays track detections closely.
+DASHBOARD_EVENT_EMIT_INTERVAL_SEC: float = 0.1
+# API runtime tailing interval for worker event files.
+DASHBOARD_EVENT_POLL_INTERVAL_SEC: float = 0.05
 
 
 # ─── RTSP Camera ──────────────────────────────────────────────
