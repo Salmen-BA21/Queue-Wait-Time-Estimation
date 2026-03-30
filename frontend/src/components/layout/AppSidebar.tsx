@@ -1,4 +1,4 @@
-import { LayoutDashboard, BarChart3, PenTool, Settings, Eye } from "lucide-react";
+import { LayoutDashboard, Settings, Eye } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -16,8 +16,6 @@ import {
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Analytics", url: "/analytics", icon: BarChart3 },
-  { title: "Zone Editor", url: "/zones", icon: PenTool },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 

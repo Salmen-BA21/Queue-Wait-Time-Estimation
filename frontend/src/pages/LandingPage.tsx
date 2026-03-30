@@ -78,9 +78,6 @@ export default function LandingPage() {
             <Button size="lg" onClick={() => navigate("/dashboard")} className="glow-cyan">
               Launch Dashboard <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
-            <Button variant="outline" size="lg" onClick={() => navigate("/analytics")}>
-              View Analytics
-            </Button>
           </div>
         </div>
 
