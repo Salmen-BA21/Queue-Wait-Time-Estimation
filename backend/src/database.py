@@ -94,6 +94,31 @@ def _create_current_schema(cursor: sqlite3.Cursor) -> None:
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS alert_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            camera_id TEXT,
+            zone_id TEXT,
+            alert_type TEXT,
+            severity TEXT,
+            message TEXT,
+            value REAL,
+            threshold REAL,
+            people_in_zone INTEGER,
+            arrival_rate REAL,
+            service_rate REAL,
+            wait_time_seconds REAL,
+            queue_stable INTEGER,
+            uncertainty_level TEXT,
+            raw_detection_count INTEGER,
+            fps REAL,
+            alerts_count INTEGER,
+            payload_json TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
 
 def _migrate_feed_configs_schema(cursor: sqlite3.Cursor) -> None:
     """Add newly required feed config columns for existing databases."""
@@ -567,6 +592,122 @@ def delete_feed_config(feed_id: str) -> None:
     try:
         cursor.execute("DELETE FROM feed_configs WHERE feed_id = ?", (feed_id,))
         conn.commit()
+    finally:
+        conn.close()
+
+
+# ============================================================================
+# ALERT HISTORY OPERATIONS
+# ============================================================================
+
+def archive_alert_payload(payload: Dict[str, Any]) -> int:
+    """Persist an incoming queue alert payload as one row per alert."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        metrics = payload.get("metrics") or {}
+        uncertainty = payload.get("uncertainty") or {}
+        alerts = payload.get("alerts") or []
+        serialized_payload = json.dumps(payload, default=str)
+        rows_inserted = 0
+
+        if not alerts:
+            cursor.execute(
+                """
+                INSERT INTO alert_history (
+                    timestamp,
+                    camera_id,
+                    zone_id,
+                    alert_type,
+                    severity,
+                    message,
+                    value,
+                    threshold,
+                    people_in_zone,
+                    arrival_rate,
+                    service_rate,
+                    wait_time_seconds,
+                    queue_stable,
+                    uncertainty_level,
+                    raw_detection_count,
+                    fps,
+                    alerts_count,
+                    payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    payload.get("timestamp"),
+                    payload.get("camera_id"),
+                    payload.get("zone_id"),
+                    payload.get("alert_type"),
+                    payload.get("alert_severity") or payload.get("severity"),
+                    payload.get("alert_reason") or payload.get("message"),
+                    payload.get("alert_value") or payload.get("value"),
+                    payload.get("alert_threshold") or payload.get("threshold"),
+                    metrics.get("people_in_zone"),
+                    metrics.get("arrival_rate"),
+                    metrics.get("service_rate"),
+                    metrics.get("wait_time_seconds"),
+                    int(bool(metrics.get("queue_stable", True))),
+                    uncertainty.get("level"),
+                    payload.get("raw_detection_count"),
+                    payload.get("fps"),
+                    0,
+                    serialized_payload,
+                ),
+            )
+            conn.commit()
+            return 1
+
+        for alert in alerts:
+            cursor.execute(
+                """
+                INSERT INTO alert_history (
+                    timestamp,
+                    camera_id,
+                    zone_id,
+                    alert_type,
+                    severity,
+                    message,
+                    value,
+                    threshold,
+                    people_in_zone,
+                    arrival_rate,
+                    service_rate,
+                    wait_time_seconds,
+                    queue_stable,
+                    uncertainty_level,
+                    raw_detection_count,
+                    fps,
+                    alerts_count,
+                    payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    payload.get("timestamp"),
+                    payload.get("camera_id"),
+                    payload.get("zone_id"),
+                    alert.get("type"),
+                    alert.get("severity"),
+                    alert.get("message"),
+                    alert.get("value"),
+                    alert.get("threshold"),
+                    metrics.get("people_in_zone"),
+                    metrics.get("arrival_rate"),
+                    metrics.get("service_rate"),
+                    metrics.get("wait_time_seconds"),
+                    int(bool(metrics.get("queue_stable", True))),
+                    uncertainty.get("level"),
+                    payload.get("raw_detection_count"),
+                    payload.get("fps"),
+                    len(alerts),
+                    serialized_payload,
+                ),
+            )
+            rows_inserted += 1
+
+        conn.commit()
+        return rows_inserted
     finally:
         conn.close()
 

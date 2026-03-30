@@ -28,6 +28,8 @@ from src.api.models import (
     Establishment,
     FeedSnapshotResult,
     FeedSnapshotEvent,
+    QueueAlertArchiveRequest,
+    QueueAlertArchiveResponse,
     ONVIFCameraTestRequest,
     ONVIFCameraTestResult,
     ONVIFDevice,
@@ -47,6 +49,7 @@ from src.api.models import (
 )
 from src.api.runtime import FeedRegistry, FeedStartError, FeedStateError, WebSocketHub
 from src.database import (
+    archive_alert_payload,
     create_caisse,
     create_establishment,
     get_caisse_by_id,
@@ -453,6 +456,27 @@ async def test_onvif_camera(
     return ApiResponse(
         data=result,
         message="ONVIF camera test successful." if ok else "ONVIF camera test failed.",
+    )
+
+
+@app.post("/api/alerts/archive", response_model=ApiResponse[QueueAlertArchiveResponse])
+async def archive_queue_alerts(request: QueueAlertArchiveRequest) -> ApiResponse[QueueAlertArchiveResponse]:
+    try:
+        archived_alerts = await asyncio.to_thread(
+            archive_alert_payload,
+            request.model_dump(mode="python"),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to archive alert payload: {exc}") from exc
+
+    return ApiResponse(
+        data=QueueAlertArchiveResponse(
+            archived_alerts=archived_alerts,
+            camera_id=request.camera_id,
+            zone_id=request.zone_id,
+            timestamp=request.timestamp,
+        ),
+        message="Alert payload archived successfully.",
     )
 
 

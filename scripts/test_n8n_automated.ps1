@@ -6,6 +6,10 @@ param(
     [string]$AlertSeverity = "warning",
     [string]$AlertReason = "High queue length: 16 people (warning: 8)",
     [int]$PeopleInZone = 16,
+    [string]$CameraId = "cam_01",
+    [string]$ZoneId = "checkout_lane_3",
+    [string]$FeedId = "cashier_1",
+    [bool]$ForceTelegram = $false,
     [int]$TimeoutSeconds = 60,
     [int]$PollIntervalSeconds = 3,
     [bool]$IncludeSecret = $true
@@ -31,6 +35,7 @@ $sendStartedAt = Get-Date
 Write-Host "Running automated n8n test against: $N8nBaseUrl"
 Write-Host "Webhook path: $WebhookPath"
 Write-Host "Polling timeout: $TimeoutSeconds seconds"
+Write-Host "Force Telegram: $ForceTelegram"
 
 try {
     & $sendScript `
@@ -40,6 +45,10 @@ try {
         -AlertSeverity $AlertSeverity `
         -AlertReason $AlertReason `
         -PeopleInZone $PeopleInZone `
+        -CameraId $CameraId `
+        -ZoneId $ZoneId `
+        -FeedId $FeedId `
+        -ForceTelegram:$ForceTelegram `
         -IncludeSecret:$IncludeSecret
 } catch {
     throw "Webhook post failed: $($_.Exception.Message)"

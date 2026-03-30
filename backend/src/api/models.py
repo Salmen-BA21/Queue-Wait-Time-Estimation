@@ -28,6 +28,57 @@ class ApiResponse(BaseModel, Generic[T]):
     message: str | None = None
 
 
+class QueueAlertItem(BaseModel):
+    """Single alert emitted by the queue analysis pipeline."""
+
+    type: str
+    severity: str
+    message: str
+    value: float | None = None
+    threshold: float | None = None
+
+
+class QueueAlertMetrics(BaseModel):
+    """Metrics snapshot associated with an archived alert payload."""
+
+    people_in_zone: int = Field(ge=0)
+    arrival_rate: float = Field(ge=0.0)
+    service_rate: float = Field(ge=0.0)
+    wait_time_seconds: float = Field(ge=0.0)
+    queue_stable: bool
+
+
+class QueueAlertUncertainty(BaseModel):
+    """Uncertainty summary attached to an archived alert payload."""
+
+    lambda_ci: list[float] | None = None
+    mu_ci: list[float] | None = None
+    wait_time_ci: list[float] | None = None
+    level: str | None = None
+
+
+class QueueAlertArchiveRequest(BaseModel):
+    """Payload archived from the n8n workflow for later analysis."""
+
+    timestamp: datetime
+    camera_id: str = Field(min_length=1, max_length=120)
+    zone_id: str = Field(min_length=1, max_length=120)
+    metrics: QueueAlertMetrics
+    uncertainty: QueueAlertUncertainty | None = None
+    alerts: list[QueueAlertItem] = Field(default_factory=list)
+    raw_detection_count: int | None = Field(default=None, ge=0)
+    fps: float | None = Field(default=None, ge=0.0)
+
+
+class QueueAlertArchiveResponse(BaseModel):
+    """Response returned after persisting an alert archive payload."""
+
+    archived_alerts: int = Field(ge=0)
+    camera_id: str
+    zone_id: str
+    timestamp: datetime
+
+
 class UploadVideoResponse(BaseModel):
     """Location of a video uploaded through the dashboard."""
 

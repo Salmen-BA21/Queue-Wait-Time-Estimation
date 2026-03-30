@@ -110,6 +110,7 @@ class TestQueueVisionApi(unittest.TestCase):
         conn = database.get_connection()
         try:
             cursor = conn.cursor()
+            cursor.execute("DELETE FROM alert_history")
             cursor.execute("DELETE FROM video_sessions")
             cursor.execute("DELETE FROM feed_configs")
             cursor.execute("DELETE FROM caisses")
@@ -228,6 +229,73 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertEqual(feed["caisse_id"], caisse["id"])
         self.assertIsNotNone(feed["zone"])
         self.assertEqual(len(feed["zone"]["points"]), 3)
+
+    def test_archive_queue_alerts_persists_one_row_per_alert(self) -> None:
+        response = self.client.post(
+            "/api/alerts/archive",
+            json={
+                "timestamp": "2026-03-05T14:32:10.123Z",
+                "camera_id": "cam_01",
+                "zone_id": "checkout_lane_3",
+                "metrics": {
+                    "people_in_zone": 16,
+                    "arrival_rate": 0.15,
+                    "service_rate": 0.16,
+                    "wait_time_seconds": 137.4,
+                    "queue_stable": False,
+                },
+                "uncertainty": {
+                    "lambda_ci": [0.10, 0.22],
+                    "mu_ci": [0.11, 0.23],
+                    "wait_time_ci": [110.0, 165.0],
+                    "level": "LOW",
+                },
+                "alerts": [
+                    {
+                        "type": "WAIT_TIME_CRITICAL",
+                        "severity": "critical",
+                        "message": "Wait time exceeded 120s threshold",
+                        "value": 137.4,
+                        "threshold": 120,
+                    },
+                    {
+                        "type": "QUEUE_BACKLOG_CRITICAL",
+                        "severity": "critical",
+                        "message": "Queue backlog exceeded 15 people threshold",
+                        "value": 16,
+                        "threshold": 15,
+                    },
+                ],
+                "raw_detection_count": 16,
+                "fps": 23.8,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+        self.assertEqual(payload["archived_alerts"], 2)
+        self.assertEqual(payload["camera_id"], "cam_01")
+
+        conn = database.get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM alert_history")
+            count = cursor.fetchone()[0]
+            cursor.execute(
+                "SELECT alert_type, severity, message, people_in_zone, queue_stable, alerts_count FROM alert_history ORDER BY id"
+            )
+            rows = cursor.fetchall()
+        finally:
+            conn.close()
+
+        self.assertEqual(count, 2)
+        self.assertEqual(rows[0]["alert_type"], "WAIT_TIME_CRITICAL")
+        self.assertEqual(rows[0]["severity"], "critical")
+        self.assertEqual(rows[0]["people_in_zone"], 16)
+        self.assertEqual(rows[0]["queue_stable"], 0)
+        self.assertEqual(rows[0]["alerts_count"], 2)
+        self.assertEqual(rows[1]["alert_type"], "QUEUE_BACKLOG_CRITICAL")
+        self.assertEqual(rows[1]["alerts_count"], 2)
 
     def test_feed_creation_hides_embedded_rtsp_credentials(self) -> None:
         response = self.client.post(

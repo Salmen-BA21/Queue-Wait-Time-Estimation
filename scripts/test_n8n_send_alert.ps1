@@ -8,6 +8,10 @@ param(
     [double]$ArrivalRate = 0.15,
     [double]$ServiceRate = 0.16,
     [double]$EstimatedWaitSec = 137.4,
+    [string]$CameraId = "cam_01",
+    [string]$ZoneId = "checkout_lane_3",
+    [string]$FeedId = "cashier_1",
+    [bool]$ForceTelegram = $false,
     [bool]$IncludeSecret = $true
 )
 if ($null -eq $N8nBaseUrl -or [string]::IsNullOrWhiteSpace($N8nBaseUrl)) {
@@ -44,9 +48,9 @@ if ($AlertTriggered) {
 
 $body = @{
     timestamp = (Get-Date).ToString("o")
-    camera_id = "cam_01"
-    zone_id = "checkout_lane_3"
-    feed_id = "cashier_1"
+    camera_id = $CameraId
+    zone_id = $ZoneId
+    feed_id = $FeedId
     source = "C:/Users/ELITE/Downloads/retail_store.mp4"
     people_in_zone = $PeopleInZone
     arrival_rate = $ArrivalRate
@@ -64,6 +68,7 @@ $body = @{
     alert_reason = $AlertReason
     alert_severity = $AlertSeverity
     alerts = $alerts
+    force_telegram = $ForceTelegram
     system_uptime_sec = 0
     confidence_scores = @()
     establishment_name = $null
