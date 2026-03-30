@@ -18,9 +18,9 @@ class ZoneManager:
 
     Parameters
     ----------
-    polygon_points : list[list[int]]
-        Polygon vertices **in pixel coords** ``[[x1,y1], [x2,y2], …]``.
-        If the values look normalised (all ≤ 1), they are scaled to
+    polygon_points : list[list[float]]
+        Polygon vertices in either pixel coords or normalised coords
+        ``[[x1,y1], [x2,y2], …]``. If the values look normalised (all ≤ 1), they are scaled to
         *frame_resolution* automatically.
     frame_resolution : tuple[int, int]
         ``(width, height)`` of the video frames.
@@ -28,7 +28,7 @@ class ZoneManager:
 
     def __init__(
         self,
-        polygon_points: list[list[int]],
+        polygon_points: list[list[float]],
         frame_resolution: tuple[int, int],
     ) -> None:
         self._frame_w, self._frame_h = frame_resolution

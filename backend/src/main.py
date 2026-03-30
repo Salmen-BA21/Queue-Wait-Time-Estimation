@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import math
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -207,7 +208,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def parse_zone_points(raw: str | None) -> list[list[int]] | None:
+def parse_zone_points(raw: str | None) -> list[list[float]] | None:
     """Parse the ``--zone-points`` JSON string into a list of [x, y] pairs."""
     if raw is None:
         return None
@@ -215,7 +216,20 @@ def parse_zone_points(raw: str | None) -> list[list[int]] | None:
         points = json.loads(raw)
         if not isinstance(points, list) or len(points) < 3:
             raise ValueError("Need at least 3 points for a polygon.")
-        return [[int(p[0]), int(p[1])] for p in points]
+
+        parsed_points: list[list[float]] = []
+        for point in points:
+            if not isinstance(point, (list, tuple)) or len(point) < 2:
+                raise ValueError("Each zone point must be a [x, y] pair.")
+
+            x = float(point[0])
+            y = float(point[1])
+            if not math.isfinite(x) or not math.isfinite(y):
+                raise ValueError("Zone point coordinates must be finite numbers.")
+
+            parsed_points.append([x, y])
+
+        return parsed_points
     except (json.JSONDecodeError, TypeError, IndexError, ValueError) as exc:
         logger.warning("Invalid --zone-points (%s). Using full-frame zone.", exc)
         return None

@@ -37,11 +37,11 @@ MATCH_THRESH: float = 0.8
 
 # ─── Zone ─────────────────────────────────────────────────────
 # Fallback polygon: full frame (will be overridden by --zone-points)
-DEFAULT_ZONE_POLYGON: list[list[int]] = [
-    [0, 0],
-    [1, 0],
-    [1, 1],
-    [0, 1],
+DEFAULT_ZONE_POLYGON: list[list[float]] = [
+    [0.0, 0.0],
+    [1.0, 0.0],
+    [1.0, 1.0],
+    [0.0, 1.0],
 ]  # normalised – scaled to frame size at runtime
 
 
@@ -88,7 +88,7 @@ class AppConfig:
 
     source: str | int = 0
     model_size: str = "n"
-    zone_points: Optional[list[list[int]]] = None
+    zone_points: Optional[list[list[float]]] = None
     output_fps: int = DEFAULT_OUTPUT_FPS
     log_interval_sec: float = DEFAULT_LOG_INTERVAL_SEC
     confidence: float = DEFAULT_CONFIDENCE
@@ -114,6 +114,6 @@ class AppConfig:
         return YOLO_MODEL_MAP.get(self.model_size, YOLO_MODEL_MAP["n"])
 
     @property
-    def zone_polygon(self) -> list[list[int]]:
+    def zone_polygon(self) -> list[list[float]]:
         """Return zone polygon – user-supplied or default."""
         return self.zone_points if self.zone_points else DEFAULT_ZONE_POLYGON
