@@ -28,6 +28,7 @@ from src.config import (
     DASHBOARD_EVENT_EMIT_INTERVAL_SEC,
     WINDOW_NAME,
     N8N_WEBHOOK_URL,
+    N8N_WEBHOOK_SECRET,
     WEBHOOK_ENABLED,
     WEBHOOK_SEND_INTERVAL_SEC,
     ALERT_DEDUPE_WINDOW_SEC,
@@ -255,7 +256,7 @@ def run(cfg: AppConfig) -> None:
             )
         )
         annotators = create_annotators()
-        webhook_client = WebhookClient(N8N_WEBHOOK_URL) if cfg.webhook_enabled else None
+        webhook_client = WebhookClient(N8N_WEBHOOK_URL, webhook_secret=N8N_WEBHOOK_SECRET) if cfg.webhook_enabled else None
         event_writer = DashboardEventWriter(cfg.events_file)
 
         # Multi-stream identity for webhook payloads; fallback to source string

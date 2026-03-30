@@ -8,10 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useState } from "react";
 import { Save, Trash2, Plus, TestTube, Camera, Bell, Webhook, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
+import { useMutation, useQuery } from "@tanstack/react-query";
+
+import { getWebhookIntegrationStatus, testWebhookIntegration } from "@/lib/api";
 
 export default function SettingsPage() {
   const [thresholds, setThresholds] = useState({ maxWaitTime: 15, maxQueueSize: 20 });
-  const [webhookUrl, setWebhookUrl] = useState("https://n8n.example.com/webhook/queue-alerts");
   const [cameras, setCameras] = useState([
     { id: "1", name: "Entrance A", url: "rtsp://192.168.1.101/stream", enabled: true },
     { id: "2", name: "Entrance B", url: "rtsp://192.168.1.102/stream", enabled: true },
@@ -20,8 +22,22 @@ export default function SettingsPage() {
   ]);
   const [notifications, setNotifications] = useState({ email: true, push: false, webhook: true });
 
+  const webhookStatusQuery = useQuery({
+    queryKey: ["webhook-integration-status"],
+    queryFn: getWebhookIntegrationStatus,
+  });
+
+  const testWebhookMutation = useMutation({
+    mutationFn: testWebhookIntegration,
+    onSuccess: (result) => {
+      toast.success(result.message);
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Webhook test failed");
+    },
+  });
+
   const handleSave = () => toast.success("Settings saved successfully");
-  const testWebhook = () => toast.info("Webhook test sent");
 
   return (
     <AppLayout>
@@ -67,21 +83,32 @@ export default function SettingsPage() {
             <CardTitle className="text-base flex items-center gap-2">
               <Webhook className="h-4 w-4 text-primary" /> Webhook Integration
             </CardTitle>
-            <CardDescription>Connect to n8n or other automation platforms</CardDescription>
+            <CardDescription>Connect to the backend-managed n8n webhook integration</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Webhook URL</Label>
+              <Label className="text-xs text-muted-foreground">Configured Webhook URL</Label>
               <div className="flex gap-2">
                 <Input
-                  value={webhookUrl}
-                  onChange={(e) => setWebhookUrl(e.target.value)}
+                  value={webhookStatusQuery.data?.webhook_url ?? "Loading backend configuration..."}
+                  readOnly
                   className="bg-background border-border font-mono text-xs"
                 />
-                <Button variant="outline" size="sm" onClick={testWebhook}>
-                  <TestTube className="h-3 w-3 mr-1" /> Test
+                <Button variant="outline" size="sm" onClick={() => testWebhookMutation.mutate()} disabled={testWebhookMutation.isPending}>
+                  <TestTube className="h-3 w-3 mr-1" /> {testWebhookMutation.isPending ? "Testing" : "Test"}
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                {webhookStatusQuery.data?.webhook_enabled
+                  ? "Webhook delivery is enabled in the backend."
+                  : "Webhook delivery is disabled in the backend."}
+                {webhookStatusQuery.data && (
+                  <span>
+                    {" "}
+                    Shared secret {webhookStatusQuery.data.secret_configured ? "is configured" : "is missing"}.
+                  </span>
+                )}
+              </p>
             </div>
           </CardContent>
         </Card>

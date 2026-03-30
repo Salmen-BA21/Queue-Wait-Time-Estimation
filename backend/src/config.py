@@ -7,6 +7,7 @@ All tuneable values live here so they are easy to find and override later
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -72,7 +73,8 @@ RTSP_RECONNECT_DELAY_SEC: float = 3.0
 RTSP_TRANSPORT: str = "tcp"  # "tcp" | "udp"
 # ─── Webhook / n8n Integration ────────────────────────────────
 # Local n8n webhook URL – change if n8n is on different host/port
-N8N_WEBHOOK_URL: str = "http://localhost:5678/webhook/queue-metrics"
+N8N_WEBHOOK_URL: str = os.getenv("N8N_WEBHOOK_URL", "http://localhost:5678/webhook/queue-metrics")
+N8N_WEBHOOK_SECRET: str = os.getenv("N8N_WEBHOOK_SECRET", "")
 WEBHOOK_ENABLED: bool = True  # Set to False to disable webhook sending
 WEBHOOK_TIMEOUT_SEC: float = 5.0
 WEBHOOK_RETRY_COUNT: int = 3

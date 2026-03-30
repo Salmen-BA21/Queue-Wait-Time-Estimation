@@ -26,6 +26,7 @@ class WebhookClient:
     def __init__(
         self,
         webhook_url: str,
+        webhook_secret: str | None = None,
         timeout: float = 5.0,
         retry_count: int = 3,
         retry_delay: float = 1.0,
@@ -38,6 +39,8 @@ class WebhookClient:
         webhook_url : str
             Full URL to n8n webhook endpoint.
             Example: "http://localhost:5678/webhook/queue-metrics"
+        webhook_secret : str | None
+            Optional shared secret sent as `X-Webhook-Secret`.
         timeout : float
             Request timeout in seconds.
         retry_count : int
@@ -48,6 +51,7 @@ class WebhookClient:
             Directory for CSV backup files (default: 'data').
         """
         self.webhook_url = webhook_url
+        self.webhook_secret = webhook_secret.strip() if isinstance(webhook_secret, str) and webhook_secret.strip() else None
         self.timeout = timeout
         self.retry_count = retry_count
         self.retry_delay = retry_delay
@@ -128,7 +132,10 @@ class WebhookClient:
                     self.webhook_url,
                     json=payload_dict,
                     timeout=self.timeout,
-                    headers={"Content-Type": "application/json"},
+                    headers={
+                        "Content-Type": "application/json",
+                        **({"X-Webhook-Secret": self.webhook_secret} if self.webhook_secret else {}),
+                    },
                 )
                 
                 # Check response

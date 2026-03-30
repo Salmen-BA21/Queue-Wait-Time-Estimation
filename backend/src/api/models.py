@@ -79,6 +79,22 @@ class QueueAlertArchiveResponse(BaseModel):
     timestamp: datetime
 
 
+class WebhookIntegrationStatus(BaseModel):
+    """Current n8n webhook configuration exposed to the settings page."""
+
+    webhook_url: str | None = None
+    webhook_enabled: bool
+    secret_configured: bool
+
+
+class WebhookIntegrationTestResult(BaseModel):
+    """Result of sending a test payload to the configured webhook."""
+
+    success: bool
+    webhook_url: str | None = None
+    message: str
+
+
 class UploadVideoResponse(BaseModel):
     """Location of a video uploaded through the dashboard."""
 

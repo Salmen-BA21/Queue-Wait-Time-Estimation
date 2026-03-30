@@ -108,6 +108,18 @@ export interface SystemHealth {
   timestamp: string;
 }
 
+export interface WebhookIntegrationStatus {
+  webhook_url: string | null;
+  webhook_enabled: boolean;
+  secret_configured: boolean;
+}
+
+export interface WebhookIntegrationTestResult {
+  success: boolean;
+  webhook_url: string | null;
+  message: string;
+}
+
 export interface FeedSnapshotEvent {
   event: "snapshot";
   payload: {
@@ -426,6 +438,16 @@ export function listFeeds(): Promise<VideoFeed[]> {
 
 export function getSystemHealth(): Promise<SystemHealth> {
   return fetchApi<SystemHealth>("/api/system/health");
+}
+
+export function getWebhookIntegrationStatus(): Promise<WebhookIntegrationStatus> {
+  return fetchApi<WebhookIntegrationStatus>("/api/system/webhook");
+}
+
+export function testWebhookIntegration(): Promise<WebhookIntegrationTestResult> {
+  return fetchApi<WebhookIntegrationTestResult>("/api/system/webhook/test", {
+    method: "POST",
+  });
 }
 
 export function createFeed(input: CreateFeedInput): Promise<VideoFeed> {

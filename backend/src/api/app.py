@@ -30,6 +30,8 @@ from src.api.models import (
     FeedSnapshotEvent,
     QueueAlertArchiveRequest,
     QueueAlertArchiveResponse,
+    WebhookIntegrationStatus,
+    WebhookIntegrationTestResult,
     ONVIFCameraTestRequest,
     ONVIFCameraTestResult,
     ONVIFDevice,
@@ -58,6 +60,9 @@ from src.database import (
     get_establishments,
     init_db,
 )
+from src.config import N8N_WEBHOOK_SECRET, N8N_WEBHOOK_URL, WEBHOOK_ENABLED
+from src.queue_analyzer import QueueMetrics
+from src.webhook_client import WebhookClient
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -789,6 +794,67 @@ async def get_system_health() -> ApiResponse[SystemHealth]:
         timestamp=datetime.now(timezone.utc),
     )
     return ApiResponse(data=health)
+
+
+@app.get("/api/system/webhook", response_model=ApiResponse[WebhookIntegrationStatus])
+async def get_webhook_integration_status() -> ApiResponse[WebhookIntegrationStatus]:
+    return ApiResponse(
+        data=WebhookIntegrationStatus(
+            webhook_url=N8N_WEBHOOK_URL or None,
+            webhook_enabled=WEBHOOK_ENABLED,
+            secret_configured=bool(N8N_WEBHOOK_SECRET),
+        ),
+        message="Webhook integration status loaded successfully.",
+    )
+
+
+@app.post("/api/system/webhook/test", response_model=ApiResponse[WebhookIntegrationTestResult])
+async def test_webhook_integration() -> ApiResponse[WebhookIntegrationTestResult]:
+    if not N8N_WEBHOOK_URL:
+        raise HTTPException(status_code=503, detail="N8N webhook URL is not configured.")
+
+    client = WebhookClient(N8N_WEBHOOK_URL, webhook_secret=N8N_WEBHOOK_SECRET)
+    sample_metrics = QueueMetrics(
+        timestamp=datetime.now().timestamp(),
+        people_in_zone=3,
+        arrival_rate=0.05,
+        service_rate=0.10,
+        estimated_wait_sec=5.0,
+        queue_stable=True,
+        arrival_rate_lower=0.02,
+        arrival_rate_upper=0.09,
+        service_rate_lower=0.06,
+        service_rate_upper=0.15,
+        wait_time_lower=3.0,
+        wait_time_upper=8.5,
+        uncertainty_level="Low",
+    )
+
+    try:
+        success = await asyncio.to_thread(
+            client.send_metrics,
+            metrics=sample_metrics,
+            frame_id=1,
+            source="settings-page-test",
+            feed_id="settings_test",
+            alert_triggered=False,
+            alert_reason="Webhook test payload from settings page",
+            alert_severity="info",
+        )
+    finally:
+        client.close()
+
+    if not success:
+        raise HTTPException(status_code=502, detail="Webhook test payload could not be delivered.")
+
+    return ApiResponse(
+        data=WebhookIntegrationTestResult(
+            success=True,
+            webhook_url=N8N_WEBHOOK_URL,
+            message="Webhook test payload delivered successfully.",
+        ),
+        message="Webhook test completed successfully.",
+    )
 
 
 @app.websocket("/ws/metrics")

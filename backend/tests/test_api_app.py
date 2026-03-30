@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from backend.app import app
+import src.api.app as api_app
 from src import database
 from src.api.models import AlertModel, BatchFeedDraft, BatchFeedLaunchRequest, QueueMetricsModel, ZonePolygon
 from src.api.runtime import FeedRegistry, FeedStartError, FeedWorkerHandle, SubprocessFeedWorkerRunner, WebSocketHub
@@ -155,6 +156,31 @@ class TestQueueVisionApi(unittest.TestCase):
         )
         self.assertEqual(duplicate_response.status_code, 409)
         self.assertEqual(duplicate_response.json()["detail"], "Establishment already exists.")
+
+    def test_get_webhook_integration_status(self) -> None:
+        response = self.client.get("/api/system/webhook")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+        self.assertEqual(payload["webhook_url"], api_app.N8N_WEBHOOK_URL)
+        self.assertTrue(payload["webhook_enabled"])
+        self.assertFalse(payload["secret_configured"])
+
+    def test_webhook_test_endpoint_uses_webhook_client(self) -> None:
+        with patch("src.api.app.WebhookClient") as webhook_client_cls:
+            webhook_client = webhook_client_cls.return_value
+            webhook_client.send_metrics.return_value = True
+
+            response = self.client.post("/api/system/webhook/test")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()["data"]
+        self.assertTrue(payload["success"])
+        self.assertEqual(payload["webhook_url"], api_app.N8N_WEBHOOK_URL)
+        webhook_client_cls.assert_called_once()
+        self.assertEqual(webhook_client_cls.call_args.args[0], api_app.N8N_WEBHOOK_URL)
+        self.assertEqual(webhook_client_cls.call_args.kwargs["webhook_secret"], api_app.N8N_WEBHOOK_SECRET)
+        webhook_client.send_metrics.assert_called_once()
 
     def test_create_and_list_caisses_for_establishment(self) -> None:
         establishment = self.client.post(
