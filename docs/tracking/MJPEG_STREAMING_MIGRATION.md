@@ -116,27 +116,42 @@ The migration is additive and keeps existing flows intact.
 - `/ws/metrics` contract is unchanged.
 - Existing feed CRUD/start/stop/restart APIs are unchanged.
 
-## Low-Latency Tuning (Implemented)
+## Throughput, Smoothness, And Playback Pacing (March 31, 2026)
 
-To reduce web overlay delay and make tracking feel closer to GUI behavior, event cadence was increased:
+The first low-latency tuning improved overlay freshness but increased pressure on slower machines. The runtime profile now prioritizes smoothness by default while keeping high-throughput toggles available.
 
-- Worker dashboard event emit interval:
-  - from `1.0s` to `0.1s`
-  - constant: `DASHBOARD_EVENT_EMIT_INTERVAL_SEC` in `backend/src/config.py`
-- API runtime event-file poll interval:
-  - from `0.25s` to `0.05s`
-  - constant: `DASHBOARD_EVENT_POLL_INTERVAL_SEC` in `backend/src/config.py`
+- Backend event cadence defaults:
+  - `DASHBOARD_EVENT_EMIT_INTERVAL_SEC`: `0.2`
+  - `DASHBOARD_EVENT_POLL_INTERVAL_SEC`: `0.1`
+- Dashboard client cadence defaults:
+  - metrics flush interval: `250ms`
+  - stale threshold: `3500ms`
+  - fallback polling interval: `1500ms`
+- Worker launch profile (API + GUI):
+  - `--device auto` (resolves to CUDA automatically when available)
+  - `--detector-imgsz 512`
+  - `--process-every-n-frames 1` (visual smoothness default)
+- File playback profile:
+  - `--realtime-file-playback` enabled by default
+  - file sources are paced to native source FPS (not rounded), preventing fast-forward playback feel
+- Main loop integration path:
+  - webhook delivery moved to an async dispatcher thread to prevent retry delays from blocking frame processing
+  - rolling performance telemetry added to logs (`loop_fps`, `proc_fps`, stage timings)
 
-Effect:
+Observed local behavior after pacing fix:
 
-- Faster propagation of `metrics_update` events (including `detections`) to `/ws/metrics`.
-- Lower visual lag between MJPEG video frames and detection overlays in the dashboard.
+- File source at 13.1 FPS with realtime playback enabled: loop/proc stabilizes around source-rate (~13 FPS)
+- Throughput mode remains available by disabling realtime playback (`--no-realtime-file-playback`) when benchmark speed is preferred over natural playback speed
 
 Changed files for this tuning:
 
 - `backend/src/config.py`
 - `backend/src/main.py`
+- `backend/src/detector.py`
 - `backend/src/api/runtime.py`
+- `backend/src/gui/app.py`
+- `frontend/src/hooks/use-dashboard-websocket.ts`
+- `backend/tests/test_main_playback.py`
 
 ## Validation Run
 
@@ -145,6 +160,8 @@ Validated during implementation:
 - `python -m unittest backend.tests.test_api_app.TestQueueVisionApi.test_feed_stream_returns_not_found_for_missing_feed backend.tests.test_api_app.TestQueueVisionApi.test_feed_stream_requires_running_feed backend.tests.test_api_app.TestQueueVisionApi.test_feed_stream_yields_mjpeg_chunks`
 - `npm --prefix frontend run test -- FeedGrid.test.tsx`
 - `python -m py_compile backend/src/api/runtime.py backend/src/api/app.py backend/tests/test_api_app.py`
+- `python -m unittest backend.tests.test_main_playback`
+- `python -m unittest test_gui_app`
 
 Note:
 

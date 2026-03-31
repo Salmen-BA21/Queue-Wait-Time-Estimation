@@ -550,6 +550,9 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertIn("secret", command)
         self.assertIn("--rtsp-transport", command)
         self.assertIn("udp", command)
+        self.assertIn("--device", command)
+        self.assertIn("--detector-imgsz", command)
+        self.assertIn("--process-every-n-frames", command)
         self.assertIn("--dashboard-render-frames", command)
         self.assertIn("--dashboard-frame-jpeg-quality", command)
 

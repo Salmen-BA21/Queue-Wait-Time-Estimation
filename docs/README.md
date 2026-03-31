@@ -8,7 +8,7 @@ This directory contains all project documentation, now standardized around **Spr
 Web application UI/UX design documentation:
 - **[README.md](../design/README.md)** – Quick-start guide for implementing the frontend
 - **[DESIGN_SPEC.md](../design/DESIGN_SPEC.md)** – Complete technical design specification (7 pages)
-- **pencil-new.pen** – Pencil design file (use Pencil MCP tools to view)
+- **QueueVision Design.pen** – Pencil design file (use Pencil MCP tools to view)
 
 ### 🔹 `/sprints/` (primary)
 Sprint-specific planning and execution documentation:
@@ -23,6 +23,7 @@ Project progress and status tracking:
 - **STATUS_REPORT.md** – Status updates on specific issues/fixes
 - **WEB_APP_GUI_PARITY_PLAN.md** – Remaining work to bring the web app to full desktop GUI feature parity
 - **MJPEG_STREAMING_MIGRATION.md** – Snapshot polling to MJPEG streaming migration details
+	- Includes March 31 updates for GPU device selection, source-FPS playback pacing, and smoothness tuning defaults.
 
 ### 🔹 `/daily-logs/`
 Daily development logs (legacy filenames may still use "Phase"):
@@ -49,7 +50,7 @@ Legacy phase documents are archived to preserve history. New updates should be w
 
 ---
 
-*Last organized: February 27, 2026*
+*Last organized: March 31, 2026*
 
 ## Development — Running locally
 

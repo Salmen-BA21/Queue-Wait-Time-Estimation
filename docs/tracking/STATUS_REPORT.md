@@ -1,5 +1,44 @@
 # Queue Wait-Time Estimation System - Status Report
 
+**Last Updated:** March 31, 2026
+
+## ✅ FIXED: Runtime Smoothness, GPU Selection, And Playback Pacing
+
+### Overview
+Implemented a focused runtime optimization pass to improve visual smoothness and remove playback timing artifacts while keeping queue metrics behavior unchanged.
+
+### What Changed
+- **GPU selection hardening**
+  - Added explicit inference device control (`auto`, `cpu`, `cuda:0`, etc.).
+  - Added startup diagnostics showing resolved device and CUDA runtime availability.
+- **Detector performance controls**
+  - Added configurable YOLO image size (`--detector-imgsz`).
+  - Added frame processing stride (`--process-every-n-frames`).
+- **Main loop responsiveness**
+  - Webhook delivery moved to an async dispatcher thread to avoid blocking the hot path.
+  - Rolling telemetry added to logs (`loop_fps`, `proc_fps`, detect/track/analyze stage timings).
+- **Playback speed correction**
+  - Added realtime file playback mode and made it default.
+  - File sources are now paced to native source FPS (exact float), preventing fast-forward playback feel.
+
+### Files Updated
+- `backend/src/main.py`
+- `backend/src/config.py`
+- `backend/src/detector.py`
+- `backend/src/api/runtime.py`
+- `backend/src/gui/app.py`
+- `frontend/src/hooks/use-dashboard-websocket.ts`
+- `backend/tests/test_main_playback.py`
+- `backend/tests/test_api_app.py`
+- `test_gui_app.py`
+
+### Verification
+- Targeted unit tests for parser/defaults/playback flags and worker command construction.
+- Runtime verification on local video source:
+  - GPU resolved to `cuda:0` on RTX 4060.
+  - Realtime playback run stabilized near source FPS.
+  - Stage timings confirmed detection remains the dominant cost center.
+
 ## ✅ FIXED: IP Camera Discovery Implementation
 
 ### Overview
@@ -68,7 +107,7 @@ This prevents garbage collection by maintaining strong references throughout the
 ## ✅ System Architecture
 
 ### Core Pipeline
-1. **Detection**: YOLOv11 object detector (person class)
+1. **Detection**: YOLO26 object detector (person class)
 2. **Tracking**: ByteTrack persistent tracking
 3. **Zone Analysis**: PolygonZone for queue area detection
 4. **Queueing Model**: M/M/1 theory for wait time estimation

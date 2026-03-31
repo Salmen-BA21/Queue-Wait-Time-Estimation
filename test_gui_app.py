@@ -32,6 +32,8 @@ class TestGetAnalysisCommands(unittest.TestCase):
     # ── single video, no zone ─────────────────────────────────
 
     def test_single_video_no_zone(self):
+        from backend.src.gui.app import DEFAULT_GUI_PROCESS_EVERY_N_FRAMES
+
         win = self._make_window()
         win.video_paths = [r"C:\videos\cam1.mp4"]
         win.model_size.set("n")
@@ -47,6 +49,14 @@ class TestGetAnalysisCommands(unittest.TestCase):
         self.assertEqual(cmd[cmd.index("--source") + 1], r"C:\videos\cam1.mp4")
         self.assertIn("--model-size", cmd)
         self.assertEqual(cmd[cmd.index("--model-size") + 1], "n")
+        self.assertIn("--device", cmd)
+        self.assertIn("--detector-imgsz", cmd)
+        self.assertEqual(cmd[cmd.index("--detector-imgsz") + 1], "512")
+        self.assertIn("--process-every-n-frames", cmd)
+        self.assertEqual(
+            cmd[cmd.index("--process-every-n-frames") + 1],
+            str(DEFAULT_GUI_PROCESS_EVERY_N_FRAMES),
+        )
         self.assertIn("--queue-length-warning", cmd)
         self.assertEqual(cmd[cmd.index("--queue-length-warning") + 1], "8")
         self.assertNotIn("--zone-points", cmd)

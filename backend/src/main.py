@@ -16,8 +16,11 @@ import json
 import logging
 import math
 import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from queue import Empty, Full, Queue
+from threading import Event, Thread
 
 import cv2
 import numpy as np
@@ -25,9 +28,13 @@ import supervision as sv
 
 from src.config import (
     AppConfig,
+    DEFAULT_INFERENCE_DEVICE,
+    DEFAULT_DETECTOR_IMAGE_SIZE,
     DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY,
     DEFAULT_LOG_INTERVAL_SEC,
     DEFAULT_OUTPUT_FPS,
+    DEFAULT_PROCESS_EVERY_N_FRAMES,
+    DEFAULT_REALTIME_FILE_PLAYBACK,
     DASHBOARD_EVENT_EMIT_INTERVAL_SEC,
     WINDOW_NAME,
     N8N_WEBHOOK_URL,
@@ -72,6 +79,106 @@ class DashboardEventWriter:
             self._stream.close()
 
 
+@dataclass(frozen=True)
+class WebhookJob:
+    """Typed unit of webhook work consumed by the background dispatcher."""
+
+    metrics: QueueMetrics
+    frame_id: int
+    source: str
+    feed_id: str | None
+    alert_triggered: bool = False
+    alert_reason: str = ""
+    alert_severity: str = "info"
+    confidence_scores: list[float] | None = None
+
+
+class AsyncWebhookDispatcher:
+    """Send webhook payloads on a background thread to keep the loop responsive."""
+
+    def __init__(self, webhook_client: WebhookClient, max_queue_size: int = 32) -> None:
+        self._client = webhook_client
+        self._queue: Queue[WebhookJob] = Queue(maxsize=max_queue_size)
+        self._stop_event = Event()
+        self._worker = Thread(
+            target=self._run,
+            name="queue-webhook-dispatcher",
+            daemon=True,
+        )
+        self._worker.start()
+
+    def enqueue(
+        self,
+        *,
+        metrics: QueueMetrics,
+        frame_id: int,
+        source: str,
+        feed_id: str | None,
+        alert_triggered: bool = False,
+        alert_reason: str = "",
+        alert_severity: str = "info",
+        confidence_scores: list[float] | None = None,
+    ) -> None:
+        payload = WebhookJob(
+            metrics=metrics,
+            frame_id=frame_id,
+            source=source,
+            feed_id=feed_id,
+            alert_triggered=alert_triggered,
+            alert_reason=alert_reason,
+            alert_severity=alert_severity,
+            confidence_scores=confidence_scores,
+        )
+
+        if self._stop_event.is_set():
+            return
+
+        try:
+            self._queue.put_nowait(payload)
+            return
+        except Full:
+            pass
+
+        # Keep the latest payloads under sustained backpressure.
+        try:
+            self._queue.get_nowait()
+            self._queue.task_done()
+        except Empty:
+            pass
+
+        try:
+            self._queue.put_nowait(payload)
+        except Full:
+            logger.debug("Dropping webhook payload: dispatcher queue is still full.")
+
+    def _run(self) -> None:
+        while not self._stop_event.is_set() or not self._queue.empty():
+            try:
+                payload = self._queue.get(timeout=0.2)
+            except Empty:
+                continue
+
+            try:
+                self._client.send_metrics(
+                    metrics=payload.metrics,
+                    frame_id=payload.frame_id,
+                    source=payload.source,
+                    feed_id=payload.feed_id,
+                    alert_triggered=payload.alert_triggered,
+                    alert_reason=payload.alert_reason,
+                    alert_severity=payload.alert_severity,
+                    confidence_scores=payload.confidence_scores,
+                )
+            except Exception as exc:
+                logger.debug("Async webhook send failed: %s", exc)
+            finally:
+                self._queue.task_done()
+
+    def stop(self, timeout_sec: float = 2.0) -> None:
+        self._stop_event.set()
+        self._worker.join(timeout=timeout_sec)
+
+
 # ═══════════════════════════════════════════════════════════════
 # Argument parser
 # ═══════════════════════════════════════════════════════════════
@@ -102,6 +209,33 @@ def build_parser() -> argparse.ArgumentParser:
         help="YOLO model size – n(ano), s(mall), m(edium), l(arge), x(large). (default: n)",
     )
     parser.add_argument(
+        "--device",
+        type=str,
+        default=DEFAULT_INFERENCE_DEVICE,
+        help=(
+            "Inference device: auto, cpu, cuda, cuda:0, ... "
+            f"(default: {DEFAULT_INFERENCE_DEVICE})"
+        ),
+    )
+    parser.add_argument(
+        "--detector-imgsz",
+        type=int,
+        default=DEFAULT_DETECTOR_IMAGE_SIZE,
+        help=(
+            "Inference image size passed to YOLO. "
+            f"Smaller values are faster. (default: {DEFAULT_DETECTOR_IMAGE_SIZE})"
+        ),
+    )
+    parser.add_argument(
+        "--process-every-n-frames",
+        type=int,
+        default=DEFAULT_PROCESS_EVERY_N_FRAMES,
+        help=(
+            "Run detection/tracking every N frames and reuse the latest result in-between. "
+            f"(default: {DEFAULT_PROCESS_EVERY_N_FRAMES})"
+        ),
+    )
+    parser.add_argument(
         "--zone-points",
         type=str,
         default=None,
@@ -116,6 +250,23 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=DEFAULT_OUTPUT_FPS,
         help=f"Display refresh rate in FPS. (default: {DEFAULT_OUTPUT_FPS})",
+    )
+    parser.set_defaults(realtime_file_playback=DEFAULT_REALTIME_FILE_PLAYBACK)
+    file_playback_group = parser.add_mutually_exclusive_group()
+    file_playback_group.add_argument(
+        "--realtime-file-playback",
+        dest="realtime_file_playback",
+        action="store_true",
+        help=(
+            "Pace non-RTSP file sources to their native FPS for natural playback speed. "
+            f"(default: {DEFAULT_REALTIME_FILE_PLAYBACK})"
+        ),
+    )
+    file_playback_group.add_argument(
+        "--no-realtime-file-playback",
+        dest="realtime_file_playback",
+        action="store_false",
+        help="Process non-RTSP file sources as fast as possible.",
     )
     parser.add_argument(
         "--log-interval-sec",
@@ -136,7 +287,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--resize-scale",
         type=float,
         default=1.0,
-        help="Scale factor to resize the frame (e.g., 0.5 for 50%). (default: 1.0)",
+        help="Scale factor to resize the frame (e.g., 0.5 for 50%%). (default: 1.0)",
     )
     parser.add_argument(
         "--queue-length-warning",
@@ -268,7 +419,12 @@ def run(cfg: AppConfig) -> None:
         Assembled runtime configuration.
     """
     # ── Initialise components ─────────────────────────────────
-    detector = PersonDetector(model_path=cfg.model_path, confidence=cfg.confidence)
+    detector = PersonDetector(
+        model_path=cfg.model_path,
+        confidence=cfg.confidence,
+        device=cfg.inference_device,
+        image_size=cfg.detector_imgsz if cfg.detector_imgsz > 0 else None,
+    )
 
     stream = open_video_source(
         cfg.source,
@@ -291,6 +447,7 @@ def run(cfg: AppConfig) -> None:
         )
         annotators = create_annotators()
         webhook_client = WebhookClient(N8N_WEBHOOK_URL, webhook_secret=N8N_WEBHOOK_SECRET) if cfg.webhook_enabled else None
+        webhook_dispatcher = AsyncWebhookDispatcher(webhook_client) if webhook_client else None
         event_writer = DashboardEventWriter(cfg.events_file)
 
         # Multi-stream identity for webhook payloads; fallback to source string
@@ -300,7 +457,21 @@ def run(cfg: AppConfig) -> None:
             else (f"caisse_{cfg.caisse_id}" if cfg.caisse_id is not None else str(cfg.source))
         )
 
-        frame_delay = int(1000 / cfg.output_fps) if cfg.output_fps > 0 else 1
+        source_is_file = _is_file_source(cfg.source)
+        source_fps = max(float(stream.fps), 1.0)
+        realtime_file_playback = bool(cfg.realtime_file_playback and source_is_file)
+
+        display_target_fps = cfg.output_fps
+        if realtime_file_playback and display_target_fps <= 0 and not cfg.headless:
+            display_target_fps = max(1, int(round(source_fps)))
+
+        frame_delay = int(1000 / display_target_fps) if display_target_fps > 0 else 1
+        playback_target_fps = _compute_playback_target_fps(
+            source_fps=source_fps,
+            output_fps=display_target_fps,
+            realtime_file_playback=realtime_file_playback,
+        )
+        process_stride = max(1, int(cfg.process_every_n_frames))
         last_log_time = time.monotonic()
         last_webhook_time = time.monotonic()
         last_dashboard_event_time = time.monotonic()
@@ -309,113 +480,175 @@ def run(cfg: AppConfig) -> None:
         frame_count = 0
         dashboard_jpeg_quality = int(np.clip(cfg.dashboard_frame_jpeg_quality, 30, 95))
 
-        logger.info("Entering main loop. Press 'q' to quit.")
+        last_detections: sv.Detections | None = None
+        last_in_zone: np.ndarray | None = None
+        last_labels: list[str] = []
+        last_metrics: QueueMetrics | None = None
 
-        for frame in stream.frames():
-            frame_count += 1
+        # Real-time pacing for headless file playback (GUI path is paced by waitKey).
+        playback_started_at = time.perf_counter()
+        playback_frame_index = 0
 
-            # 1. Detect
-            detections = detector.detect(frame)
+        # Rolling performance counters (reset on each metrics log window)
+        window_started_at = time.monotonic()
+        last_logged_frame_count = 0
+        processed_frames_window = 0
+        detect_ms_window = 0.0
+        track_ms_window = 0.0
+        analyze_ms_window = 0.0
 
-            # 2. Track
-            detections = tracker.update(detections)
+        logger.info(
+            "Entering main loop. Press 'q' to quit. (process_every_n_frames=%d, detector_imgsz=%s, realtime_file_playback=%s)",
+            process_stride,
+            cfg.detector_imgsz if cfg.detector_imgsz > 0 else "auto",
+            realtime_file_playback,
+        )
 
-            # 3. Zone trigger
-            in_zone = zone_mgr.trigger(detections)
+        try:
+            for frame in stream.frames():
+                frame_count += 1
+                playback_frame_index += 1
+                event_timestamp = time.time()
 
-            # 4. Queue metrics
-            metrics: QueueMetrics = analyzer.update(
-                in_zone_mask=in_zone,
-                tracker_ids=detections.tracker_id,
-            )
-            event_timestamp = time.time()
-            alerts = threshold_detector.check_metrics(
-                people_in_zone=metrics.people_in_zone,
-                estimated_wait_sec=metrics.estimated_wait_sec,
-                arrival_rate=metrics.arrival_rate,
-                service_rate=metrics.service_rate,
-                uncertainty_level=metrics.uncertainty_level,
-                queue_stable=metrics.queue_stable,
-                frame_id=frame_count,
-                timestamp=event_timestamp,
-            )
-            labels = _build_labels(detections, in_zone)
+                should_process_frame = (
+                    last_detections is None
+                    or last_metrics is None
+                    or process_stride <= 1
+                    or (frame_count % process_stride == 0)
+                )
 
-            # 5. Draw
-            if not cfg.headless:
-                frame = draw_detections(frame, detections, annotators, labels)
-                frame = zone_mgr.annotate(frame)
-                frame = draw_metrics_overlay(frame, _metrics_dict(metrics))
+                alerts = []
+                if should_process_frame:
+                    stage_started = time.perf_counter()
+                    detections = detector.detect(frame)
+                    detect_ms_window += (time.perf_counter() - stage_started) * 1000.0
 
-                # Resize frame if scale != 1.0
-                if cfg.resize_scale != 1.0:
-                    frame = cv2.resize(frame, (0, 0), fx=cfg.resize_scale, fy=cfg.resize_scale)
+                    stage_started = time.perf_counter()
+                    detections = tracker.update(detections)
+                    track_ms_window += (time.perf_counter() - stage_started) * 1000.0
 
-                # 6. Show
-                cv2.imshow(WINDOW_NAME, frame)
-                key = cv2.waitKey(frame_delay) & 0xFF
-                if key == ord("q"):
-                    logger.info("Quit requested by user.")
-                    break
-            else:
-                # Still check for break conditions/events from the input
-                # or just use sleep to match the frame relay speed if needed,
-                # though headless usually runs as fast as the source permits.
-                pass
+                    stage_started = time.perf_counter()
+                    in_zone = zone_mgr.trigger(detections)
+                    metrics = analyzer.update(
+                        in_zone_mask=in_zone,
+                        tracker_ids=detections.tracker_id,
+                    )
+                    analyze_ms_window += (time.perf_counter() - stage_started) * 1000.0
 
-            # 7. Periodic logging & webhook sending
-            now = time.monotonic()
-            if (now - last_dashboard_event_time) >= DASHBOARD_EVENT_EMIT_INTERVAL_SEC:
-                render_frame_jpeg_base64: str | None = None
-                if cfg.dashboard_render_frames:
-                    render_frame = frame.copy()
-                    render_frame = draw_detections(render_frame, detections, annotators, labels)
-                    render_frame = zone_mgr.annotate(render_frame)
-                    render_frame = draw_metrics_overlay(render_frame, _metrics_dict(metrics))
+                    alerts = threshold_detector.check_metrics(
+                        people_in_zone=metrics.people_in_zone,
+                        estimated_wait_sec=metrics.estimated_wait_sec,
+                        arrival_rate=metrics.arrival_rate,
+                        service_rate=metrics.service_rate,
+                        uncertainty_level=metrics.uncertainty_level,
+                        queue_stable=metrics.queue_stable,
+                        frame_id=frame_count,
+                        timestamp=event_timestamp,
+                    )
+                    labels = _build_labels(detections, in_zone)
 
+                    last_detections = detections
+                    last_in_zone = in_zone
+                    last_metrics = metrics
+                    last_labels = labels
+                    processed_frames_window += 1
+                else:
+                    detections = last_detections
+                    in_zone = last_in_zone if last_in_zone is not None else np.array([], dtype=bool)
+                    metrics = last_metrics
+                    labels = last_labels
+
+                if detections is None or metrics is None:
+                    continue
+
+                rendered_display_frame: np.ndarray | None = None
+
+                # 5. Draw + 6. Show
+                if not cfg.headless:
+                    rendered_display_frame = draw_detections(frame.copy(), detections, annotators, labels)
+                    rendered_display_frame = zone_mgr.annotate(rendered_display_frame)
+                    rendered_display_frame = draw_metrics_overlay(rendered_display_frame, _metrics_dict(metrics))
+
+                    # Resize frame if scale != 1.0
                     if cfg.resize_scale != 1.0:
-                        render_frame = cv2.resize(
-                            render_frame,
+                        rendered_display_frame = cv2.resize(
+                            rendered_display_frame,
                             (0, 0),
                             fx=cfg.resize_scale,
                             fy=cfg.resize_scale,
                         )
 
-                    encoded_ok, encoded_frame = cv2.imencode(
-                        ".jpg",
-                        render_frame,
-                        [int(cv2.IMWRITE_JPEG_QUALITY), dashboard_jpeg_quality],
-                    )
-                    if encoded_ok:
-                        render_frame_jpeg_base64 = base64.b64encode(encoded_frame.tobytes()).decode("ascii")
+                    cv2.imshow(WINDOW_NAME, rendered_display_frame)
 
-                event_writer.emit(
-                    "metrics_update",
-                    {
-                        "metrics": _dashboard_metrics_payload(
-                            metrics,
-                            event_timestamp,
-                            detections,
-                            render_frame_jpeg_base64=render_frame_jpeg_base64,
+                    wait_delay = frame_delay
+                    if realtime_file_playback:
+                        target_elapsed = playback_frame_index / playback_target_fps
+                        elapsed = time.perf_counter() - playback_started_at
+                        sleep_sec = target_elapsed - elapsed
+                        wait_delay = max(1, int(sleep_sec * 1000)) if sleep_sec > 0 else 1
+
+                    key = cv2.waitKey(wait_delay) & 0xFF
+                    if key == ord("q"):
+                        logger.info("Quit requested by user.")
+                        break
+
+                # 7. Periodic logging and event emission
+                now = time.monotonic()
+                if (now - last_dashboard_event_time) >= DASHBOARD_EVENT_EMIT_INTERVAL_SEC:
+                    render_frame_jpeg_base64: str | None = None
+                    if cfg.dashboard_render_frames:
+                        if rendered_display_frame is not None:
+                            render_frame = rendered_display_frame
+                        else:
+                            render_frame = frame.copy()
+                            render_frame = draw_detections(render_frame, detections, annotators, labels)
+                            render_frame = zone_mgr.annotate(render_frame)
+                            render_frame = draw_metrics_overlay(render_frame, _metrics_dict(metrics))
+
+                            if cfg.resize_scale != 1.0:
+                                render_frame = cv2.resize(
+                                    render_frame,
+                                    (0, 0),
+                                    fx=cfg.resize_scale,
+                                    fy=cfg.resize_scale,
+                                )
+
+                        encoded_ok, encoded_frame = cv2.imencode(
+                            ".jpg",
+                            render_frame,
+                            [int(cv2.IMWRITE_JPEG_QUALITY), dashboard_jpeg_quality],
                         )
-                    },
-                )
-                last_dashboard_event_time = now
+                        if encoded_ok:
+                            render_frame_jpeg_base64 = base64.b64encode(encoded_frame.tobytes()).decode("ascii")
 
-            for alert in alerts:
-                if alert.message == last_warning_message:
-                    continue
-                event_writer.emit(
-                    "alert_fired",
-                    {"alert": _dashboard_alert_payload(alert)},
-                )
-                last_warning_message = alert.message
-                # Immediately forward the warning to webhook (if configured), but respect dedupe window
-                if webhook_client:
-                    now_ts = time.time()
-                    if (now_ts - last_warning_webhook_time) >= ALERT_DEDUPE_WINDOW_SEC:
-                        try:
-                            webhook_client.send_metrics(
+                    event_writer.emit(
+                        "metrics_update",
+                        {
+                            "metrics": _dashboard_metrics_payload(
+                                metrics,
+                                event_timestamp,
+                                detections,
+                                render_frame_jpeg_base64=render_frame_jpeg_base64,
+                            )
+                        },
+                    )
+                    last_dashboard_event_time = now
+
+                for alert in alerts:
+                    if alert.message == last_warning_message:
+                        continue
+
+                    event_writer.emit(
+                        "alert_fired",
+                        {"alert": _dashboard_alert_payload(alert)},
+                    )
+                    last_warning_message = alert.message
+
+                    # Immediately forward the warning to webhook (if configured), respecting dedupe window.
+                    if webhook_dispatcher:
+                        now_ts = time.time()
+                        if (now_ts - last_warning_webhook_time) >= ALERT_DEDUPE_WINDOW_SEC:
+                            webhook_dispatcher.enqueue(
                                 metrics=metrics,
                                 frame_id=frame_count,
                                 source=str(cfg.source),
@@ -425,43 +658,56 @@ def run(cfg: AppConfig) -> None:
                                 alert_severity=alert.severity.value,
                             )
                             last_warning_webhook_time = now_ts
-                        except Exception as exc:
-                            event_writer.emit(
-                                "system_warning",
-                                {
-                                    "code": "webhook_delivery_failed",
-                                    "message": f"Alert webhook delivery failed: {exc}",
-                                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                                },
-                            )
-                            logger.debug(f"Alert webhook send failed: {exc}")
 
-            if (now - last_log_time) >= cfg.log_interval_sec:
-                _log_metrics(metrics, frame_count)
-                last_log_time = now
-            
-            # 8. Periodic webhook sending to n8n
-            if webhook_client and (now - last_webhook_time) >= WEBHOOK_SEND_INTERVAL_SEC:
-                try:
-                    webhook_client.send_metrics(
+                if (now - last_log_time) >= cfg.log_interval_sec:
+                    elapsed = max(now - window_started_at, 1e-6)
+                    loop_fps = (frame_count - last_logged_frame_count) / elapsed
+                    processed_fps = processed_frames_window / elapsed
+                    avg_detect_ms = detect_ms_window / processed_frames_window if processed_frames_window else 0.0
+                    avg_track_ms = track_ms_window / processed_frames_window if processed_frames_window else 0.0
+                    avg_analyze_ms = analyze_ms_window / processed_frames_window if processed_frames_window else 0.0
+
+                    _log_metrics(
+                        metrics,
+                        frame_count,
+                        loop_fps=loop_fps,
+                        processed_fps=processed_fps,
+                        process_stride=process_stride,
+                        avg_detect_ms=avg_detect_ms,
+                        avg_track_ms=avg_track_ms,
+                        avg_analyze_ms=avg_analyze_ms,
+                    )
+                    last_log_time = now
+                    window_started_at = now
+                    last_logged_frame_count = frame_count
+                    processed_frames_window = 0
+                    detect_ms_window = 0.0
+                    track_ms_window = 0.0
+                    analyze_ms_window = 0.0
+
+                # 8. Periodic webhook sending to n8n
+                if webhook_dispatcher and (now - last_webhook_time) >= WEBHOOK_SEND_INTERVAL_SEC:
+                    webhook_dispatcher.enqueue(
                         metrics=metrics,
                         frame_id=frame_count,
                         source=str(cfg.source),
                         feed_id=feed_identifier,
                     )
-                except Exception as exc:
-                    event_writer.emit(
-                        "system_warning",
-                        {
-                            "code": "webhook_delivery_failed",
-                            "message": f"Webhook delivery failed: {exc}",
-                            "timestamp": datetime.now(timezone.utc).isoformat(),
-                        },
-                    )
-                    logger.debug(f"Webhook send failed: {exc}")
-                last_webhook_time = now
+                    last_webhook_time = now
 
-        event_writer.close()
+                if realtime_file_playback and cfg.headless:
+                    target_elapsed = playback_frame_index / playback_target_fps
+                    elapsed = time.perf_counter() - playback_started_at
+                    sleep_sec = target_elapsed - elapsed
+                    if sleep_sec > 0:
+                        time.sleep(min(sleep_sec, 0.25))
+        finally:
+            if webhook_dispatcher:
+                webhook_dispatcher.stop()
+            if webhook_client:
+                webhook_client.close()
+            event_writer.close()
+
     cv2.destroyAllWindows()
     logger.info("Pipeline finished. Processed %d frames.", frame_count)
 
@@ -484,6 +730,37 @@ def _build_labels(detections, in_zone: np.ndarray) -> list[str]:
     return labels
 
 
+def _is_file_source(source: str | int) -> bool:
+    """Return True when source is a local video file path."""
+    if isinstance(source, int):
+        return False
+
+    source_text = str(source).strip()
+    if not source_text or source_text.isdigit():
+        return False
+
+    return not source_text.lower().startswith("rtsp://")
+
+
+def _compute_playback_target_fps(
+    *,
+    source_fps: float,
+    output_fps: int,
+    realtime_file_playback: bool,
+) -> float:
+    """Choose target FPS for playback pacing.
+
+    Real-time file playback should follow the file's native FPS (float) for
+    natural speed, while non-realtime mode can optionally use output_fps.
+    """
+    normalized_source_fps = max(float(source_fps), 1.0)
+    if realtime_file_playback:
+        return normalized_source_fps
+    if output_fps > 0:
+        return float(output_fps)
+    return normalized_source_fps
+
+
 def _metrics_dict(m: QueueMetrics) -> dict[str, str]:
     """Convert ``QueueMetrics`` to a display-friendly dict with uncertainty.
     
@@ -499,10 +776,20 @@ def _metrics_dict(m: QueueMetrics) -> dict[str, str]:
     }
 
 
-def _log_metrics(m: QueueMetrics, frame_count: int) -> None:
-    """Write metrics to the logger with uncertainty."""
+def _log_metrics(
+    m: QueueMetrics,
+    frame_count: int,
+    *,
+    loop_fps: float,
+    processed_fps: float,
+    process_stride: int,
+    avg_detect_ms: float,
+    avg_track_ms: float,
+    avg_analyze_ms: float,
+) -> None:
+    """Write queue metrics and rolling loop performance diagnostics."""
     logger.info(
-        "[frame %d] zone=%d | λ=%.4f [%.4f,%.4f] | μ=%.4f [%.4f,%.4f] | W=%.1fs [%.1f,%.1f] | unc=%s | stable=%s",
+        "[frame %d] zone=%d | λ=%.4f [%.4f,%.4f] | μ=%.4f [%.4f,%.4f] | W=%.1fs [%.1f,%.1f] | unc=%s | stable=%s | loop_fps=%.2f | proc_fps=%.2f | stride=%d | detect=%.1fms | track=%.1fms | analyze=%.1fms",
         frame_count,
         m.people_in_zone,
         m.arrival_rate,
@@ -516,6 +803,12 @@ def _log_metrics(m: QueueMetrics, frame_count: int) -> None:
         m.wait_time_upper,
         m.uncertainty_level,
         m.queue_stable,
+        loop_fps,
+        processed_fps,
+        process_stride,
+        avg_detect_ms,
+        avg_track_ms,
+        avg_analyze_ms,
     )
 
 
@@ -589,10 +882,14 @@ def main() -> None:
     cfg = AppConfig(
         source=args.source,
         model_size=args.model_size,
+        inference_device=(args.device or "auto").strip() or "auto",
         zone_points=zone_pts,
         output_fps=args.output_fps,
         log_interval_sec=args.log_interval_sec,
         resize_scale=args.resize_scale,
+        detector_imgsz=max(0, int(args.detector_imgsz)),
+        process_every_n_frames=max(1, int(args.process_every_n_frames)),
+        realtime_file_playback=bool(args.realtime_file_playback),
         queue_length_warning=args.queue_length_warning,
         rtsp_username=args.rtsp_user,
         rtsp_password=args.rtsp_pass,

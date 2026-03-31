@@ -26,6 +26,12 @@ if str(_backend_root) not in sys.path:
     sys.path.insert(0, str(_backend_root))
 
 logger = logging.getLogger("queue_system.gui")
+DEFAULT_GUI_DETECTOR_IMGSZ = 512
+DEFAULT_GUI_PROCESS_EVERY_N_FRAMES = max(
+    1,
+    int(os.getenv("QUEUE_GUI_PROCESS_EVERY_N_FRAMES", "1")),
+)
+DEFAULT_GUI_INFERENCE_DEVICE = os.getenv("QUEUE_INFERENCE_DEVICE", "auto").strip() or "auto"
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -1468,6 +1474,9 @@ class MainWindow:
                 sys.executable, "-m", "src.main",
                 "--source", path,
                 "--model-size", model_size,
+                "--device", DEFAULT_GUI_INFERENCE_DEVICE,
+                "--detector-imgsz", str(DEFAULT_GUI_DETECTOR_IMGSZ),
+                "--process-every-n-frames", str(DEFAULT_GUI_PROCESS_EVERY_N_FRAMES),
                 "--log-level", self.log_level.get(),
                 "--resize-scale", "0.5",
                 "--queue-length-warning", str(warning_threshold),

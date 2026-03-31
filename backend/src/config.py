@@ -26,6 +26,9 @@ PERSON_CLASS_ID: int = 0
 
 # Minimum detection confidence to keep
 DEFAULT_CONFIDENCE: float = 0.35
+# Inference image size passed to YOLO (smaller = faster, lower detail)
+DEFAULT_DETECTOR_IMAGE_SIZE: int = int(os.getenv("QUEUE_DETECTOR_IMGSZ", "512"))
+DEFAULT_INFERENCE_DEVICE: str = os.getenv("QUEUE_INFERENCE_DEVICE", "auto").strip() or "auto"
 
 
 # ─── Tracker ──────────────────────────────────────────────────
@@ -55,12 +58,34 @@ MIN_EVENTS_FOR_RATE: int = 2       # min events to compute a rate
 DEFAULT_OUTPUT_FPS: int = 0
 DEFAULT_LOG_INTERVAL_SEC: float = 5.0
 WINDOW_NAME: str = "Queue Estimation"
-DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY: int = 85
+DEFAULT_PROCESS_EVERY_N_FRAMES: int = max(
+    1,
+    int(os.getenv("QUEUE_PROCESS_EVERY_N_FRAMES", "1")),
+)
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    """Read a boolean flag from environment variables."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+DEFAULT_REALTIME_FILE_PLAYBACK: bool = _env_flag("QUEUE_REALTIME_FILE_PLAYBACK", True)
+
+DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY: int = int(
+    os.getenv("QUEUE_DASHBOARD_JPEG_QUALITY", "70"),
+)
 # Dashboard low-latency controls
 # Emit metrics/update events frequently so web overlays track detections closely.
-DASHBOARD_EVENT_EMIT_INTERVAL_SEC: float = 0.1
+DASHBOARD_EVENT_EMIT_INTERVAL_SEC: float = float(
+    os.getenv("QUEUE_DASHBOARD_EMIT_INTERVAL_SEC", "0.2"),
+)
 # API runtime tailing interval for worker event files.
-DASHBOARD_EVENT_POLL_INTERVAL_SEC: float = 0.05
+DASHBOARD_EVENT_POLL_INTERVAL_SEC: float = float(
+    os.getenv("QUEUE_DASHBOARD_POLL_INTERVAL_SEC", "0.1"),
+)
 
 
 # ─── RTSP Camera ──────────────────────────────────────────────
@@ -93,6 +118,10 @@ class AppConfig:
     output_fps: int = DEFAULT_OUTPUT_FPS
     log_interval_sec: float = DEFAULT_LOG_INTERVAL_SEC
     confidence: float = DEFAULT_CONFIDENCE
+    inference_device: str = DEFAULT_INFERENCE_DEVICE
+    detector_imgsz: int = DEFAULT_DETECTOR_IMAGE_SIZE
+    process_every_n_frames: int = DEFAULT_PROCESS_EVERY_N_FRAMES
+    realtime_file_playback: bool = DEFAULT_REALTIME_FILE_PLAYBACK
     tracker_type: str = DEFAULT_TRACKER_TYPE
     resize_scale: float = 1.0
     queue_length_warning: int = 8

@@ -16,10 +16,10 @@ export const feedsQueryKey = ["feeds"] as const;
 export const systemHealthQueryKey = ["system-health"] as const;
 
 const SOCKET_RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000, 30000] as const;
-const METRICS_FLUSH_INTERVAL_MS = 120;
+const METRICS_FLUSH_INTERVAL_MS = 250;
 const SOCKET_HEARTBEAT_INTERVAL_MS = 10000;
-const METRICS_STALE_THRESHOLD_MS = 2000;
-const FALLBACK_POLL_INTERVAL_MS = 800;
+const METRICS_STALE_THRESHOLD_MS = 3500;
+const FALLBACK_POLL_INTERVAL_MS = 1500;
 
 export interface ActivityItem {
   id: string;

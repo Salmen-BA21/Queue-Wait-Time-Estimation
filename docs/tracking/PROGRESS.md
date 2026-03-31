@@ -1,7 +1,7 @@
 # Project Progress Report - Queue Wait-Time Estimation System
 
-**Current Date:** March 6, 2026
-**Last Updated:** March 6, 2026  
+**Current Date:** March 31, 2026
+**Last Updated:** March 31, 2026  
 
 This report assesses the completion status of each sprint based on the project structure, documentation, and daily logs.
 
@@ -87,6 +87,12 @@ This report assesses the completion status of each sprint based on the project s
   - ✅ Documentation updated (`docs/IP_CAMERA_DISCOVERY_README.md`, `README.md`)
   - ✅ Test scripts created (`backend/scripts/discover_cameras.py`, `test_ip_camera_discovery.py`)
   - ✅ Code cleanup (removed duplicate files, fixed import paths)
+- ✅ **Runtime smoothness and GPU controls added (Mar 31):**
+  - ✅ CUDA/CPU device selection option and startup diagnostics
+  - ✅ Detector image-size and frame-stride controls
+  - ✅ Async webhook dispatcher to avoid hot-loop stalls
+  - ✅ Realtime file playback pacing with exact source-FPS target
+  - ✅ Targeted tests for playback/parser defaults and command generation
 - ⏳ Telegram bot setup and integration pending
 - ⏳ Persistence checking with n8n state pending  
 
@@ -189,7 +195,7 @@ This report assesses the completion status of each sprint based on the project s
 
 ---
 
-**Recent Activity (Feb 21 - Mar 5):**
+**Recent Activity (Feb 21 - Mar 31):**
 - Feb 21: Queue metrics data generated (queue_metrics_2026-02-21.csv)
 - Feb 23: Documentation reorganization and cleanup completed
 - Feb 27: Complete web UI/UX design created (7 pages in Pencil MCP)
@@ -200,8 +206,11 @@ This report assesses the completion status of each sprint based on the project s
 - Mar 4: All 7 pages implemented in React + TypeScript with 55+ UI components
 - Mar 5: RTSP camera support added with authentication and connection testing
 - Mar 5: GUI enhanced with RTSP camera management interface
+- Mar 31: Runtime throughput/smoothness tuning implemented (detector imgsz, stride, async webhook dispatch)
+- Mar 31: CUDA device enforcement and logging added for reliable GPU usage validation
+- Mar 31: File playback pacing fixed to match native source FPS in realtime mode
 
 **Local test run (development environment):**
 - 67 passed, 2 warnings (pytest) — verified on developer machine
 
-*This report was updated as of March 5, 2026.*
+*This report was updated as of March 31, 2026.*

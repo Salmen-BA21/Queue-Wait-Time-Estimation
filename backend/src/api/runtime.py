@@ -55,7 +55,12 @@ from src.database import (
     upsert_feed_config,
     update_caisse_zone_points,
 )
-from src.config import DASHBOARD_EVENT_POLL_INTERVAL_SEC, DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY
+from src.config import (
+    DASHBOARD_EVENT_POLL_INTERVAL_SEC,
+    DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY,
+    DEFAULT_DETECTOR_IMAGE_SIZE,
+    DEFAULT_PROCESS_EVERY_N_FRAMES,
+)
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -63,6 +68,12 @@ UPLOAD_DIR = (BACKEND_DIR / "data" / "uploads").resolve()
 RUNTIME_LOG_DIR = (BACKEND_DIR / "data" / "runtime").resolve()
 DEFAULT_LOG_LEVEL = "INFO"
 DEFAULT_RESIZE_SCALE = 0.8
+DEFAULT_WORKER_PROCESS_EVERY_N_FRAMES = max(
+    1,
+    int(os.getenv("QUEUE_WORKER_PROCESS_EVERY_N_FRAMES", str(DEFAULT_PROCESS_EVERY_N_FRAMES))),
+)
+DEFAULT_WORKER_DETECTOR_IMAGE_SIZE = max(320, min(640, DEFAULT_DETECTOR_IMAGE_SIZE))
+DEFAULT_WORKER_INFERENCE_DEVICE = os.getenv("QUEUE_INFERENCE_DEVICE", "auto").strip() or "auto"
 
 
 class FeedStateError(RuntimeError):
@@ -714,6 +725,12 @@ class SubprocessFeedWorkerRunner:
             record.source,
             "--model-size",
             record.model_size,
+            "--device",
+            DEFAULT_WORKER_INFERENCE_DEVICE,
+            "--detector-imgsz",
+            str(DEFAULT_WORKER_DETECTOR_IMAGE_SIZE),
+            "--process-every-n-frames",
+            str(DEFAULT_WORKER_PROCESS_EVERY_N_FRAMES),
             "--log-level",
             record.log_level or DEFAULT_LOG_LEVEL,
             "--resize-scale",

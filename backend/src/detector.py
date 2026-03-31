@@ -11,6 +11,7 @@ import logging
 
 import numpy as np
 import supervision as sv
+import torch
 from ultralytics import YOLO  # type: ignore
 
 from src.config import PERSON_CLASS_ID
@@ -38,12 +39,53 @@ class PersonDetector:
         model_path: str = "yolo26n.pt",
         confidence: float = 0.35,
         device: str = "",
+        image_size: int | None = None,
     ) -> None:
-        logger.info("Loading YOLO model: %s (device=%s)", model_path, device or "auto")
+        resolved_device = self._resolve_device(device)
+        logger.info(
+            "Loading YOLO model: %s (requested_device=%s, resolved_device=%s, imgsz=%s)",
+            model_path,
+            device or "auto",
+            resolved_device,
+            image_size if image_size else "auto",
+        )
         self._model = YOLO(model_path)
         self._confidence = confidence
-        self._device = device or None
-        logger.info("Model loaded successfully.")
+        self._device = resolved_device
+        self._image_size = image_size if image_size and image_size > 0 else None
+        logger.info(
+            "Model loaded successfully (torch=%s, cuda_available=%s, cuda_runtime=%s, cuda_device=%s).",
+            torch.__version__,
+            torch.cuda.is_available(),
+            torch.version.cuda,
+            torch.cuda.get_device_name(0) if torch.cuda.is_available() else "N/A",
+        )
+
+    @staticmethod
+    def _resolve_device(device: str) -> str:
+        requested = (device or "auto").strip().lower()
+
+        if requested in {"", "auto"}:
+            if torch.cuda.is_available():
+                return "cuda:0"
+            if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                return "mps"
+            return "cpu"
+
+        if requested.startswith("cuda") and not torch.cuda.is_available():
+            raise RuntimeError(
+                "CUDA device requested but torch.cuda.is_available() is False. "
+                "Install CUDA-enabled PyTorch or use --device cpu."
+            )
+
+        if requested == "mps" and not (
+            hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+        ):
+            raise RuntimeError(
+                "MPS device requested but it is not available in this environment."
+            )
+
+        return requested
 
     def detect(self, frame: np.ndarray) -> sv.Detections:
         """Run inference and return person-only ``sv.Detections``.
@@ -62,6 +104,8 @@ class PersonDetector:
             frame,
             conf=self._confidence,
             device=self._device,
+            imgsz=self._image_size,
+            classes=[PERSON_CLASS_ID],
             verbose=False,
         )[0]
 
