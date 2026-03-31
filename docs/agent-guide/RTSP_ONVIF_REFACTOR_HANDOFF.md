@@ -1,25 +1,15 @@
 # RTSP / ONVIF Refactor Handoff
 
-This brief is for the next agent, ideally `code-fixer.agent.md`, to continue the RTSP / ONVIF cleanup without breaking the current API contract.
+This brief is for the next agent to continue ONVIF cleanup without breaking the current API contract.
 
 ## Context
 
-The last 3 commits show a progression in ONVIF support:
+ONVIF logic is now split by responsibility:
 
-1. `2747cfb` - broad ONVIF discovery and RTSP stream-resolution rewrite.
-2. `daea365` - stricter ONVIF RTSP resolution plus tests.
-3. `735f75a` - docs and agent-instruction cleanup only.
+- [backend/src/onvif_client.py](../../backend/src/onvif_client.py): discovery + ONVIF stream resolution
+- [backend/src/rtsp_camera.py](../../backend/src/rtsp_camera.py): RTSP connection testing, snapshot, capture/reconnect behavior
 
-The current implementation in [backend/src/rtsp_camera.py](../../backend/src/rtsp_camera.py) is functional but too large and too custom. It manually implements:
-
-- WS-Discovery device discovery
-- ONVIF capability lookup
-- ONVIF GetServices fallback
-- ONVIF GetProfiles and GetStreamUri requests
-- RTSP URL sanitation and testing
-- OpenCV RTSP capture and reconnect logic
-
-The user’s concern is that the ONVIF path is more complex than necessary and may be better handled with `onvif-zeep`.
+The current concern is maintainability and complexity in ONVIF SOAP handling. The split is correct, but internals can still be simplified.
 
 ## What to Preserve
 
@@ -29,24 +19,21 @@ Do not break these behaviors:
 - Existing API response shapes in [backend/src/api/app.py](../../backend/src/api/app.py)
 - Sanitized RTSP URLs in API outputs
 - Backward-compatible discovery entry points:
-  - `RTSPCamera.discover_ip_devices()`
-  - `RTSPCamera.discover_onvif_devices()`
-  - `RTSPCamera.get_rtsp_urls_from_onvif_device()`
+  - `discover_ip_devices()`
+  - `discover_onvif_devices()`
+  - `get_rtsp_urls_from_onvif_device()`
 
 ## Recommended Refactor Order
 
-### 1. Separate RTSP capture from ONVIF control-plane logic
+### 1. Keep existing module split
 
-Keep camera streaming and reconnect behavior in `backend/src/rtsp_camera.py`, but move ONVIF-specific logic into a smaller adapter or service module.
+The split between `rtsp_camera.py` and `onvif_client.py` is already in place. Do not re-merge them.
 
-Suggested split:
-
-- `backend/src/rtsp_camera.py` - RTSP connection, test, snapshot, reconnect
-- `backend/src/onvif_client.py` or similar - discovery and stream resolution
+Focus on reducing complexity inside `onvif_client.py` while preserving function signatures.
 
 ### 2. Replace manual ONVIF SOAP code if feasible
 
-The main candidate for simplification is replacing the hand-written SOAP/XML logic with `onvif-zeep`.
+The main candidate is replacing selected hand-written SOAP/XML blocks with `onvif-zeep`.
 
 Use it for:
 
@@ -84,20 +71,20 @@ Update or add tests before changing implementation so behavior stays stable.
 A safe end state would look like this:
 
 - `rtsp_camera.py` remains the public entry point for RTSP operations
-- ONVIF lookup is delegated to a dedicated helper module
+- `onvif_client.py` remains the dedicated ONVIF helper module
 - The public methods still return the same payloads and URL lists
 - The backend API does not need to change
 
 ## Notes for the Next Agent
 
 - Start from the current behavior, not from the ideal API.
-- Prefer the smallest refactor that removes the custom ONVIF SOAP code.
+- Prefer the smallest refactor that simplifies custom ONVIF SOAP code.
 - If `onvif-zeep` adds complexity or platform risk, keep the current logic but extract and simplify it.
 - Avoid changing the frontend unless the backend contract changes, which should be avoided.
 
 ## Suggested Next Step
 
-Have the next agent inspect the ONVIF-specific block in [backend/src/rtsp_camera.py](../../backend/src/rtsp_camera.py) and decide whether to:
+Have the next agent inspect ONVIF-specific blocks in [backend/src/onvif_client.py](../../backend/src/onvif_client.py) and decide whether to:
 
 1. Extract it into a dedicated module with the same behavior, or
 2. Replace it with `onvif-zeep` while keeping the current API contract intact.

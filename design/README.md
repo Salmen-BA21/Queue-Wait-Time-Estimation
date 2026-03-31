@@ -10,7 +10,7 @@ A complete UI/UX design for the **QueueVision** web application was created usin
 
 ### Design File Location
 
-- **File:** `pencil-new.pen` (at workspace root)
+- **File:** `QueueVision Design.pen` (inside `design/`)
 - **Tool:** Pencil MCP — the file is encrypted and can ONLY be read using Pencil MCP tools (`batch_get`, `get_screenshot`, `snapshot_layout`, etc.)
 - **DO NOT** try to read the `.pen` file with `read_file` or `grep_search` — it will return encrypted data
 
@@ -96,17 +96,17 @@ Node IDs for screenshots:
 - Heatmap: `SU8Ec`
 
 ### Step 4: Connect to Backend
-The existing Python backend (`src/`) provides:
+The existing Python backend (`backend/src/`) provides:
 - YOLO26 detection + ByteTrack tracking
 - M/M/1 queue analysis with Bayesian uncertainty
 - Webhook client for n8n integration
 - CSV logging
 
-The web frontend will need to:
-1. Create REST API endpoints wrapping the existing Python logic
-2. Add WebSocket/SSE for real-time camera feeds and metrics
+The web frontend should:
+1. Use existing REST endpoints in `backend/src/api/app.py`
+2. Consume websocket events from `/ws/metrics`
 3. Implement zone drawing with HTML5 Canvas API
-4. Build chart components from the analytics data in `data/*.csv`
+4. Build chart components from metrics data and live updates
 
 ---
 
@@ -126,12 +126,12 @@ The web frontend will need to:
 | File | Purpose |
 |------|---------|
 | `design/DESIGN_SPEC.md` | Complete technical design specification |
-| `pencil-new.pen` | Pencil design file (use MCP tools to view) |
-| `src/config.py` | Backend configuration (maps to Settings page) |
-| `src/queue_analyzer.py` | Queue metrics (maps to Dashboard KPIs) |
-| `src/uncertainty.py` | Uncertainty calculations (maps to Analytics confidence intervals) |
-| `src/threshold_detector.py` | Alert logic (maps to Dashboard alert sidebar) |
-| `src/webhook_client.py` | n8n integration (maps to Settings webhook section) |
+| `QueueVision Design.pen` | Pencil design file (use MCP tools to view) |
+| `backend/src/config.py` | Backend configuration (maps to Settings page) |
+| `backend/src/queue_analyzer.py` | Queue metrics (maps to Dashboard KPIs) |
+| `backend/src/uncertainty.py` | Uncertainty calculations (maps to Analytics confidence intervals) |
+| `backend/src/threshold_detector.py` | Alert logic (maps to Dashboard alert sidebar) |
+| `backend/src/webhook_client.py` | n8n integration (maps to Settings webhook section) |
 | `data/*.csv` | Historical metrics (maps to Analytics charts) |
 
 ---

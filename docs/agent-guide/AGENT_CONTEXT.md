@@ -6,7 +6,7 @@
 
 ## 📍 Current Sprint
 
-**Sprint 11 – Web Application Frontend Implementation**
+**Sprint 11 – Web Application Integration & Stabilization**
 **Status:** IN PROGRESS 🔄
 
 - ✅ Design completed (Sprint 10)
@@ -17,8 +17,9 @@
 - ✅ Tailwind CSS configured
 - ✅ Routing structure in place with React Router
 - ✅ Testing setup (Vitest)
-- ⏳ API integration with backend (pending)
-- ⏳ Backend REST API endpoints (pending)
+- ✅ Typed frontend API client implemented (`frontend/src/lib/api.ts`)
+- ✅ Backend REST + websocket BFF implemented (`backend/src/api/` + `/ws/metrics`)
+- ⏳ Remaining frontend wiring polish and end-to-end validation
 
 **Also Completed (Sprint 5 Enhancement):**
 - ✅ RTSP camera support with authentication (Mar 5)
@@ -28,11 +29,10 @@
 ---
 
 ## 🎯 Next Immediate Tasks
-1. **Connect Frontend to Backend API:** Frontend API client remains to be implemented; the backend BFF REST endpoints are already implemented in `backend/src/api/` (feeds, uploads, RTSP/ONVIF tests and `/ws/metrics`).
-2. **Complete Dashboard Integration:** Wire up real-time metrics from backend to frontend Dashboard page
-3. **Telegram Bot Setup:** Complete Sprint 5 by implementing Telegram bot integration with n8n
-4. **Frontend Testing:** Add integration tests for page flows and API communication
-5. **Deployment Setup:** Configure Docker for frontend + backend + n8n stack
+1. **Complete Dashboard Runtime Wiring:** Continue UX/state polish for live metrics and feed-state transitions.
+2. **Telegram Bot Setup:** Complete Sprint 5 by finishing Telegram credential/config onboarding in n8n.
+3. **Frontend Testing:** Expand integration/E2E coverage for API and websocket flows.
+4. **Deployment Setup:** Finalize Docker/full-stack deployment profile (frontend + backend + n8n).
 
 ---
 
@@ -56,7 +56,7 @@
 design/                    ⭐ WEB DESIGN
   ├── README.md              (Quick-start guide)
   ├── DESIGN_SPEC.md         (Full technical design spec – 7 pages)
-  └── pencil-new.pen         (Pencil MCP design file – DO NOT read with text tools)
+  └── QueueVision Design.pen (Pencil MCP design file – DO NOT read with text tools)
 
 backend/                   ⭐ PYTHON BACKEND
   ├── src/
@@ -149,5 +149,5 @@ docs/
 
 ---
 
-**Last Updated:** March 5, 2026
+**Last Updated:** March 31, 2026
 

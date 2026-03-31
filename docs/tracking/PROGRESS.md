@@ -77,7 +77,7 @@ This report assesses the completion status of each sprint based on the project s
   - ✅ GUI integration for RTSP camera management
   - ✅ Automatic reconnection logic
 - ✅ **IP Camera Discovery Added (Mar 6):**
-  - ✅ WS-Discovery protocol implementation (`backend/src/rtsp_camera.py`)
+  - ✅ WS-Discovery protocol implementation (`backend/src/onvif_client.py`)
   - ✅ IP camera discovery with device information extraction
   - ✅ RTSP stream URL retrieval from camera media services
   - ✅ XML namespace fixes for SOAP parsing
@@ -116,7 +116,7 @@ This report assesses the completion status of each sprint based on the project s
 - ✅ Design specification documented in `design/DESIGN_SPEC.md`
 - ✅ Agent handoff guide created in `design/README.md`
 - ✅ All 7 pages verified with screenshots
-**Design file:** `pencil-new.pen` (Pencil MCP format, 7 pages at 1440×900px)
+**Design file:** `QueueVision Design.pen` (Pencil MCP format, 7 pages at 1440×900px)
 
 ### Sprint 11 – Web Application Frontend Implementation ⭐ LATEST
 **Status: IN PROGRESS**
@@ -136,9 +136,9 @@ This report assesses the completion status of each sprint based on the project s
 - ✅ React Router setup for page navigation
 - ✅ Testing framework configured (Vitest)
 - ✅ TypeScript full type safety throughout
-⏳ API client implementation (frontend) — pending (frontend needs to consume existing backend BFF)
-✅ Backend BFF REST API endpoints implemented (`backend/src/api/`) — feeds, uploads, RTSP/ONVIF tests, snapshots, and `/ws/metrics`
-⏳ Real-time metrics integration (frontend wiring pending)
+- ✅ API client implementation complete (`frontend/src/lib/api.ts`)
+- ✅ Backend BFF REST API endpoints implemented (`backend/src/api/`) — feeds, uploads, RTSP/ONVIF tests, snapshots, and `/ws/metrics`
+- ⏳ Real-time metrics integration polish (remaining runtime UX/state refinements)
 
 ### Sprint 8 – Final Testing & Evaluation
 **Current Focus:** Frontend integration (implement API client and wire dashboard to existing backend BFF) and Telegram bot completion  
@@ -174,7 +174,7 @@ This report assesses the completion status of each sprint based on the project s
 
 ## 🎯 Next Immediate Tasks
 
-1. **Connect Frontend to Backend API:** Implement the frontend API client to consume the existing backend BFF endpoints (`/api/*`) and the `/ws/metrics` websocket feed.
+1. **Stabilize Frontend Runtime Integration:** Finalize dashboard state transitions and websocket-driven UI updates across all feed states.
 2. **Complete Dashboard Integration:** Wire real-time metrics from backend to frontend Dashboard
 3. **Telegram Bot Setup:** Complete Sprint 5 by implementing Telegram bot with n8n
 4. **Frontend Testing:** Add E2E tests for page flows and API communication

@@ -2,6 +2,8 @@
 
 **Last Updated:** March 31, 2026
 
+> Note: This file is a cumulative status log. Some older sections preserve historical context from before the `backend/` + `frontend/` restructure and may reference legacy paths. For the current runtime contract, use `README.md` and `docs/API_FOR_FRONTEND.md`.
+
 ## ✅ FIXED: Runtime Smoothness, GPU Selection, And Playback Pacing
 
 ### Overview
@@ -60,10 +62,10 @@ Implemented complete IP camera discovery system with GUI integration, allowing a
 - **Documentation**: Updated README, created detailed ONVIF guide
 
 ### Files Created/Modified
-- `backend/src/rtsp_camera.py`: Added IP Camera Discovery class and methods
+- `backend/src/onvif_client.py`: Added ONVIF discovery and stream resolution helpers
 - `backend/src/gui/app.py`: Added IP Camera Discovery tab and handlers
 - `backend/scripts/discover_cameras.py`: Discovery example script
-- `backend/scripts/test_ip_discovery.py`: Basic discovery test
+- `backend/scripts/test_ip_camera_discovery.py`: Basic discovery test
 - `docs/IP_CAMERA_DISCOVERY_README.md`: Complete usage guide
 - `README.md`: Updated with GUI integration instructions
 
@@ -104,7 +106,7 @@ This prevents garbage collection by maintaining strong references throughout the
   - Changed display_frame() to store images in instance variables
   - Fixed Unicode print statements (✓ → [OK])
 
-## ✅ System Architecture
+## ✅ System Architecture (Legacy Snapshot)
 
 ### Core Pipeline
 1. **Detection**: YOLO26 object detector (person class)

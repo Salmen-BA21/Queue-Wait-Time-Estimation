@@ -1,6 +1,6 @@
 # 🎨 QueueVision Web Application – Complete Design Specification
 
-**Design File:** `pencil-new.pen` (Pencil MCP format)  
+**Design File:** `QueueVision Design.pen` (Pencil MCP format)  
 **Total Pages:** 7  
 **Canvas Size:** 1440 × 900 px per page  
 **Created:** February 27, 2026  
@@ -584,7 +584,7 @@ interface AppSettings {
 
 | Item | Value |
 |------|-------|
-| **File** | `pencil-new.pen` (workspace root) |
+| **File** | `QueueVision Design.pen` (`design/` folder) |
 | **Tool** | Pencil MCP (`.pen` format, encrypted) |
 | **Access** | Use Pencil MCP tools only (`batch_get`, `get_screenshot`, etc.) |
 | **Pages** | 7 frames, each 1440×900px, spaced 1540px apart on x-axis |

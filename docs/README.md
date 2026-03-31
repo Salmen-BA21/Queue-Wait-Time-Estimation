@@ -46,7 +46,7 @@ Legacy phase documents are archived to preserve history. New updates should be w
 - **Understanding a Sprint?** → Check `sprints/` or `daily-logs/`
 - **Checking Recent Work?** → See `tracking/STATUS_REPORT.md` or latest in `daily-logs/`
 
-- **Backend API:** The backend BFF REST API and websocket (`/ws/metrics`) are implemented in `backend/src/api/`. Frontend developers should consume these endpoints; frontend API client work remains.
+- **Backend API:** The backend BFF REST API and websocket (`/ws/metrics`) are implemented in `backend/src/api/`, and the typed frontend client is implemented in `frontend/src/lib/api.ts`.
 
 ---
 

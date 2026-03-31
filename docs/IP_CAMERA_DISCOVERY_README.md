@@ -9,7 +9,8 @@ This feature automatically discovers IP cameras on your local network using stan
 - **Device Information**: Extracts camera details (name, manufacturer, model, IP, serial number, hardware version, location)
 - **RTSP Stream Detection**: Automatically retrieves RTSP stream URLs from discovered devices
   - Tries ONVIF media service first (standard method)
-  - Falls back to common stream paths (`/profile0`, `/profile1`, `/stream1`, `/live/main`, etc.) for cameras without media service
+  - Resolves media service via device capabilities when WS-Discovery does not expose it directly
+  - Returns an empty list if ONVIF does not provide usable stream URIs (no URL guessing)
 - **Authentication Support**: Handles username/password authentication for device queries and stream access
 - **GUI Integration**: Fully integrated into the queue monitoring GUI application
 - **Connection Testing**: Test RTSP streams with credentials before adding to monitoring
@@ -62,10 +63,10 @@ The IP camera discovery feature is fully integrated into the main GUI applicatio
 ### Basic Discovery
 
 ```python
-from backend.src.rtsp_camera import RTSPCamera
+from backend.src.onvif_client import discover_ip_devices
 
 # Discover all IP cameras on the network
-devices = RTSPCamera.discover_ip_devices()
+devices = discover_ip_devices(timeout=5.0)
 
 for device in devices:
     print(f"Found camera: {device['name']}")
@@ -77,8 +78,11 @@ for device in devices:
 ### Get RTSP Streams
 
 ```python
+from backend.src.onvif_client import get_rtsp_urls_from_onvif_device
+from backend.src.rtsp_camera import RTSPCamera
+
 # Get RTSP URLs from a discovered device
-rtsp_urls = RTSPCamera.get_rtsp_urls_from_onvif_device(
+rtsp_urls = get_rtsp_urls_from_onvif_device(
     device,
     username="admin",  # Optional
     password="password123"  # Optional
@@ -122,17 +126,17 @@ If WS-Discovery does not list the media service directly, the system queries the
 ### Example: Discovering Camera Without Media Service
 
 ```python
-from backend.src.rtsp_camera import RTSPCamera
+from backend.src.onvif_client import discover_onvif_devices, get_rtsp_urls_from_onvif_device
 
 # Discover device (e.g., Digital Watchdog DVR)
-devices = RTSPCamera.discover_onvif_devices()
+devices = discover_onvif_devices()
 device = devices[0]
 
 # No media service in device['services']
 print(device['services'])  # Output: {'device': '...'}
 
 # Stage 2 resolves the media XAddr from device capabilities
-urls = RTSPCamera.get_rtsp_urls_from_onvif_device(
+urls = get_rtsp_urls_from_onvif_device(
     device,
     username="admin",
     password="password123"
@@ -145,12 +149,15 @@ print(urls)
 ### Integration with Queue System
 
 ```python
+from backend.src.onvif_client import discover_onvif_devices, get_rtsp_urls_from_onvif_device
+from backend.src.rtsp_camera import RTSPCamera
+
 # Add discovered cameras to your queue monitoring
-devices = RTSPCamera.discover_onvif_devices()
+devices = discover_onvif_devices()
 
 camera_configs = []
 for device in devices:
-    rtsp_urls = RTSPCamera.get_rtsp_urls_from_onvif_device(device)
+    rtsp_urls = get_rtsp_urls_from_onvif_device(device)
 
     for rtsp_url in rtsp_urls:
         # Test connection first
@@ -172,7 +179,7 @@ for config in camera_configs:
 
 | Feature | GUI Method | Programmatic Method |
 |---------|------------|-------------------|
-| **Discovery** | Click "Discover Cameras" button | `RTSPCamera.discover_ip_devices()` |
+| **Discovery** | Click "Discover Cameras" button | `discover_ip_devices()` |
 | **Device Selection** | Multi-select from listbox | Iterate through devices list |
 | **Credential Entry** | Secure dialog prompts | Pass username/password parameters |
 | **Connection Testing** | Built-in test button | `RTSPCamera.test_connection()` |
@@ -209,7 +216,7 @@ Each discovered device returns a dictionary with:
 #### Discovery Button Not Working
 - **Symptom**: Clicking "Discover Cameras" shows no progress or hangs
 - **Solution**: Check Windows Firewall settings for multicast UDP traffic
-- **Test**: Run `python backend/scripts/test_ip_discovery.py` from command line
+- **Test**: Run `python backend/scripts/test_ip_camera_discovery.py` from command line
 
 #### Cameras Not Appearing in List
 - **Symptom**: Discovery completes but no cameras shown
@@ -235,7 +242,7 @@ Each discovered device returns a dictionary with:
 
 #### Authentication Issues
 - Some cameras require authentication for media service queries
-- Try providing username/password to `get_rtsp_urls_from_device()`
+- Try providing username/password to `get_rtsp_urls_from_onvif_device()`
 - Default credentials vary by manufacturer:
   - Hikvision: `admin`/`12345`
   - Dahua: `admin`/`admin`
@@ -248,9 +255,10 @@ Each discovered device returns a dictionary with:
 
 ## 📋 Requirements
 
-- `lxml` library for XML parsing (automatically installed)
+- `lxml` library for XML parsing (installed via `requirements.txt`)
 - Network access to multicast UDP traffic (port 3702)
-- IP cameras supporting standard discovery protocols
+- Cameras reachable on the same subnet
+- IP cameras supporting ONVIF/WS-Discovery
 
 ## 📊 Example Output
 

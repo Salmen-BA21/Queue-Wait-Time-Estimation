@@ -5,7 +5,7 @@ N8N_API_KEY=${N8N_API_KEY:-}
 if [ -z "$N8N_BASE_URL" ]; then
   read -p "Enter your n8n base URL (e.g. http://localhost:5678): " N8N_BASE_URL
 fi
-URL="$N8N_BASE_URL/rest/executions?limit=1"
+URL="$N8N_BASE_URL/api/v1/executions?limit=1"
 echo "Querying n8n executions: $URL"
 AUTH_HEADER=()
 if [ -n "$N8N_API_KEY" ]; then

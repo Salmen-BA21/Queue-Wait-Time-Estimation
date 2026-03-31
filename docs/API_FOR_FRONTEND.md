@@ -1,109 +1,248 @@
-# API Summary for Frontend Developers
+# API Contract for Frontend
 
-This document lists the primary backend BFF endpoints and websocket contract frontend should consume.
+Canonical contract for the web dashboard frontend.
 
-Base API: `/api/` (FastAPI app in `backend/src/api/app.py`)
-WebSocket: `/ws/metrics`
+- Backend REST base: `/api`
+- WebSocket endpoint: `/ws/metrics`
+- Source of truth: `backend/src/api/app.py`, `backend/src/api/models.py`, `frontend/src/lib/api.ts`
 
-## Key REST endpoints
+## Response Envelope
 
-- `GET /api/feeds`
-  - Returns list of configured feeds (VideoFeed model).
+Most REST endpoints return:
 
-- `POST /api/feeds`
-  - Create/register a feed (body: `CreateFeedRequest`). Returns created `VideoFeed`.
-
-- `POST /api/feeds/batch-launch`
-  - Launch a batch of staged feeds. Body: `BatchFeedLaunchRequest`.
-
-- `GET /api/feeds/{feed_id}/status`
-  - Get status of a feed (VideoFeed).
-
-- `POST /api/feeds/{feed_id}/start` — start a feed
-- `POST /api/feeds/{feed_id}/stop` — stop a feed
-- `POST /api/feeds/{feed_id}/restart` — restart a feed
-- `DELETE /api/feeds/{feed_id}` — delete a feed
-- `POST /api/feeds/{feed_id}/zone` — update feed zone
-- `GET /api/feeds/{feed_id}/snapshot` — capture feed snapshot (returns `FeedSnapshotResult`)
-- `GET /api/feeds/{feed_id}/stream` — MJPEG live stream (`multipart/x-mixed-replace; boundary=frame`) for running feeds
-
-### MJPEG stream behavior
-
-- Intended for live RTSP/webcam cards in the dashboard.
-- Endpoint returns:
-  - `404` when feed does not exist
-  - `409` when feed exists but is not running/initializing
-  - `200` streaming response when feed is active
-- Client transport recommendation:
-  - Use stream endpoint for steady-state live rendering.
-  - Fall back to `GET /api/feeds/{feed_id}/snapshot` on transient stream error.
-  - Keep snapshot endpoint for zone-editor workflows.
-
-- `POST /api/upload` or `POST /api/uploads/video`
-  - Upload video file (multipart). Returns `preview_path` usable by frontend for playback.
-
-- RTSP / ONVIF helpers:
-  - `POST /api/sources/rtsp/test` — test RTSP connection (body: `RTSPConnectionTestRequest`)
-  - `POST /api/sources/rtsp/snapshot` — capture RTSP snapshot
-  - `POST /api/sources/onvif/discover` — discover devices (ONVIF)
-  - `POST /api/sources/onvif/streams` — resolve ONVIF streams
-  - `POST /api/sources/onvif/test` — ONVIF camera test
-
-- Metadata endpoints:
-  - `GET /api/establishments`
-  - `POST /api/establishments`
-  - `GET /api/establishments/{id}/caisses`
-  - `POST /api/establishments/{id}/caisses`
-
-- System health:
-  - `GET /api/system/health`
-
-## WebSocket: `/ws/metrics`
-
-- Connect to `/ws/metrics` to receive live events. On connect the server sends a `FeedSnapshotEvent` with current feeds.
-- The pipeline writes newline-delimited JSON events to an events file when running in CLI; frontend will receive updates via broadcaster.
-
-### Dashboard websocket payload (example fields)
-- `timestamp` (float)
-- `people_in_zone` (int)
-- `arrival_rate` (float)
-- `service_rate` (float)
-- `wait_time_seconds` (float|null) — null when queue unstable
-- `wait_time_ci` (list|null) — [lower, upper]
-- `uncertainty_level` ("Low"|"Medium"|"High")
-- `queue_stable` (bool)
-
-Use these fields to update metrics, charts, and alert statuses in the dashboard.
-
-## Webhook payload (n8n) — reference
-See `backend/src/webhook.py` for `QueuePayload` and `EXAMPLE_PAYLOAD`.
-Important fields sent to n8n include:
-- `timestamp`, `frame_id`, `source`
-- `people_in_zone`, `arrival_rate`, `service_rate`, `estimated_wait_sec`
-- `arrival_rate_lower`, `arrival_rate_upper`, `service_rate_lower`, `service_rate_upper`, `wait_time_lower`, `wait_time_upper`
-- `uncertainty_level`, `queue_stable`, `alert_triggered`, `alert_reason`, `alert_severity`
-
-## Notes for Frontend Implementation
-- The backend BFF is implemented (`backend/src/api/app.py`). The frontend should implement an API client to call the endpoints above and connect to `/ws/metrics` for live updates.
-- Uploaded video `preview_path` values are served at `/api/uploads/files/{file_name}`.
-- RTSP/ONVIF endpoints perform potentially blocking IO; use the provided async endpoints — they offload work to threads.
-
-## Example: consume websocket (pseudo-code)
-
-```js
-const ws = new WebSocket('ws://localhost:8000/ws/metrics');
-ws.onmessage = (ev) => {
-  const data = JSON.parse(ev.data);
-  // Handle FeedSnapshotEvent or other events
-};
+```json
+{
+  "success": true,
+  "data": {},
+  "message": "optional"
+}
 ```
 
-## Where to look in repo
-- Backend API implementation: `backend/src/api/app.py`
-- WebSocket hub & runtime: `backend/src/api/runtime.py`
-- Payload model: `backend/src/webhook.py`
-- Dashboard payload builder: `backend/src/main.py` (`_dashboard_metrics_payload`)
+Streaming endpoint `/api/feeds/{feed_id}/stream` returns MJPEG bytes and does not use the envelope.
 
----
+## Feed Endpoints
 
-Last updated: automatic update by dev agent on request.
+| Method | Path | Request Body | Response `data` |
+|---|---|---|---|
+| GET | `/api/feeds` | None | `VideoFeed[]` |
+| POST | `/api/feeds` | `CreateFeedRequest` | `VideoFeed` |
+| POST | `/api/feeds/batch-launch` | `BatchFeedLaunchRequest` | `BatchFeedLaunchResponse` |
+| GET | `/api/feeds/{feed_id}/status` | None | `VideoFeed` |
+| POST | `/api/feeds/{feed_id}/start` | None | `VideoFeed` |
+| POST | `/api/feeds/{feed_id}/stop` | None | `VideoFeed` |
+| POST | `/api/feeds/{feed_id}/restart` | None | `VideoFeed` |
+| DELETE | `/api/feeds/{feed_id}` | None | `{ "feed_id": string }` |
+| GET | `/api/feeds/{feed_id}/snapshot` | None | `FeedSnapshotResult` |
+| GET | `/api/feeds/{feed_id}/stream` | None | `multipart/x-mixed-replace` |
+| POST | `/api/feeds/{feed_id}/zone` | `ZoneUpdateRequest` | `VideoFeed` |
+| POST | `/api/feeds/{feed_id}/thresholds` | `QueueThresholdUpdateRequest` | `VideoFeed` |
+
+### MJPEG Stream Status Codes
+
+- `200`: feed streaming
+- `404`: feed id not found
+- `409`: feed exists but is not running/initializing
+
+Recommended frontend strategy:
+
+1. Use `/api/feeds/{feed_id}/stream` for live cards.
+2. Fallback to `/api/feeds/{feed_id}/snapshot` on transient stream failures.
+3. Keep snapshot endpoint for zone editor and re-zoning workflows.
+
+## Video Upload Endpoints
+
+| Method | Path | Request Body | Response `data` |
+|---|---|---|---|
+| POST | `/api/upload` | multipart form `file` | `UploadVideoResponse` |
+| POST | `/api/uploads/video` | multipart form `file` | `UploadVideoResponse` |
+| GET | `/api/uploads/files/{file_name}` | None | file bytes |
+
+`UploadVideoResponse.preview_path` is browser-facing and should be used by the frontend for preview playback.
+
+## Source Onboarding Endpoints
+
+### RTSP
+
+| Method | Path | Request Body | Response `data` |
+|---|---|---|---|
+| POST | `/api/sources/rtsp/test` | `RTSPConnectionTestRequest` | `RTSPConnectionTestResult` |
+| POST | `/api/sources/rtsp/snapshot` | `RTSPSnapshotRequest` | `RTSPSnapshotResult` |
+
+### ONVIF
+
+| Method | Path | Request Body | Response `data` |
+|---|---|---|---|
+| POST | `/api/sources/onvif/discover` | `ONVIFDiscoveryRequest` | `ONVIFDevice[]` |
+| POST | `/api/sources/onvif/streams` | `ONVIFStreamResolutionRequest` | `ONVIFStream[]` |
+| POST | `/api/sources/onvif/test` | `ONVIFCameraTestRequest` | `ONVIFCameraTestResult` |
+
+## Metadata Endpoints
+
+| Method | Path | Request Body | Response `data` |
+|---|---|---|---|
+| GET | `/api/establishments` | None | `Establishment[]` |
+| POST | `/api/establishments` | `CreateEstablishmentRequest` | `Establishment` |
+| GET | `/api/establishments/{establishment_id}/caisses` | None | `Caisse[]` |
+| POST | `/api/establishments/{establishment_id}/caisses` | `CreateCaisseRequest` | `Caisse` |
+
+## System and Integration Endpoints
+
+| Method | Path | Request Body | Response `data` |
+|---|---|---|---|
+| GET | `/api/system/health` | None | `SystemHealth` |
+| GET | `/api/system/webhook` | None | `WebhookIntegrationStatus` |
+| POST | `/api/system/webhook/test` | None | `WebhookIntegrationTestResult` |
+| POST | `/api/alerts/archive` | `QueueAlertArchiveRequest` | `QueueAlertArchiveResponse` |
+
+## Core Request/Response Shapes
+
+### CreateFeedRequest
+
+```json
+{
+  "name": "Lane 3",
+  "source": "rtsp://camera.local:554/stream1",
+  "model_size": "n",
+  "establishment_id": 1,
+  "caisse_id": 2,
+  "rtsp_username": "admin",
+  "rtsp_password": "secret",
+  "rtsp_transport": "tcp"
+}
+```
+
+### ZoneUpdateRequest
+
+```json
+{
+  "zone": {
+    "points": [
+      { "x": 0.2, "y": 0.25 },
+      { "x": 0.8, "y": 0.25 },
+      { "x": 0.8, "y": 0.95 },
+      { "x": 0.2, "y": 0.95 }
+    ]
+  }
+}
+```
+
+### QueueThresholdUpdateRequest
+
+```json
+{
+  "queue_length_warning": 10
+}
+```
+
+### QueueMetrics (from websocket `metrics_update`)
+
+```json
+{
+  "timestamp": 1711898585.12,
+  "people_in_zone": 7,
+  "arrival_rate": 0.14,
+  "service_rate": 0.18,
+  "wait_time_seconds": 22.7,
+  "wait_time_ci": [14.3, 33.8],
+  "uncertainty_level": "Low",
+  "queue_stable": true,
+  "detections": [[12, 44, 130, 312, 0.94, 0, 53]],
+  "render_frame_jpeg_base64": null
+}
+```
+
+`detections` and `render_frame_jpeg_base64` are optional fields.
+
+## WebSocket Contract: `/ws/metrics`
+
+On connect, server emits snapshot first, then incremental events.
+
+### Event Types
+
+1. `snapshot`
+2. `feed_status`
+3. `metrics_update`
+4. `alert_fired`
+5. `system_warning`
+
+### Event Schemas
+
+```json
+{
+  "event": "snapshot",
+  "payload": { "feeds": [] }
+}
+```
+
+```json
+{
+  "event": "feed_status",
+  "payload": {
+    "action": "created",
+    "feed": {},
+    "feed_id": "feed_123"
+  }
+}
+```
+
+```json
+{
+  "event": "metrics_update",
+  "payload": {
+    "feed_id": "feed_123",
+    "metrics": {}
+  }
+}
+```
+
+```json
+{
+  "event": "alert_fired",
+  "payload": {
+    "feed_id": "feed_123",
+    "alert": {
+      "alert_type": "QUEUE_BACKLOG_WARNING",
+      "severity": "warning",
+      "message": "Queue length exceeded",
+      "threshold_name": "queue_length_warning",
+      "current_value": 12,
+      "threshold_value": 8,
+      "frame_id": 455,
+      "timestamp": "2026-03-31T10:15:20.000Z"
+    }
+  }
+}
+```
+
+```json
+{
+  "event": "system_warning",
+  "payload": {
+    "feed_id": "feed_123",
+    "code": "SOURCE_UNREACHABLE",
+    "message": "RTSP reconnect attempts exhausted",
+    "timestamp": "2026-03-31T10:16:02.000Z"
+  }
+}
+```
+
+## Webhook Payload Note
+
+There are two related but different payloads in this repository:
+
+1. Backend runtime webhook payload (`backend/src/webhook.py`) used by `WebhookClient`:
+   - Flat fields such as `alert_triggered`, `alert_reason`, `alert_severity`
+2. Alert archive payload (`POST /api/alerts/archive`) used for structured alert storage:
+   - Includes nested `metrics`, optional `uncertainty`, and `alerts[]`
+
+When integrating n8n, use the runtime webhook payload as the incoming contract unless your workflow explicitly transforms and archives to `/api/alerts/archive`.
+
+## Frontend Client Mapping
+
+The frontend already maps these routes in `frontend/src/lib/api.ts`, including:
+
+- `updateFeedThresholds()`
+- `getWebhookIntegrationStatus()`
+- `testWebhookIntegration()`
+- `getFeedMjpegStreamUrl()`
+- websocket types for all five event families

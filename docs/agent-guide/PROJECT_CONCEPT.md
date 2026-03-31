@@ -156,7 +156,7 @@ Assumptions:
   • Single queue, single service point
   
 Formula:
-  W = λ / (μ - λ)
+     W = 1 / (μ - λ)
   
 Where:
   λ = average arrival rate (people/sec)
@@ -165,6 +165,9 @@ Where:
   
 Conditions:
   λ < μ (system must be stable)
+
+Implementation note:
+     When λ >= μ, runtime marks the queue unstable and avoids the stable-formula division.
 ```
 
 ### Bayesian Uncertainty

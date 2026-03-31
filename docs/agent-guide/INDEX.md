@@ -138,7 +138,7 @@ frontend/                  ⭐ REACT FRONTEND (NEW)
 design/                    ⭐ WEB DESIGN
 ├── README.md              (quick-start for frontend implementation)
 ├── DESIGN_SPEC.md         (full technical design specification)
-└── pencil-new.pen         (Pencil MCP design file – 7 pages)
+└── QueueVision Design.pen (Pencil MCP design file – 7 pages)
 
 docs/tracking/             (project status)
 ├── PROGRESS.md            (sprint-by-sprint breakdown)
@@ -169,7 +169,7 @@ docs/daily-logs/           (development history)
 
 ---
 
-**Last Updated:** March 5, 2026
+**Last Updated:** March 31, 2026
 
 Welcome to the Queue Wait-Time Estimation System! 🚀
 
