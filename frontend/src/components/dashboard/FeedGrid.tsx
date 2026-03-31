@@ -95,10 +95,7 @@ function FeedThresholdEditor({
   );
 }
 
-function shouldUseSnapshotTransport(feed: VideoFeed): boolean {
-  const source = feed.source.trim().toLowerCase();
-  return source.startsWith("rtsp://") || /^\d+$/.test(source);
-}
+
 
 function FeedTransportSurface({
   feed,
@@ -122,15 +119,13 @@ function FeedTransportSurface({
   const [fallbackFrameUrl, setFallbackFrameUrl] = useState<string | null>(null);
   const [streamAttempt, setStreamAttempt] = useState(0);
   const [streamErrorCount, setStreamErrorCount] = useState(0);
-  const usesSnapshotTransport = shouldUseSnapshotTransport(feed);
 
   useEffect(() => {
     setPlaybackFailed(false);
   }, [feed.feed_id, feed.preview_path]);
 
   const transportActive = uiStatus !== "offline" && !isStopping;
-  const shouldUseMjpegStream = usesSnapshotTransport
-    && transportActive
+  const shouldUseMjpegStream = transportActive
     && (feed.status === "running" || feed.status === "initializing");
   const streamUrl = shouldUseMjpegStream
     ? `${getFeedMjpegStreamUrl(feed.feed_id)}?attempt=${streamAttempt}`
