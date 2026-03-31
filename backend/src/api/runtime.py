@@ -510,6 +510,11 @@ class FeedFrameStreamManager:
         capture_source: str | int = int(source) if source.isdigit() else source
         return cv2.VideoCapture(capture_source)
 
+    @staticmethod
+    def _fps_to_frame_interval(native_fps: float) -> float:
+        """Return the per-frame sleep duration that matches a video file's native FPS."""
+        return 1.0 / native_fps if native_fps > 0 else 1.0 / 25.0
+
     def _capture_loop(self, state: FeedFrameStreamState) -> None:
         try:
             import cv2
@@ -523,6 +528,16 @@ class FeedFrameStreamManager:
         capture = self._open_capture(state)
         failure_count = 0
         is_rtsp_source = state.source.lower().startswith("rtsp://")
+        is_live_source = is_rtsp_source or state.source.isdigit()
+
+        # For file sources, throttle the capture loop to the video's native FPS so
+        # the MJPEG stream plays back at real speed and doesn't burn CPU looping.
+        frame_interval = (
+            self._fps_to_frame_interval(capture.get(cv2.CAP_PROP_FPS))
+            if not is_live_source and capture.isOpened()
+            else 0.0
+        )
+        last_frame_time = time.monotonic()
 
         try:
             while not state.stop_event.is_set():
@@ -531,6 +546,8 @@ class FeedFrameStreamManager:
                     time.sleep(0.2)
                     capture.release()
                     capture = self._open_capture(state)
+                    if not is_live_source and capture.isOpened():
+                        frame_interval = self._fps_to_frame_interval(capture.get(cv2.CAP_PROP_FPS))
                     continue
 
                 ok, frame = capture.read()
@@ -566,6 +583,13 @@ class FeedFrameStreamManager:
                     state.height = frame_height
                     state.last_error = None
                     state.condition.notify_all()
+
+                if frame_interval > 0:
+                    now = time.monotonic()
+                    sleep_time = frame_interval - (now - last_frame_time)
+                    if sleep_time > 0:
+                        time.sleep(sleep_time)
+                    last_frame_time = time.monotonic()
         finally:
             capture.release()
             with state.condition:
