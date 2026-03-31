@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FeedGrid } from "@/components/dashboard/FeedGrid";
 import { getFeedMjpegStreamUrl, getFeedSnapshot, type VideoFeed } from "@/lib/api";
@@ -12,6 +12,10 @@ vi.mock("@/lib/api", async () => {
     getFeedSnapshot: vi.fn(),
     resolveApiUrl: vi.fn((path: string) => `http://localhost:8000${path}`),
   };
+});
+
+beforeEach(() => {
+  vi.clearAllMocks();
 });
 
 function createFeed(overrides: Partial<VideoFeed> = {}): VideoFeed {
@@ -44,17 +48,6 @@ function createFeed(overrides: Partial<VideoFeed> = {}): VideoFeed {
 
 describe("FeedGrid MJPEG transport", () => {
   it("renders RTSP feeds with the MJPEG endpoint instead of snapshot polling", () => {
-    vi.mocked(getFeedSnapshot).mockResolvedValue({
-      feed_id: "feed-1",
-      source: "rtsp://camera-1/live",
-      captured: true,
-      resolution: "1280x720",
-      width: 1280,
-      height: 720,
-      image_data_url: "data:image/jpeg;base64,ZmFrZQ==",
-      error: null,
-    });
-
     render(
       <FeedGrid
         feeds={[createFeed()]}
@@ -104,4 +97,59 @@ describe("FeedGrid MJPEG transport", () => {
     });
     expect(await screen.findByAltText("Checkout 1 fallback frame")).toBeInTheDocument();
   });
+
+  it("renders running uploaded video feeds with the MJPEG endpoint", () => {
+    render(
+      <FeedGrid
+        feeds={[
+          createFeed({
+            feed_id: "feed-2",
+            name: "Retail Video",
+            source: "/data/uploads/retail.mp4",
+            preview_path: "/api/uploads/files/retail.mp4",
+            status: "running",
+          }),
+        ]}
+        emptyState={false}
+        activeFeedAction={null}
+        onEditZone={() => {}}
+        onFeedAction={() => {}}
+        onSaveThresholds={async () => {}}
+        isSavingThresholds={false}
+      />,
+    );
+
+    const liveFrame = screen.getByAltText("Retail Video live frame") as HTMLImageElement;
+    expect(liveFrame.src).toContain("/api/feeds/feed-2/stream?attempt=0");
+    expect(getFeedMjpegStreamUrl).toHaveBeenCalledWith("feed-2");
+    expect(getFeedSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("shows static video preview for created (not yet started) uploaded video feeds", () => {
+    render(
+      <FeedGrid
+        feeds={[
+          createFeed({
+            feed_id: "feed-3",
+            name: "Retail Video",
+            source: "/data/uploads/retail.mp4",
+            preview_path: "/api/uploads/files/retail.mp4",
+            status: "created",
+          }),
+        ]}
+        emptyState={false}
+        activeFeedAction={null}
+        onEditZone={() => {}}
+        onFeedAction={() => {}}
+        onSaveThresholds={async () => {}}
+        isSavingThresholds={false}
+      />,
+    );
+
+    expect(screen.queryByAltText("Retail Video live frame")).not.toBeInTheDocument();
+    const videoEl = document.querySelector("video") as HTMLVideoElement | null;
+    expect(videoEl).not.toBeNull();
+    expect(videoEl!.src).toContain("/api/uploads/files/retail.mp4");
+  });
 });
+

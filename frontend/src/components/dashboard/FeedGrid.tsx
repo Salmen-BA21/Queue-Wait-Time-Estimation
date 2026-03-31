@@ -95,6 +95,7 @@ function FeedThresholdEditor({
   );
 }
 
+
 function FeedTransportSurface({
   feed,
   uiStatus,
@@ -225,45 +226,26 @@ function FeedTransportSurface({
               void captureSnapshotFallback();
             }}
           />
-          {/* Tracking overlays (zone polygon + person boxes) */}
-          {videoDims && (zonePolygonPoints || (uiStatus === "online" && detections?.length)) && (
+          {/* Zone polygon overlay only – detection boxes are already drawn by the backend pipeline */}
+          {videoDims && zonePolygonPoints && (
             <svg
               className="absolute inset-0 h-full w-full pointer-events-none"
               viewBox={`0 0 ${videoDims.width} ${videoDims.height}`}
               preserveAspectRatio="xMidYMid slice"
             >
-              {zonePolygonPoints && (
-                <>
-                  <polygon
-                    points={zonePolygonPoints}
-                    className="fill-cyan-400/10 stroke-cyan-300"
-                    strokeWidth={3}
-                    vectorEffect="non-scaling-stroke"
-                  />
-                  <polyline
-                    points={zonePolygonPoints}
-                    className="stroke-cyan-100/70"
-                    strokeWidth={1}
-                    fill="none"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                </>
-              )}
-
-              {uiStatus === "online" && detections?.map((det, idx) => {
-                const [x1, y1, x2, y2] = det;
-                return (
-                  <rect
-                    key={idx}
-                    x={x1}
-                    y={y1}
-                    width={x2 - x1}
-                    height={y2 - y1}
-                    className="fill-primary/10 stroke-primary stroke-[2]"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                );
-              })}
+              <polygon
+                points={zonePolygonPoints}
+                className="fill-cyan-400/10 stroke-cyan-300"
+                strokeWidth={3}
+                vectorEffect="non-scaling-stroke"
+              />
+              <polyline
+                points={zonePolygonPoints}
+                className="stroke-cyan-100/70"
+                strokeWidth={1}
+                fill="none"
+                vectorEffect="non-scaling-stroke"
+              />
             </svg>
           )}
         </>
