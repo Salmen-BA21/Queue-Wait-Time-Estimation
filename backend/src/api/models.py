@@ -182,6 +182,7 @@ class QueueMetricsModel(BaseModel):
     uncertainty_level: str
     queue_stable: bool
     detections: list[list[float]] | None = None
+    render_frame_jpeg_base64: str | None = None
 
 
 class AlertModel(BaseModel):

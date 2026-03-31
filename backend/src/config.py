@@ -55,6 +55,7 @@ MIN_EVENTS_FOR_RATE: int = 2       # min events to compute a rate
 DEFAULT_OUTPUT_FPS: int = 0
 DEFAULT_LOG_INTERVAL_SEC: float = 5.0
 WINDOW_NAME: str = "Queue Estimation"
+DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY: int = 85
 # Dashboard low-latency controls
 # Emit metrics/update events frequently so web overlays track detections closely.
 DASHBOARD_EVENT_EMIT_INTERVAL_SEC: float = 0.1
@@ -106,6 +107,8 @@ class AppConfig:
     feed_id: Optional[str] = None
     webhook_enabled: bool = WEBHOOK_ENABLED
     events_file: Optional[str] = None
+    dashboard_render_frames: bool = False
+    dashboard_frame_jpeg_quality: int = DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY
     headless: bool = False
 
     @property

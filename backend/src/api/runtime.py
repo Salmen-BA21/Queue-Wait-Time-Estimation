@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import binascii
 import json
 import os
 import subprocess
@@ -54,14 +55,14 @@ from src.database import (
     upsert_feed_config,
     update_caisse_zone_points,
 )
-from src.config import DASHBOARD_EVENT_POLL_INTERVAL_SEC
+from src.config import DASHBOARD_EVENT_POLL_INTERVAL_SEC, DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 UPLOAD_DIR = (BACKEND_DIR / "data" / "uploads").resolve()
 RUNTIME_LOG_DIR = (BACKEND_DIR / "data" / "runtime").resolve()
 DEFAULT_LOG_LEVEL = "INFO"
-DEFAULT_RESIZE_SCALE = 0.5
+DEFAULT_RESIZE_SCALE = 0.8
 
 
 class FeedStateError(RuntimeError):
@@ -281,6 +282,7 @@ class FeedFrameStreamState:
     username: str | None
     password: str | None
     transport: Literal["tcp", "udp"]
+    mode: Literal["capture", "worker"] = "capture"
     subscribers: int = 0
     latest_frame: bytes | None = None
     frame_index: int = 0
@@ -314,10 +316,13 @@ class FeedFrameStreamManager:
         async with self._lock:
             state = self._states.get(feed_id)
             if state is not None and (
+                state.mode == "capture"
+                and (
                 state.source != source
                 or state.username != username
                 or state.password != password
                 or state.transport != transport
+                )
             ):
                 stale_state = state
                 state = None
@@ -333,7 +338,10 @@ class FeedFrameStreamManager:
                 self._states[feed_id] = state
 
             state.subscribers += 1
-            should_start = state.worker is None or not state.worker.is_alive()
+            should_start = (
+                state.mode == "capture"
+                and (state.worker is None or not state.worker.is_alive())
+            )
 
         if stale_state is not None:
             await asyncio.to_thread(self._stop_state, stale_state)
@@ -372,6 +380,51 @@ class FeedFrameStreamManager:
 
         for state in states:
             await asyncio.to_thread(self._stop_state, state)
+
+    async def push_worker_frame(
+        self,
+        *,
+        feed_id: str,
+        source: str,
+        username: str | None,
+        password: str | None,
+        transport: Literal["tcp", "udp"],
+        frame_bytes: bytes,
+    ) -> None:
+        stale_state: FeedFrameStreamState | None = None
+
+        async with self._lock:
+            state = self._states.get(feed_id)
+            if state is not None and state.mode == "capture":
+                stale_state = state
+                state = None
+
+            if state is None:
+                state = FeedFrameStreamState(
+                    feed_id=feed_id,
+                    source=source,
+                    username=username,
+                    password=password,
+                    transport=transport,
+                    mode="worker",
+                )
+                self._states[feed_id] = state
+
+            # Keep source metadata in sync in case feed credentials/transport changed.
+            state.source = source
+            state.username = username
+            state.password = password
+            state.transport = transport
+            state.mode = "worker"
+
+        if stale_state is not None:
+            await asyncio.to_thread(self._stop_state, stale_state)
+
+        with state.condition:
+            state.latest_frame = frame_bytes
+            state.frame_index += 1
+            state.last_error = None
+            state.condition.notify_all()
 
     async def wait_for_next_frame(
         self,
@@ -643,6 +696,9 @@ class SubprocessFeedWorkerRunner:
             str(DEFAULT_RESIZE_SCALE),
             "--events-file",
             str(event_path),
+            "--dashboard-render-frames",
+            "--dashboard-frame-jpeg-quality",
+            str(DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY),
             "--headless",
         ]
 
@@ -736,19 +792,38 @@ class WebSocketHub:
         async with self._lock:
             clients = list(self._clients)
 
+        if not clients:
+            return
+
+        send_results = await asyncio.gather(
+            *(self._send_json(websocket, payload) for websocket in clients),
+            return_exceptions=False,
+        )
+
         stale_clients: list[WebSocket] = []
-        for websocket in clients:
-            try:
-                await websocket.send_json(payload)
-            except RuntimeError:
-                stale_clients.append(websocket)
-            except WebSocketDisconnect:
+        for websocket, delivered in zip(clients, send_results):
+            if not delivered:
                 stale_clients.append(websocket)
 
         if stale_clients:
             async with self._lock:
                 for websocket in stale_clients:
                     self._clients.discard(websocket)
+
+            for websocket in stale_clients:
+                try:
+                    await websocket.close()
+                except RuntimeError:
+                    pass
+                except WebSocketDisconnect:
+                    pass
+
+    async def _send_json(self, websocket: WebSocket, payload: dict) -> bool:
+        try:
+            await asyncio.wait_for(websocket.send_json(payload), timeout=2.0)
+            return True
+        except (RuntimeError, WebSocketDisconnect, asyncio.TimeoutError):
+            return False
 
     async def broadcast_feed_event(
         self,
@@ -1385,14 +1460,42 @@ class FeedRegistry:
         return model
 
     async def _apply_metrics_update(self, feed_id: str, metrics: QueueMetricsModel) -> None:
+        worker_frame_payload = metrics.render_frame_jpeg_base64
+        metrics_without_frame = metrics.model_copy(update={"render_frame_jpeg_base64": None})
+
+        source: str | None = None
+        username: str | None = None
+        password: str | None = None
+        transport: Literal["tcp", "udp"] = "tcp"
+
         async with self._lock:
             record = self._feeds.get(feed_id)
             if record is None:
                 return
 
-            record.latest_metrics = metrics.model_dump(mode="python")
+            record.latest_metrics = metrics_without_frame.model_dump(mode="python")
+            source = record.source
+            username = record.rtsp_username
+            password = record.rtsp_password
+            transport = record.rtsp_transport or "tcp"
 
-        await self._broadcaster.broadcast_metrics_event(feed_id=feed_id, metrics=metrics)
+        if isinstance(worker_frame_payload, str) and worker_frame_payload:
+            try:
+                frame_bytes = base64.b64decode(worker_frame_payload, validate=True)
+            except (ValueError, binascii.Error):
+                frame_bytes = b""
+
+            if frame_bytes and source is not None:
+                await self._frame_streams.push_worker_frame(
+                    feed_id=feed_id,
+                    source=source,
+                    username=username,
+                    password=password,
+                    transport=transport,
+                    frame_bytes=frame_bytes,
+                )
+
+        await self._broadcaster.broadcast_metrics_event(feed_id=feed_id, metrics=metrics_without_frame)
 
     async def _apply_alert_fired(self, feed_id: str, alert: AlertModel) -> None:
         await self._broadcaster.broadcast_alert_event(feed_id=feed_id, alert=alert)
@@ -1419,8 +1522,20 @@ class FeedRegistry:
         )
 
     async def _drain_worker_events(self, feed_id: str, handle: FeedWorkerHandle) -> None:
-        for event in self._read_worker_events(handle):
+        events = self._read_worker_events(handle)
+        if not events:
+            return
+
+        latest_metrics_event: dict[str, Any] | None = None
+        for event in events:
+            event_type = event.get("event")
+            if event_type == "metrics_update":
+                latest_metrics_event = event
+                continue
             await self._dispatch_worker_event(feed_id, event)
+
+        if latest_metrics_event is not None:
+            await self._dispatch_worker_event(feed_id, latest_metrics_event)
 
     def _read_worker_events(self, handle: FeedWorkerHandle) -> list[dict[str, Any]]:
         if handle.event_path is None or not handle.event_path.exists():

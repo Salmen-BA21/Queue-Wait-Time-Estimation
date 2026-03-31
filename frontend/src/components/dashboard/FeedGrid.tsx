@@ -95,17 +95,13 @@ function FeedThresholdEditor({
   );
 }
 
-function shouldUseSnapshotTransport(feed: VideoFeed): boolean {
-  const source = feed.source.trim().toLowerCase();
-  return source.startsWith("rtsp://") || /^\d+$/.test(source);
-}
-
 function FeedTransportSurface({
   feed,
   uiStatus,
   peopleInZone,
   waitTimeSeconds,
   detections,
+  renderedFrameJpegBase64,
   isStopping,
   onOpenViewer,
 }: {
@@ -114,6 +110,7 @@ function FeedTransportSurface({
   peopleInZone: number;
   waitTimeSeconds: number | undefined | null;
   detections?: number[][] | null;
+  renderedFrameJpegBase64?: string | null;
   isStopping: boolean;
   onOpenViewer?: () => void;
 }) {
@@ -122,15 +119,16 @@ function FeedTransportSurface({
   const [fallbackFrameUrl, setFallbackFrameUrl] = useState<string | null>(null);
   const [streamAttempt, setStreamAttempt] = useState(0);
   const [streamErrorCount, setStreamErrorCount] = useState(0);
-  const usesSnapshotTransport = shouldUseSnapshotTransport(feed);
+  const renderedFrameDataUrl = renderedFrameJpegBase64
+    ? `data:image/jpeg;base64,${renderedFrameJpegBase64}`
+    : null;
 
   useEffect(() => {
     setPlaybackFailed(false);
   }, [feed.feed_id, feed.preview_path]);
 
   const transportActive = uiStatus !== "offline" && !isStopping;
-  const shouldUseMjpegStream = usesSnapshotTransport
-    && transportActive
+  const shouldUseMjpegStream = transportActive
     && (feed.status === "running" || feed.status === "initializing");
   const streamUrl = shouldUseMjpegStream
     ? `${getFeedMjpegStreamUrl(feed.feed_id)}?attempt=${streamAttempt}`
@@ -172,6 +170,7 @@ function FeedTransportSurface({
 
   const previewUrl = feed.preview_path ? resolveApiUrl(feed.preview_path) : null;
   const showLiveFrame = Boolean(streamUrl) && !playbackFailed;
+  const showRenderedFrame = transportActive && !showLiveFrame && Boolean(renderedFrameDataUrl);
   const showFallbackFrame = !showLiveFrame && transportActive && Boolean(fallbackFrameUrl);
   const showPreview = transportActive && !showLiveFrame && !showFallbackFrame && Boolean(previewUrl) && !playbackFailed;
   const zonePoints = feed.zone?.points ?? [];
@@ -199,7 +198,15 @@ function FeedTransportSurface({
       disabled={!onOpenViewer}
       aria-label={onOpenViewer ? `Open ${feed.name} in expanded view` : undefined}
     >
-      {showLiveFrame ? (
+      {showRenderedFrame ? (
+        <img
+          className="h-full w-full object-cover"
+          src={renderedFrameDataUrl ?? undefined}
+          alt={`${feed.name} rendered tracking frame`}
+          onLoad={onImageLoad}
+          onError={() => setPlaybackFailed(true)}
+        />
+      ) : showLiveFrame ? (
         <>
           <img
             key={streamUrl}
@@ -462,6 +469,7 @@ function FeedGridComponent({
                 peopleInZone={peopleInZone}
                 waitTimeSeconds={wait_time_seconds}
                 detections={detections}
+                renderedFrameJpegBase64={feed.latest_metrics?.render_frame_jpeg_base64}
                 isStopping={currentAction === "stop"}
                 onOpenViewer={() => setExpandedFeedId(feed.feed_id)}
               />
@@ -612,6 +620,7 @@ function FeedGridComponent({
               peopleInZone={expandedFeed.latest_metrics?.people_in_zone ?? 0}
               waitTimeSeconds={expandedFeed.latest_metrics?.wait_time_seconds}
               detections={expandedFeed.latest_metrics?.detections}
+              renderedFrameJpegBase64={expandedFeed.latest_metrics?.render_frame_jpeg_base64}
               isStopping={
                 activeFeedAction?.feedId === expandedFeed.feed_id && activeFeedAction.action === "stop"
               }

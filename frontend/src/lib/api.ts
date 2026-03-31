@@ -63,6 +63,7 @@ export interface QueueMetrics {
   uncertainty_level: string;
   queue_stable: boolean;
   detections?: number[][] | null;
+  render_frame_jpeg_base64?: string | null;
 }
 
 export interface QueueAlert {

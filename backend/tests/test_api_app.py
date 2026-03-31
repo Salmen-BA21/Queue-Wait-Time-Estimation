@@ -550,6 +550,8 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertIn("secret", command)
         self.assertIn("--rtsp-transport", command)
         self.assertIn("udp", command)
+        self.assertIn("--dashboard-render-frames", command)
+        self.assertIn("--dashboard-frame-jpeg-quality", command)
 
     def test_feed_snapshot_uses_saved_rtsp_credentials(self) -> None:
         response = self.client.post(

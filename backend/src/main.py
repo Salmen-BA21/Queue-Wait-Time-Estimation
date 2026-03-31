@@ -11,6 +11,7 @@ Run with::
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import logging
 import math
@@ -24,6 +25,7 @@ import supervision as sv
 
 from src.config import (
     AppConfig,
+    DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY,
     DEFAULT_LOG_INTERVAL_SEC,
     DEFAULT_OUTPUT_FPS,
     DASHBOARD_EVENT_EMIT_INTERVAL_SEC,
@@ -201,6 +203,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional JSONL file used to stream structured dashboard events back to the API runtime.",
     )
     parser.add_argument(
+        "--dashboard-render-frames",
+        action="store_true",
+        help=(
+            "Include worker-rendered JPEG frames in dashboard metrics events "
+            "so browser tracking boxes stay synchronized with detections."
+        ),
+    )
+    parser.add_argument(
+        "--dashboard-frame-jpeg-quality",
+        type=int,
+        default=DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY,
+        help=(
+            "JPEG quality (1-100) for dashboard-rendered frames when "
+            "--dashboard-render-frames is enabled. (default: "
+            f"{DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY})"
+        ),
+    )
+    parser.add_argument(
         "--headless",
         action="store_true",
         help="Run without opening any GUI windows (cv2.imshow). (default: False)",
@@ -287,6 +307,7 @@ def run(cfg: AppConfig) -> None:
         last_warning_message: str | None = None
         last_warning_webhook_time = 0.0
         frame_count = 0
+        dashboard_jpeg_quality = int(np.clip(cfg.dashboard_frame_jpeg_quality, 30, 95))
 
         logger.info("Entering main loop. Press 'q' to quit.")
 
@@ -318,10 +339,10 @@ def run(cfg: AppConfig) -> None:
                 frame_id=frame_count,
                 timestamp=event_timestamp,
             )
+            labels = _build_labels(detections, in_zone)
 
             # 5. Draw
             if not cfg.headless:
-                labels = _build_labels(detections, in_zone)
                 frame = draw_detections(frame, detections, annotators, labels)
                 frame = zone_mgr.annotate(frame)
                 frame = draw_metrics_overlay(frame, _metrics_dict(metrics))
@@ -345,9 +366,39 @@ def run(cfg: AppConfig) -> None:
             # 7. Periodic logging & webhook sending
             now = time.monotonic()
             if (now - last_dashboard_event_time) >= DASHBOARD_EVENT_EMIT_INTERVAL_SEC:
+                render_frame_jpeg_base64: str | None = None
+                if cfg.dashboard_render_frames:
+                    render_frame = frame.copy()
+                    render_frame = draw_detections(render_frame, detections, annotators, labels)
+                    render_frame = zone_mgr.annotate(render_frame)
+                    render_frame = draw_metrics_overlay(render_frame, _metrics_dict(metrics))
+
+                    if cfg.resize_scale != 1.0:
+                        render_frame = cv2.resize(
+                            render_frame,
+                            (0, 0),
+                            fx=cfg.resize_scale,
+                            fy=cfg.resize_scale,
+                        )
+
+                    encoded_ok, encoded_frame = cv2.imencode(
+                        ".jpg",
+                        render_frame,
+                        [int(cv2.IMWRITE_JPEG_QUALITY), dashboard_jpeg_quality],
+                    )
+                    if encoded_ok:
+                        render_frame_jpeg_base64 = base64.b64encode(encoded_frame.tobytes()).decode("ascii")
+
                 event_writer.emit(
                     "metrics_update",
-                    {"metrics": _dashboard_metrics_payload(metrics, event_timestamp, detections)},
+                    {
+                        "metrics": _dashboard_metrics_payload(
+                            metrics,
+                            event_timestamp,
+                            detections,
+                            render_frame_jpeg_base64=render_frame_jpeg_base64,
+                        )
+                    },
                 )
                 last_dashboard_event_time = now
 
@@ -472,6 +523,7 @@ def _dashboard_metrics_payload(
     m: QueueMetrics,
     timestamp: float,
     detections: sv.Detections | None = None,
+    render_frame_jpeg_base64: str | None = None,
 ) -> dict[str, object]:
     """Convert runtime metrics into the frontend websocket contract."""
     wait_time_seconds: float | None = m.estimated_wait_sec if m.queue_stable else None
@@ -501,6 +553,7 @@ def _dashboard_metrics_payload(
         "uncertainty_level": m.uncertainty_level,
         "queue_stable": m.queue_stable,
         "detections": det_list,
+        "render_frame_jpeg_base64": render_frame_jpeg_base64,
     }
 
 
@@ -549,6 +602,8 @@ def main() -> None:
         caisse_id=args.caisse_id,
         webhook_enabled=WEBHOOK_ENABLED and not args.disable_webhook,
         events_file=args.events_file,
+        dashboard_render_frames=args.dashboard_render_frames,
+        dashboard_frame_jpeg_quality=args.dashboard_frame_jpeg_quality,
         headless=args.headless,
     )
 
