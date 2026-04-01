@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Camera, Loader2, Play, RotateCcw, Square, Trash2, Wifi, WifiOff, Users } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -120,26 +120,74 @@ function FeedTransportSurface({
   const [fallbackFrameUrl, setFallbackFrameUrl] = useState<string | null>(null);
   const [streamAttempt, setStreamAttempt] = useState(0);
   const [streamErrorCount, setStreamErrorCount] = useState(0);
+  const previousStatusRef = useRef(feed.status);
+  const hadRenderedFrameRef = useRef(Boolean(renderedFrameJpegBase64));
+  const lastForcedReconnectAtRef = useRef(0);
   const renderedFrameDataUrl = renderedFrameJpegBase64
     ? `data:image/jpeg;base64,${renderedFrameJpegBase64}`
     : null;
 
   useEffect(() => {
     setPlaybackFailed(false);
+    previousStatusRef.current = feed.status;
+    hadRenderedFrameRef.current = Boolean(renderedFrameJpegBase64);
+    lastForcedReconnectAtRef.current = 0;
   }, [feed.feed_id, feed.preview_path]);
 
   const transportActive = uiStatus !== "offline" && !isStopping;
-  const shouldUseMjpegStream = transportActive
-    && (feed.status === "running" || feed.status === "initializing");
+  const hasWorkerMetrics = Boolean(feed.latest_metrics);
+  const shouldShowWorkerLoading = transportActive
+    && (feed.status === "initializing" || (feed.status === "running" && !hasWorkerMetrics));
+  const shouldUseMjpegStream = transportActive && feed.status === "running" && hasWorkerMetrics;
   const streamUrl = shouldUseMjpegStream
     ? `${getFeedMjpegStreamUrl(feed.feed_id)}?attempt=${streamAttempt}`
     : null;
+
+  useEffect(() => {
+    const previousStatus = previousStatusRef.current;
+    const enteredRunning = previousStatus !== "running" && feed.status === "running";
+
+    if (shouldUseMjpegStream && enteredRunning) {
+      const now = Date.now();
+      const reconnectCooldownMs = 1_500;
+      if (now - lastForcedReconnectAtRef.current >= reconnectCooldownMs) {
+        lastForcedReconnectAtRef.current = now;
+        setPlaybackFailed(false);
+        setStreamErrorCount(0);
+        setFallbackFrameUrl(null);
+        setStreamAttempt((attempt) => attempt + 1);
+      }
+    }
+
+    previousStatusRef.current = feed.status;
+  }, [feed.status, shouldUseMjpegStream]);
+
+  useEffect(() => {
+    const hadRenderedFrame = hadRenderedFrameRef.current;
+    const nowHasRenderedFrame = Boolean(renderedFrameJpegBase64);
+
+    if (shouldUseMjpegStream && !hadRenderedFrame && nowHasRenderedFrame) {
+      const now = Date.now();
+      const reconnectCooldownMs = 1_500;
+      if (now - lastForcedReconnectAtRef.current >= reconnectCooldownMs) {
+        lastForcedReconnectAtRef.current = now;
+        setPlaybackFailed(false);
+        setStreamErrorCount(0);
+        setFallbackFrameUrl(null);
+        setStreamAttempt((attempt) => attempt + 1);
+      }
+    }
+
+    hadRenderedFrameRef.current = nowHasRenderedFrame;
+  }, [renderedFrameJpegBase64, shouldUseMjpegStream]);
 
   useEffect(() => {
     if (!shouldUseMjpegStream) {
       setStreamAttempt(0);
       setStreamErrorCount(0);
       setFallbackFrameUrl(null);
+      hadRenderedFrameRef.current = false;
+      lastForcedReconnectAtRef.current = 0;
       return;
     }
 
@@ -173,7 +221,13 @@ function FeedTransportSurface({
   const showLiveFrame = Boolean(streamUrl) && !playbackFailed;
   const showRenderedFrame = transportActive && !showLiveFrame && Boolean(renderedFrameDataUrl);
   const showFallbackFrame = !showLiveFrame && transportActive && Boolean(fallbackFrameUrl);
-  const showPreview = transportActive && !showLiveFrame && !showFallbackFrame && Boolean(previewUrl) && !playbackFailed;
+  const showLoadingState = shouldShowWorkerLoading && !showLiveFrame && !showRenderedFrame && !showFallbackFrame;
+  const showPreview = transportActive
+    && !shouldShowWorkerLoading
+    && !showLiveFrame
+    && !showFallbackFrame
+    && Boolean(previewUrl)
+    && !playbackFailed;
   const zonePoints = feed.zone?.points ?? [];
   const zonePolygonPoints = videoDims
     ? zonePoints
@@ -356,6 +410,18 @@ function FeedTransportSurface({
             </svg>
           )}
         </>
+      ) : showLoadingState ? (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-background/90 px-4 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground/80">
+            {feed.status === "initializing" ? "Initializing worker" : "Preparing live stream"}
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            {feed.status === "initializing"
+              ? "Starting model and tracker before the first analyzed frame is emitted."
+              : "Waiting for the first analyzed frame from the backend worker."}
+          </p>
+        </div>
       ) : (
         <div className="space-y-2 px-4 text-center">
           {uiStatus === "offline" ? (

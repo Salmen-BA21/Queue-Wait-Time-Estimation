@@ -403,11 +403,19 @@ class FeedFrameStreamManager:
         frame_bytes: bytes,
     ) -> None:
         stale_state: FeedFrameStreamState | None = None
+        handoff_frame_index = 0
+        handoff_subscribers = 0
+        handoff_width: int | None = None
+        handoff_height: int | None = None
 
         async with self._lock:
             state = self._states.get(feed_id)
             if state is not None and state.mode == "capture":
                 stale_state = state
+                handoff_frame_index = state.frame_index
+                handoff_subscribers = state.subscribers
+                handoff_width = state.width
+                handoff_height = state.height
                 state = None
 
             if state is None:
@@ -419,6 +427,11 @@ class FeedFrameStreamManager:
                     transport=transport,
                     mode="worker",
                 )
+                if stale_state is not None:
+                    state.frame_index = handoff_frame_index
+                    state.subscribers = handoff_subscribers
+                    state.width = handoff_width
+                    state.height = handoff_height
                 self._states[feed_id] = state
 
             # Keep source metadata in sync in case feed credentials/transport changed.
@@ -430,6 +443,14 @@ class FeedFrameStreamManager:
 
         if stale_state is not None:
             await asyncio.to_thread(self._stop_state, stale_state)
+            with state.condition:
+                # Keep continuity if capture advanced before the old worker fully stopped.
+                state.frame_index = max(state.frame_index, stale_state.frame_index)
+                state.subscribers = max(state.subscribers, stale_state.subscribers)
+                if state.width is None:
+                    state.width = stale_state.width
+                if state.height is None:
+                    state.height = stale_state.height
 
         with state.condition:
             state.latest_frame = frame_bytes
@@ -496,6 +517,14 @@ class FeedFrameStreamManager:
 
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
+                    if (
+                        state.latest_frame is not None
+                        and state.frame_index > 0
+                        and state.frame_index < after_frame_index
+                    ):
+                        # Recover stalled subscribers when a stream restarts and
+                        # the shared frame index sequence is reset to a lower value.
+                        return state.frame_index, state.latest_frame
                     return None
 
                 state.condition.wait(timeout=remaining)
