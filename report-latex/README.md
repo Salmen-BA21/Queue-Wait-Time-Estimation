@@ -40,8 +40,8 @@ latexmk -pdf main.tex
 ## Recent changes in this template
 
 - Added front-matter chapters: `chapters/dedications.tex` and `chapters/acknowledgements.tex`.
-- The abstract that previously appeared in the front matter was removed and moved to the end of the document. It is now included via `chapters/abstract_appendix.tex` (loaded after the appendix).
-- If you prefer the final abstract to appear in the Table of Contents, add an `\addcontentsline{toc}{chapter}{Abstract}` line in `chapters/abstract_appendix.tex`.
+- Updated master flow to the new 10-chapter report structure from `chapters/01_context_project.tex` to `chapters/10_general_conclusion.tex`.
+- Removed legacy chapter files from the previous report organization.
 
 ## Overleaf / Online compilation
 

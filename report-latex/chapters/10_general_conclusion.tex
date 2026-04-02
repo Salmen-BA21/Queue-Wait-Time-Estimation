@@ -1,0 +1,40 @@
+\chapter{General Conclusion}
+\chaptertoc
+
+\section{Summary}
+This end-of-studies project delivered a complete queue wait-time estimation platform that connects computer vision, queue analytics, uncertainty quantification, web supervision, and automation workflows.
+
+From a technical standpoint, the system now includes:
+\begin{itemize}
+    \item a perception pipeline based on YOLO detection and ByteTrack identity continuity,
+    \item queue-zone filtering and event-driven estimation of $\lambda$, $\mu$, and expected wait time,
+    \item uncertainty-aware outputs with interval bounds and stability semantics,
+    \item a typed FastAPI backend-for-frontend with feed lifecycle control and live websocket events,
+    \item a React dashboard for monitoring, setup, and runtime interaction,
+    \item n8n and Telegram integration for operational alert routing.
+\end{itemize}
+
+The resulting architecture demonstrates that a full monitoring-to-action loop can be achieved with modular components while keeping the system maintainable and testable.
+
+\section{Objective Review}
+The initial objectives are considered achieved at project scope level:
+\begin{enumerate}
+    \item \textbf{Real-time detection and tracking:} implemented through dedicated detector and tracker modules.
+    \item \textbf{Queue-zone counting:} implemented with polygon-zone management and in-zone identity filtering.
+    \item \textbf{Queue metric estimation:} implemented for arrival rate, service rate, and wait time.
+    \item \textbf{Uncertainty quantification:} implemented with Bayesian and variance-based methods.
+    \item \textbf{Web monitoring:} implemented through a multi-feed dashboard with live updates.
+    \item \textbf{Automation integration:} implemented through webhook transport, n8n routing, and Telegram notifications.
+\end{enumerate}
+
+The main remaining gap is not architectural completeness, but depth of long-horizon evaluation under broader operational scenarios.
+
+\section{Future Work}
+Potential extensions include:
+\begin{itemize}
+    \item multi-zone and multi-server queue modeling (for parallel cashier configurations),
+    \item richer alert strategies (cooldown tuning, escalation policies, acknowledgment loops),
+    \item edge deployment optimization (ONNX/TensorRT profiling and resource-aware scheduling),
+    \item long-duration field evaluation with domain-specific KPI baselines,
+    \item stronger security controls for production webhook exposure and secrets management.
+\end{itemize}

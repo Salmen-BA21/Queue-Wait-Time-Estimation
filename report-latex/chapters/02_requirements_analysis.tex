@@ -1,0 +1,125 @@
+\chapter{Requirements Specification and Analysis}
+\chaptertoc
+
+\section{Introduction}
+This chapter formalizes system requirements and the main design choices that structure the project implementation. It defines actors, functional and non-functional requirements, product backlog orientation, sprint planning, data model foundations, project environment, and software architecture.
+
+\section{Requirements Specification}
+
+\subsection{Identification of Actors}
+The system involves three primary actors:
+\begin{itemize}
+    \item \textbf{Administrator}: configures sources, thresholds, and integration parameters.
+    \item \textbf{Operator}: monitors live queues and reacts to alerts during operations.
+    \item \textbf{Manager}: analyzes historical trends and uses indicators for planning decisions.
+\end{itemize}
+
+\subsection{Functional Requirements}
+The system must provide the following core functionalities:
+\begin{itemize}
+    \item real-time person detection and tracking,
+    \item configurable queue zone definition,
+    \item estimation of arrival rate ($\lambda$), service rate ($\mu$), and wait time ($W$),
+    \item uncertainty quantification for queue metrics,
+    \item real-time web dashboard updates and alerts,
+    \item RTSP and ONVIF camera integration,
+    \item automated webhook and Telegram notifications,
+    \item historical data logging and analytics.
+\end{itemize}
+
+\subsection{Non-functional Requirements}
+The main quality constraints are:
+\begin{itemize}
+    \item \textbf{Performance}: maintain real-time behavior and low alert latency.
+    \item \textbf{Scalability}: support multiple feeds and independent feed lifecycle control.
+    \item \textbf{Reliability}: tolerate transient source failures and integration interruptions.
+    \item \textbf{Usability}: provide clear web workflows for monitoring and configuration.
+    \item \textbf{Security}: protect integration channels and service endpoints.
+    \item \textbf{Maintainability}: keep modular code organization and testable interfaces.
+\end{itemize}
+
+\section{Product Backlog}
+The product backlog was prioritized by business value and technical dependency. For implementation governance, items were grouped into three domains:
+\begin{itemize}
+    \item \textbf{Backend domain}: perception pipeline, queue analytics, API and stream interfaces.
+    \item \textbf{Web domain}: dashboard UX, live monitoring integration, zone editing workflows.
+    \item \textbf{Automation domain}: n8n workflow integration, alert routing, webhook reliability.
+\end{itemize}
+Early sprints concentrated on backend foundations to reduce downstream integration risk.
+
+\section{Global Use Case Diagram}
+\begin{figure}[ht]
+    \centering
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for global use case diagram}}
+    \caption{Global use case diagram of the queue wait-time estimation system.}
+    \label{fig:global_use_case}
+\end{figure}
+
+\section{Sprint Scope Overview}
+The project implementation is organized into eight sprints. Table~\ref{tab:sprint_plan} summarizes sprint scope and expected outcomes.
+
+\begin{table}[ht]
+    \centering
+    \caption{Project sprint scope overview}
+    \label{tab:sprint_plan}
+    \begin{tabularx}{\textwidth}{l X}
+        \toprule
+        Sprint & Main outcome \\
+        \midrule
+        Sprint 1 & Detection, tracking, and queue-zone perception foundation \\
+        Sprint 2 & Queue analytics and uncertainty quantification \\
+        Sprint 3 & Camera connectivity and backend API exposure \\
+        Sprint 4 & Web design system and frontend scaffolding \\
+        Sprint 5 & Frontend integration and live monitoring \\
+        Sprint 6 & n8n automation and Telegram alerting \\
+        Sprint 7 & Evaluation and optimization \\   
+        Sprint 8 & Final consolidation, reporting, and delivery \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\section{Data Modeling}
+The data model combines runtime monitoring entities and persistence entities. The main objects are:
+\begin{itemize}
+    \item \textbf{VideoFeed}: source identity, connectivity, runtime status, and configuration.
+    \item \textbf{QueueMetrics}: timestamped indicators (people in zone, $\lambda$, $\mu$, $W$, stability).
+    \item \textbf{Alert}: severity, threshold context, and notification payload.
+    \item \textbf{Establishment} and \textbf{Caisse}: business metadata used to organize feeds.
+\end{itemize}
+These entities support both live supervision and historical analysis pipelines.
+
+\section{Project Environment}
+
+\subsection{Hardware and Software Environment}
+The development workflow uses a Python backend environment, a TypeScript frontend environment, and containerized automation services. The project is designed to run on standard development workstations and can exploit GPU acceleration when CUDA-compatible hardware is available.
+
+\subsection{Technologies Used}
+The selected technology stack is:
+\begin{itemize}
+    \item \textbf{Vision pipeline}: YOLO26, ByteTrack, OpenCV \cite{ultralytics_docs,bytetrack2022,opencv_docs}.
+    \item \textbf{Queue analytics}: NumPy, Pandas, SciPy, M/M/1 modeling \cite{gross_queueing}.
+    \item \textbf{Backend API}: FastAPI and Pydantic v2.
+    \item \textbf{Frontend}: React, TypeScript, Vite, Tailwind CSS.
+    \item \textbf{Automation}: n8n workflows with Telegram notifications.
+    \item \textbf{Persistence}: CSV metrics logging and SQLite metadata.
+\end{itemize}
+
+\section{Software Architecture}
+
+\subsection{Overall Architecture}
+The system architecture is organized in four layers:
+\begin{enumerate}
+    \item \textbf{Video acquisition}: local files, RTSP streams, and ONVIF discovery.
+    \item \textbf{Perception}: detection, tracking, and queue-zone filtering.
+    \item \textbf{Analysis}: queue metrics estimation and uncertainty modeling.
+    \item \textbf{Output and integration}: web dashboard, webhook dispatch, and alert automation.
+\end{enumerate}
+
+\subsection{Backend Architecture}
+The backend exposes REST and WebSocket interfaces for feed lifecycle control and live metrics. It includes modules for detector orchestration, tracking, queue analysis, threshold detection, webhook delivery, and camera-source management (RTSP and ONVIF). The API contract supports onboarding, runtime control, snapshots, streams, metadata, and integration diagnostics.
+
+\subsection{Frontend Architecture}
+The frontend follows a component-based architecture with typed API client mapping, feed-oriented dashboard views, and WebSocket-driven state updates. It integrates live stream rendering, per-feed controls, and alert visualization while preserving separation between presentation components and data-access logic.
+
+\section{Conclusion}
+This chapter established the requirements baseline and architecture model used throughout implementation. The next chapters present sprint-by-sprint development aligned to this specification and analysis framework.

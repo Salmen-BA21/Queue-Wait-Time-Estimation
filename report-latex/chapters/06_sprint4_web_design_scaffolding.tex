@@ -1,0 +1,57 @@
+\chapter{Sprint 4: Web Design and Scaffolding}
+\chaptertoc
+
+\section{Introduction}
+Sprint 4 defined the visual language and structural foundations of the web application. The objective was to move from backend-centric tooling to a coherent dashboard-ready frontend architecture, while preserving traceability with the queue analytics domain.
+
+\section{Sprint Backlog}
+Sprint 4 backlog focused on design-to-code readiness:
+\begin{itemize}
+    \item Define a consistent visual design system (colors, typography, spacing, component rules).
+    \item Produce complete page layouts for onboarding, monitoring, editing, analytics, and settings.
+    \item Scaffold a React + TypeScript frontend project with reusable UI primitives.
+    \item Establish routing and layout composition patterns for future live integration.
+\end{itemize}
+
+\section{Design}
+
+\subsection{UI and UX Design}
+The web design specification in \texttt{design/DESIGN\_SPEC.md} defines a ``Terminal Minimal'' style system and a seven-page navigation model. The design language emphasizes:
+\begin{itemize}
+    \item dark operational surfaces optimized for continuous monitoring,
+    \item strong semantic colors for status and alert levels,
+    \item card-based information density with consistent spacing and hierarchy,
+    \item explicit workflow guidance in setup and zone-editing screens.
+\end{itemize}
+
+The designed page set includes landing, dashboard, setup wizard, zone editor, analytics, settings, and heatmap views, which directly informed component boundaries in the frontend implementation.
+
+\subsection{Frontend Architecture}
+\begin{figure}[ht]
+    \centering
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 4 frontend architecture diagram}}
+    \caption{Frontend architecture for routing, components, and state boundaries.}
+    \label{fig:sprint4_frontend_arch}
+\end{figure}
+
+The scaffolded frontend architecture separates page-level orchestration, shared components, hooks, and API adapters:
+\begin{itemize}
+    \item \texttt{frontend/src/pages}: route-level views (Dashboard, Analytics, ZoneEditor, Settings, etc.).
+    \item \texttt{frontend/src/components}: reusable UI and domain panels.
+    \item \texttt{frontend/src/hooks}: stateful integration and workflow hooks.
+    \item \texttt{frontend/src/lib}: API contract and helper utilities.
+\end{itemize}
+
+\section{Implementation}
+Sprint 4 implementation established the frontend technical baseline:
+\begin{itemize}
+    \item Vite + React + TypeScript project initialization (\texttt{frontend/package.json}).
+    \item Tailwind CSS and shadcn/Radix-driven UI composition.
+    \item React Router page structure and layout shell integration.
+    \item Initial dashboard and setup page scaffolding for subsequent live-data wiring.
+\end{itemize}
+
+This phase intentionally prioritized architecture and design consistency over full real-time behavior. It produced the stable structure later used by Sprint 5 for websocket and API integration.
+
+\section{Conclusion}
+Sprint 4 delivered a complete design-to-frontend scaffold transition: the visual specification was formalized and mapped to a maintainable React architecture. This reduced integration risk for Sprint 5, where live backend data and runtime controls were connected.

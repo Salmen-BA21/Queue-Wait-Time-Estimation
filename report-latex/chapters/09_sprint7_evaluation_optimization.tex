@@ -1,0 +1,67 @@
+\chapter{Sprint 7: Evaluation and Optimization}
+\chaptertoc
+
+\section{Introduction}
+Sprint 7 focused on validation and runtime optimization of the end-to-end stack. The work combined unit and integration tests, operational hardening, and throughput tuning for both backend runtime and dashboard experience.
+
+\section{Sprint Backlog}
+Sprint 7 backlog included:
+\begin{itemize}
+	\item consolidate backend and frontend automated test coverage,
+	\item validate feed lifecycle, stream continuity, and API contracts,
+	\item optimize runtime throughput and responsiveness,
+	\item harden failure handling (network drops, stale data, worker exits),
+	\item document residual limitations for final delivery planning.
+\end{itemize}
+
+\section{Design}
+
+\subsection{Test Plan}
+Validation followed a layered strategy:
+\begin{itemize}
+	\item \textbf{Backend unit/integration tests:} uncertainty, API endpoints, runtime streaming behavior, webhook payload handling.
+	\item \textbf{Frontend integration tests:} dashboard setup flow, websocket event handling, and API error handling.
+	\item \textbf{Scenario tests:} n8n send/acknowledge flows, unauthorized branch, and multi-feed alert scenarios.
+\end{itemize}
+
+\subsection{Performance Metrics}
+The optimization metrics were aligned with operational requirements:
+\begin{itemize}
+	\item processing responsiveness (loop cadence and processed-frame throughput),
+	\item stream continuity under feed state transitions,
+	\item webhook impact on main-loop latency,
+	\item dashboard freshness under websocket degradation.
+\end{itemize}
+
+\section{Implementation}
+\subsection{Automated Test Coverage}
+Representative test assets include:
+\begin{itemize}
+	\item backend: \texttt{backend/tests/test\_api\_app.py}, \texttt{test\_runtime\_streams.py}, \texttt{test\_webhook.py},
+	\item backend/root: \texttt{test\_uncertainty.py}, \texttt{test\_gui\_app.py},
+	\item frontend: \texttt{frontend/src/pages/Dashboard.integration.test.tsx}, \texttt{frontend/src/hooks/use-live-dashboard.test.tsx}, \texttt{frontend/src/lib/api.test.ts}.
+\end{itemize}
+These tests verify API envelopes, event contracts, stream handoff, uncertainty calculations, and setup-workflow behavior.
+
+\subsection{Runtime Optimization Actions}
+Key optimizations implemented in \texttt{backend/src/main.py} and \texttt{backend/src/config.py} include:
+\begin{itemize}
+	\item configurable detector image size and frame stride,
+	\item explicit inference device control and diagnostics,
+	\item asynchronous webhook dispatch to keep the processing loop responsive,
+	\item real-time playback pacing for file sources.
+\end{itemize}
+
+\subsection{Resilience Improvements}
+Runtime resilience was improved at multiple levels:
+\begin{itemize}
+	\item feed worker supervision and exit recovery in \texttt{FeedRegistry},
+	\item capture-to-worker frame handoff continuity in \texttt{FeedFrameStreamManager},
+	\item websocket reconnect/fallback logic on the frontend side.
+\end{itemize}
+
+\subsection{Observed Outcome}
+The system reached a stable integration state where perception, analytics, API runtime, dashboard, and n8n automation operate as a coherent pipeline. Remaining work is mostly focused on extended benchmarking campaigns and production-grade deployment hardening rather than missing core functionality.
+
+\section{Conclusion}
+Sprint 7 consolidated quality and readiness through structured testing and targeted performance improvements. The resulting platform is functionally complete for demonstration and academic evaluation, with clearly identified extensions for industrial-scale rollout.

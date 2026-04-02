@@ -1,0 +1,115 @@
+\chapter{Context of the Project}
+\chaptertoc
+
+\section{Introduction}
+This chapter introduces the context of the Queue Wait-Time Estimation System and explains why this project is relevant for service operations. It presents the host organization context, the problem addressed, the proposed technical solution, and the project management methodology used to deliver the final system incrementally.
+
+\section{Host Organization}
+
+\subsection{DataDoIt}
+This end-of-studies project was developed in collaboration with DataDoIt. The collaboration provided a practical engineering context, including real operational constraints for queue supervision, integration requirements for external automation workflows, and quality expectations for a production-oriented prototype.
+
+\subsection{Sectors of Activity}
+Queue monitoring and wait-time estimation are important in several sectors where customer flow directly impacts service quality and resource planning:
+\begin{itemize}
+    \item retail checkout and supermarket lanes,
+    \item banking and financial service counters,
+    \item customer-service centers and administrative desks,
+    \item any operation where peak-load periods create congestion and waiting-time uncertainty.
+\end{itemize}
+
+\section{Presentation of the Project}
+
+\subsection{Project Context}
+Manual queue supervision is often subjective and difficult to scale. This project focuses on transforming camera streams into actionable operational indicators in real time. The target output is not only queue occupancy, but also interpretable decision-support metrics such as arrival rate, service rate, expected wait time, and alert status.
+
+\subsection{Problem Statement}
+Existing operational practices and basic counters have several limitations:
+\begin{itemize}
+    \item they provide limited anticipation of congestion,
+    \item they rarely estimate waiting time explicitly,
+    \item they do not quantify uncertainty, which is critical in noisy visual environments,
+    \item they are often disconnected from automated response workflows.
+\end{itemize}
+As a result, operational decisions may be delayed or based on incomplete signals.
+
+\subsection{Study of Existing Approaches}
+Recent computer-vision approaches provide strong building blocks for real-time people analysis, notably YOLO-based detection pipelines and robust tracking algorithms such as ByteTrack \cite{ultralytics_docs,bytetrack2022}. In parallel, queueing theory provides established mathematical models for estimating service-system behavior \cite{gross_queueing}. However, many practical deployments remain fragmented: they focus on counting or visualization only, with limited end-to-end integration of wait-time estimation, uncertainty quantification, and operational alerting.
+
+\subsection{Proposed Solution}
+The proposed system combines perception, analytics, and integration in one coherent pipeline:
+\begin{enumerate}
+    \item person detection and multi-object tracking from camera feeds,
+    \item polygon-based queue-zone filtering,
+    \item estimation of $\lambda$, $\mu$, and expected wait time,
+    \item Bayesian uncertainty quantification for key metrics,
+    \item real-time web supervision and automation through n8n webhooks and Telegram alerts.
+\end{enumerate}
+This architecture aims to convert video observations into reliable operational actions.
+
+\subsection{Objectives of the Project}
+The project objectives are to:
+\begin{enumerate}
+    \item detect and track people in real time,
+    \item count people in configurable queue zones,
+    \item estimate arrival and service rates,
+    \item compute expected wait time,
+    \item quantify uncertainty for operational reliability,
+    \item expose metrics through web interfaces and automation workflows.
+\end{enumerate}
+
+\subsection{Target Audience}
+The system targets three main stakeholder groups:
+\begin{itemize}
+    \item \textbf{Operators}, who monitor queue dynamics and react to active alerts,
+    \item \textbf{Managers}, who use historical and live indicators for staffing and service planning,
+    \item \textbf{End users}, who benefit indirectly from reduced waiting time and improved flow management.
+\end{itemize}
+
+\section{Project Management Methodology}
+
+\subsection{Choice of Methodology: Agile}
+An Agile approach was selected to deliver functional increments quickly while reducing technical and integration risks early. This choice was especially appropriate for a project combining computer vision, statistical modeling, backend APIs, frontend integration, and external automation services.
+
+\subsection{SCRUM}
+Development followed sprint-based Scrum planning with iterative validation. For report readability, the implementation is grouped into three logical modules.
+
+\subsubsection{Module A: Backend Core (Sprints 1-3)}
+This module established the vision and analytics backbone:
+\begin{itemize}
+    \item Sprint 1: detection, tracking, and zone filtering foundation,
+    \item Sprint 2: queue metrics and uncertainty modeling,
+    \item Sprint 3: camera connectivity and backend API exposure.
+\end{itemize}
+
+\subsubsection{Module B: Web Experience (Sprints 4-5)}
+This module focused on the web supervision experience:
+\begin{itemize}
+    \item Sprint 4: web design system and frontend scaffolding,
+    \item Sprint 5: frontend integration with live backend metrics.
+\end{itemize}
+
+\subsubsection{Module C: Automation and Finalization (Sprints 6-8)}
+This module covered integration hardening and closure:
+\begin{itemize}
+    \item Sprint 6: n8n automation and Telegram alerting,
+    \item Sprint 7: evaluation and optimization,
+    \item Sprint 8: report finalization and project consolidation.
+\end{itemize}
+
+\begin{table}[ht]
+    \centering
+    \caption{Scrum module mapping used in this report}
+    \begin{tabularx}{\textwidth}{l l X}
+        \toprule
+        Module & Sprints & Main focus \\
+        \midrule
+        Module A: Backend Core & 1 to 3 & Vision pipeline, queue analytics, camera connectivity, API services \\
+        Module B: Web Experience & 4 to 5 & Frontend design system, dashboard scaffolding, live integration \\
+        Module C: Automation and Finalization & 6 to 8 & n8n alerting, optimization, validation, and reporting \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\section{Conclusion}
+This chapter positioned the project in its organizational and technical context, clarified the addressed problem, and presented the proposed solution and delivery approach. The next chapter formalizes requirements and analysis foundations that guided implementation decisions.

@@ -1,0 +1,71 @@
+\chapter{Sprint 6: n8n Automation and Alerting}
+\chaptertoc
+
+\section{Introduction}
+Sprint 6 integrated the queue analytics pipeline with external automation workflows through n8n. The objective was to transform runtime metrics into actionable alerts with transport reliability, cooldown control, and optional Telegram notification delivery.
+
+\section{Sprint Backlog}
+Sprint 6 backlog focused on operational automation:
+\begin{itemize}
+    \item define and validate a stable webhook payload contract,
+    \item implement robust webhook transmission with retries and backup logging,
+    \item integrate alert triggers from runtime threshold detection,
+    \item implement n8n routing for authorization, cooldown, formatting, and delivery,
+    \item provide test scripts for repeated workflow validation.
+\end{itemize}
+
+\section{Design}
+
+\subsection{Component Diagram}
+\begin{figure}[ht]
+    \centering
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 6 automation component diagram}}
+    \caption{Components involved in backend-to-n8n-to-Telegram automation flow.}
+    \label{fig:sprint6_component}
+\end{figure}
+
+The automation design includes five components: queue runtime metrics, webhook payload serializer, HTTP delivery client, n8n workflow router, and notification endpoints. Alert archival is additionally routed back to backend through a dedicated API endpoint.
+
+\subsection{Data Flow Diagram}
+\begin{figure}[ht]
+    \centering
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 6 automation data flow diagram}}
+    \caption{Alert payload flow from backend metrics to external notifications.}
+    \label{fig:sprint6_data_flow}
+\end{figure}
+
+Data flow starts with periodic metrics dispatch from the runtime loop, branches on alert presence and cooldown in n8n, and then either sends Telegram notifications or returns acknowledgment without external dispatch. Archived alert payloads are persisted through \texttt{/api/alerts/archive}.
+
+\section{Implementation}
+\subsection{Webhook Payload Contract}
+\texttt{backend/src/webhook.py} defines \texttt{QueuePayload}, a structured contract carrying:
+\begin{itemize}
+    \item source metadata (timestamp, frame, source, feed ID),
+    \item queue metrics ($\lambda$, $\mu$, wait time, stability),
+    \item uncertainty bounds and classification,
+    \item alert flags and severity fields.
+\end{itemize}
+The module includes payload validation before dispatch.
+
+\subsection{Reliable Webhook Delivery}
+\texttt{backend/src/webhook\_client.py} sends payloads to n8n with timeout, retry policy, optional shared-secret header, and success/failure statistics. Each payload is also written to local CSV through \texttt{CSVMetricsLogger} as a backup persistence path.
+
+\subsection{Runtime Alert Dispatch Integration}
+In \texttt{backend/src/main.py}, webhook sending is offloaded to \texttt{AsyncWebhookDispatcher} to avoid blocking the main perception loop. The implementation supports periodic metric dispatch and immediate warning dispatch with deduplication windows to limit repeated alert spam.
+
+\subsection{n8n Workflow Routing and Telegram Delivery}
+The workflow file \texttt{n8n\_workflow\_with\_telegram.json} implements:
+\begin{itemize}
+    \item webhook reception and secret validation,
+    \item alert detection and cooldown gating,
+    \item alert history archival via backend API,
+    \item message formatting and Telegram send node,
+    \item explicit acknowledge/reject branches.
+\end{itemize}
+This structure provides auditable routing between no-alert, alert-suppressed, and alert-delivered branches.
+
+\subsection{Automation Testing Artifacts}
+Workflow validation scripts are provided in \texttt{scripts/} (e.g., \texttt{test\_n8n\_send\_alert.ps1}, \texttt{test\_n8n\_automated.ps1}, \texttt{test\_n8n\_multi\_feed\_scenario.ps1}). These scripts automate webhook submission, optional execution polling, and branch validation scenarios.
+
+\section{Conclusion}
+Sprint 6 operationalized the analytics output through a robust automation path. With validated payload contracts, resilient transport, and n8n-driven routing, queue events are now consumable by external alerting channels and archival workflows.

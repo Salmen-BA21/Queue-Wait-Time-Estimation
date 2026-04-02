@@ -1,0 +1,68 @@
+\chapter{Sprint 5: Frontend Integration and Live Monitoring}
+\chaptertoc
+
+\section{Introduction}
+Sprint 5 connected the frontend foundation to real backend services and runtime events. The objective was to provide an operational live dashboard capable of feed control, stream visualization, metric updates, and alert awareness.
+
+\section{Sprint Backlog}
+Sprint 5 backlog covered integration-critical items:
+\begin{itemize}
+    \item implement a typed API client aligned with backend response contracts,
+    \item integrate feed lifecycle actions (create/start/stop/restart/delete),
+    \item integrate websocket events for low-latency dashboard updates,
+    \item implement resilient live monitoring behavior (reconnect and fallback),
+    \item validate dashboard setup and onboarding workflows through integration tests.
+\end{itemize}
+
+\section{Design}
+
+\subsection{Data Flow Diagram}
+\begin{figure}[ht]
+    \centering
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 5 frontend data flow diagram}}
+    \caption{Data flow between backend services and frontend monitoring components.}
+    \label{fig:sprint5_data_flow}
+\end{figure}
+
+The data contract follows a layered flow: REST endpoints provide CRUD and diagnostics, websocket events provide live updates, and local dashboard state aggregates feed metrics into KPI cards, activity logs, and attention panels.
+
+\subsection{Sequence Diagrams}
+Three primary sequences were implemented:
+\begin{enumerate}
+    \item \textbf{Feed lifecycle:} dashboard action $\rightarrow$ REST endpoint $\rightarrow$ registry update $\rightarrow$ websocket \texttt{feed\_status} event.
+    \item \textbf{Live metrics:} worker metrics event $\rightarrow$ backend websocket $\rightarrow$ frontend cache merge $\rightarrow$ visual refresh.
+    \item \textbf{Alert surfacing:} backend alert event $\rightarrow$ websocket \texttt{alert\_fired}/\texttt{system\_warning} $\rightarrow$ activity and attention views.
+\end{enumerate}
+
+\section{Implementation}
+\subsection{Typed API Contract Integration}
+The frontend contract is implemented in \texttt{frontend/src/lib/api.ts}. It defines typed entities for feeds, metrics, alerts, and websocket events, and wraps network calls with explicit error classes (\texttt{ApiError}, \texttt{NetworkError}, \texttt{ValidationError}). This improved reliability of frontend-side error handling and debugging.
+
+\subsection{Dashboard State Orchestration}
+\texttt{frontend/src/hooks/use-live-dashboard.ts} coordinates data fetching and mutations through React Query. Derived indicators (online feeds, total people, average wait time, attention counts) are computed from normalized feed state and exposed to dashboard widgets.
+
+\subsection{WebSocket Reliability and Fallback Logic}
+\texttt{frontend/src/hooks/use-dashboard-websocket.ts} implements:
+\begin{itemize}
+    \item reconnect backoff,
+    \item heartbeat ping,
+    \item stale-data watchdog,
+    \item REST polling fallback during websocket degradation,
+    \item batched metric flush to reduce UI re-render pressure.
+\end{itemize}
+This design ensures graceful degradation under transient connection issues.
+
+\subsection{Dashboard UI Integration}
+\texttt{frontend/src/pages/Dashboard.tsx} integrates live feed controls, setup flow dialogs, source onboarding (RTSP/ONVIF/local file), KPI visualizations, and chart components. The page composes domain hooks and reusable dashboard components into one operational interface.
+
+\subsection{Integration Testing}
+Frontend integration behavior is validated with Vitest and Testing Library in:
+\begin{itemize}
+    \item \texttt{frontend/src/pages/Dashboard.integration.test.tsx},
+    \item \texttt{frontend/src/hooks/use-live-dashboard.test.tsx},
+    \item \texttt{frontend/src/lib/api.test.ts}.
+\end{itemize}
+These tests cover setup flow execution, websocket-event handling, and API error contract behavior.
+
+\section{Conclusion}
+Sprint 5 delivered a fully connected monitoring frontend: typed REST integration, resilient websocket updates, and operational dashboard controls. This integration created the interface layer required for end-to-end alert automation in Sprint 6.

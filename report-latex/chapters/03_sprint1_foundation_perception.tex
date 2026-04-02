@@ -1,0 +1,75 @@
+\chapter{Sprint 1: Foundation and Perception}
+\chaptertoc
+
+\section{Introduction}
+Sprint 1 established the perception backbone of the system: person detection, multi-object tracking, and zone-aware counting from video streams. The implementation is centered on the backend runtime pipeline in \texttt{backend/src/main.py}, with dedicated modules for detection, tracking, and polygon-zone logic.
+
+\section{Sprint Backlog}
+The committed Sprint 1 backlog focused on the minimum viable perception chain:
+\begin{itemize}
+    \item Integrate YOLO-based person detection with configurable model size and inference device.
+    \item Integrate persistent tracking so each detected person keeps a stable ID across frames.
+    \item Define queue zones as polygons and count only detections inside these zones.
+    \item Build a real-time loop that connects capture, detection, tracking, zone filtering, and rendering.
+    \item Expose runtime controls through CLI options for source type, model parameters, and processing stride.
+\end{itemize}
+
+\section{Sprint Analysis}
+
+\subsection{Detailed Use Case Diagram}
+\begin{figure}[ht]
+    \centering
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 1 use case diagram}}
+    \caption{Sprint 1 use case diagram for detection and tracking in queue zones.}
+    \label{fig:sprint1_use_case}
+\end{figure}
+
+The use case is centered on the operator configuring a source and zone, then launching continuous analysis. For each frame, the system detects persons, associates identities, evaluates zone membership, and updates the queue state. This sequence is the basis for all later analytics and automation layers.
+
+\subsection{Use Case Scenarios}
+Three key scenarios are implemented in Sprint 1:
+\begin{enumerate}
+    \item \textbf{Person entry into queue zone:} a new tracker ID appears inside the polygon and is treated as a queue arrival candidate.
+    \item \textbf{Tracker continuity across frames:} the same person is followed through consecutive frames using ByteTrack, reducing duplicate counting.
+    \item \textbf{Zone filtering under mixed scenes:} detections outside the polygon are ignored for queue metrics, preventing unrelated people from polluting queue state.
+\end{enumerate}
+
+\section{Design}
+
+\subsection{Activity Diagram}
+\begin{figure}[ht]
+    \centering
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 1 activity diagram}}
+    \caption{Sprint 1 activity flow from frame ingestion to queue-zone updates.}
+    \label{fig:sprint1_activity}
+\end{figure}
+
+The activity starts from a video source (local file, webcam, or RTSP stream), applies person detection, enriches detections with tracker IDs, then evaluates polygon-zone membership. The filtered state is forwarded to the queue analyzer for rate and wait-time computation.
+
+\subsection{Sequence Diagrams}
+The implemented sequence in the codebase is:
+\texttt{VideoStream/RTSPCamera} $\rightarrow$ \texttt{PersonDetector.detect()} $\rightarrow$ \texttt{ObjectTracker.update()} $\rightarrow$ \texttt{ZoneManager.trigger()} $\rightarrow$ \texttt{QueueAnalyzer.update()}. This call chain is orchestrated per frame by \texttt{run()} in \texttt{backend/src/main.py}.
+
+\section{Implementation}
+\subsection{Detection Layer}
+Detection is implemented in \texttt{backend/src/detector.py} through the \texttt{PersonDetector} class. It wraps Ultralytics YOLO inference and filters results to person class only (COCO class ID 0). The detector resolves device selection (\texttt{auto}/\texttt{cpu}/\texttt{cuda}/\texttt{mps}) and supports configurable image size for throughput control \cite{ultralytics_docs}.
+
+\subsection{Tracking Layer}
+Tracking is implemented in \texttt{backend/src/tracker.py} with \texttt{supervision.ByteTrack}. The tracker propagates persistent \texttt{tracker\_id} values across frames, which is essential for counting arrivals and departures rather than raw per-frame detections \cite{bytetrack2022}.
+
+\subsection{Zone-Aware Filtering}
+Zone logic is implemented in \texttt{backend/src/zone\_manager.py}. The module accepts polygons in normalized or pixel coordinates, auto-scales normalized points to frame size, and evaluates inclusion using \texttt{PolygonZone} with bottom-center anchors for robust queue-ground contact checks.
+
+\subsection{Main Loop Integration}
+The pipeline integration is implemented in \texttt{backend/src/main.py}. The runtime supports:
+\begin{itemize}
+    \item Source abstraction via \texttt{open\_video\_source()} for file/webcam/RTSP.
+    \item Process stride control through \texttt{--process-every-n-frames}.
+    \item Real-time overlay rendering (detections, IDs, zone, and metrics).
+    \item Headless mode and dashboard event emission hooks for future API/runtime integration.
+\end{itemize}
+
+This implementation produced a stable perception baseline for later queue analytics and uncertainty modeling \cite{opencv_docs}.
+
+\section{Conclusion}
+Sprint 1 delivered the operational perception core: reliable person detection, ID tracking continuity, and queue-zone filtering. This foundation directly enabled Sprint 2, where statistical queue metrics and uncertainty quantification were added on top of these stable perception outputs.

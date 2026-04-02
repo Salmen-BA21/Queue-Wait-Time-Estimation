@@ -1,0 +1,81 @@
+\chapter{Sprint 2: Analytics and Uncertainty}
+\chaptertoc
+
+\section{Introduction}
+Sprint 2 transformed perception outputs into operational queue indicators. The focus moved from ``who is detected'' to ``how the queue behaves'' through arrival/service-rate estimation, waiting-time computation, and explicit uncertainty quantification.
+
+\section{Sprint Backlog}
+Sprint 2 backlog priorities were:
+\begin{itemize}
+    \item Implement event-based queue rate estimation from tracked IDs in zone.
+    \item Compute wait-time estimates with explicit stable/unstable queue handling.
+    \item Add Bayesian credible intervals for rate metrics.
+    \item Add wait-time uncertainty bounds and uncertainty-level classification.
+    \item Extend runtime payloads and overlays with confidence information.
+\end{itemize}
+
+\section{Design}
+
+\subsection{Component Diagram}
+\begin{figure}[ht]
+    \centering
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 2 component diagram}}
+    \caption{Sprint 2 components for queue analysis and uncertainty computation.}
+    \label{fig:sprint2_component}
+\end{figure}
+
+At component level, \texttt{QueueAnalyzer} receives in-zone tracker IDs and produces \texttt{QueueMetrics}, while \texttt{uncertainty.py} computes uncertainty estimates and confidence intervals consumed by both logs and dashboard payloads.
+
+\subsection{Data Flow Diagram}
+\begin{figure}[ht]
+    \centering
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 2 data flow diagram}}
+    \caption{Data flow from tracked events to queue metrics and confidence intervals.}
+    \label{fig:sprint2_data_flow}
+\end{figure}
+
+Data flow is event-centric: per-frame ID transitions produce arrival/departure events, event windows produce rates $(\lambda,\mu)$, rates and occupancy produce wait-time estimates, and uncertainty modules provide interval bounds and level labels.
+
+\subsection{Sequence Diagrams}
+The implemented sequence is:
+\texttt{QueueAnalyzer.update()} computes counts and rates, then calls \texttt{estimate\_rate\_uncertainty()} and \texttt{estimate\_wait\_time\_uncertainty\_from\_variance()}, then classifies uncertainty with \texttt{classify\_uncertainty\_level()}.
+
+\section{Implementation}
+\subsection{Queue Event Windows and Rate Estimation}
+In \texttt{backend/src/queue\_analyzer.py}, arrivals and departures are tracked as timestamp deques over sliding windows. Let $N_a$ and $N_d$ be events in windows $T_a$ and $T_d$:
+\[
+\lambda = \frac{N_a}{T_a}, \qquad \mu = \frac{N_d}{T_d}
+\]
+The implementation enforces a minimum event count before returning non-zero rates, reducing unstable early-window estimates.
+
+\subsection{Wait-Time Logic and Stability Handling}
+The runtime marks queue stability with:
+\[
+\texttt{queue\_stable} = (\lambda < \mu) \land (\mu > 0)
+\]
+The wait-time logic follows two branches:
+\begin{itemize}
+    \item Stable queue: $W = \frac{1}{\mu-\lambda}$
+    \item Unstable but service observed: fallback $W = \frac{L}{\mu}$, where $L$ is people in zone
+\end{itemize}
+When no service events are observed, the implementation currently returns a zero fallback.
+
+\subsection{Bayesian and Variance-Based Uncertainty}
+In \texttt{backend/src/uncertainty.py}, rate uncertainty uses a Gamma posterior with conjugate Poisson assumptions \cite{bishop_prml}:
+\[
+\lambda \mid k,T \sim \Gamma(k+1, T),\qquad
+\mu \mid n,T \sim \Gamma(n+1, T)
+\]
+Credible intervals are computed via Gamma quantiles. Wait-time uncertainty is estimated from recent variance when history is sufficient; otherwise a controlled fallback margin is used.
+
+\subsection{Uncertainty Classification and Runtime Contract}
+Uncertainty is mapped to \texttt{Low}/\texttt{Medium}/\texttt{High} based on relative interval width. The final \texttt{QueueMetrics} object includes:
+\begin{itemize}
+    \item point estimates ($\lambda$, $\mu$, $W$),
+    \item interval bounds for rates and wait time,
+    \item stability flag and uncertainty-level label.
+\end{itemize}
+These fields are propagated to logs, overlays, webhook payloads, and dashboard events.
+
+\section{Conclusion}
+Sprint 2 delivered the analytical intelligence of the project: event-to-rate modeling, stable/unstable wait-time semantics, and uncertainty-aware outputs. This provided the mathematical and statistical core required for API exposure and external automation in the next sprint.
