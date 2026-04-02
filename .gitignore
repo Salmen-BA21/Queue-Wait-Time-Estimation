@@ -70,6 +70,7 @@ report-latex/**/*.xdv
 report-latex/**/*.maf
 report-latex/**/*.mtc*
 report-latex/**/*-SAVE-ERROR
+report-latex/quality-reports/
 
 # Ignore generated PDFs by default, but keep main report PDF versioned
 report-latex/*.pdf

@@ -2,42 +2,95 @@
 \chaptertoc
 
 \section{Introduction}
-This chapter introduces the context of the Queue Wait-Time Estimation System and explains why this project is relevant for service operations. It presents the host organization context, the problem addressed, the proposed technical solution, and the project management methodology used to deliver the final system incrementally.
+This chapter positions the Queue Wait-Time Estimation System in its operational, organizational, and methodological context. Beyond a general introduction, it clarifies why queue monitoring remains a high-impact problem for service organizations and why an end-to-end technical solution is required instead of isolated counting tools.
+
+The chapter also establishes the project baseline used in the rest of the report: collaboration context with DataDoIt, problem formalization, comparison with existing approaches, solution scope, and implementation governance through Scrum modules. This framing is intentionally detailed because later technical chapters depend on these assumptions.
 
 \section{Host Organization}
 
 \subsection{DataDoIt}
-This end-of-studies project was developed in collaboration with DataDoIt. The collaboration provided a practical engineering context, including real operational constraints for queue supervision, integration requirements for external automation workflows, and quality expectations for a production-oriented prototype.
+This end-of-studies project was carried out in collaboration with DataDoIt, a data-driven sustainability consulting firm headquartered at Elghazal Technopark in Tunis, Tunisia. DataDoIt specializes in transforming environmental and sustainability commitments into measurable, actionable outcomes for governments, municipalities, and enterprises across the EMEA region. The company operates at the intersection of data science and sustainability, offering services that span decarbonization strategy, ESG reporting, smart resource analytics, and circular economy implementation. Its approach, summarized as Measure It, Optimize It, Do It, reflects a methodology grounded in quantitative assessment, strategic planning, and hands-on technical deployment. To date, the company has delivered over 15 active projects across 6 key sectors, with a reported average ROI of 2.3x and a 94\% client retention rate.
+
+The collaboration provided a concrete engineering context in which data collection, real-time monitoring, and automated analytics are central concerns, requirements that directly shaped the design and scope of this project.
+
+\begin{table}[ht]
+    \centering
+    \caption{Collaboration perimeter with DataDoIt}
+    \label{tab:datadoit_perimeter}
+    \begin{tabularx}{\textwidth}{|l|X|}
+        \hline
+        Dimension & Scope in this project \\ \hline
+        Business context & Queue management in service scenarios where waiting time and staffing decisions are operationally sensitive. \\ \hline
+        Engineering constraints & Multi-source video ingestion, variable visual conditions, low-latency monitoring, and integration with automation channels. \\ \hline
+        Expected outputs & Actionable queue indicators, uncertainty-aware wait-time estimation, and alert-ready payloads for external workflows. \\ \hline
+        Validation mode & Iterative sprint reviews using implementation evidence from backend modules, API contracts, frontend behavior, and automation tests. \\ \hline
+    \end{tabularx}
+\end{table}
 
 \subsection{Sectors of Activity}
-Queue monitoring and wait-time estimation are important in several sectors where customer flow directly impacts service quality and resource planning:
+DataDoIt delivers sustainability solutions across six mission-critical sectors where data-driven environmental performance has direct operational and financial implications:
 \begin{itemize}
-    \item retail checkout and supermarket lanes,
-    \item banking and financial service counters,
-    \item customer-service centers and administrative desks,
-    \item any operation where peak-load periods create congestion and waiting-time uncertainty.
+    \item government and public sector institutions seeking to translate climate policy into measurable action,
+    \item smart cities and municipalities requiring integrated urban resilience and climate adaptation systems,
+    \item industrial and manufacturing operations targeting Scope 1-3 carbon footprint reduction and supply chain efficiency,
+    \item real estate and infrastructure organizations pursuing green certification and climate-resilient asset development,
+    \item financial services firms navigating ESG compliance and green finance opportunities,
+    \item energy and utilities providers accelerating the transition toward renewable integration and grid modernization.
 \end{itemize}
 
 \section{Presentation of the Project}
 
 \subsection{Project Context}
-Manual queue supervision is often subjective and difficult to scale. This project focuses on transforming camera streams into actionable operational indicators in real time. The target output is not only queue occupancy, but also interpretable decision-support metrics such as arrival rate, service rate, expected wait time, and alert status.
+Manual queue supervision is often subjective, difficult to scale, and highly dependent on operator availability. In many environments, monitoring remains reactive: teams observe congestion after it appears rather than anticipating it early with measurable indicators.
+
+This project addresses that gap by transforming camera streams into decision-oriented telemetry. The target output is not only occupancy counts, but a coherent set of operational metrics: people in zone, arrival rate, service rate, expected wait time, uncertainty level, and alert states consumable by monitoring and automation layers.
 
 \subsection{Problem Statement}
-Existing operational practices and basic counters have several limitations:
+Existing operational practices and basic counting tools present recurring limitations:
 \begin{itemize}
     \item they provide limited anticipation of congestion,
     \item they rarely estimate waiting time explicitly,
     \item they do not quantify uncertainty, which is critical in noisy visual environments,
     \item they are often disconnected from automated response workflows.
 \end{itemize}
-As a result, operational decisions may be delayed or based on incomplete signals.
+
+As a consequence, interventions (staff reallocation, lane opening, escalation) can be delayed or triggered on incomplete signals. The problem is therefore both analytical and integrational: producing robust indicators and delivering them through actionable channels.
+
+\begin{table}[ht]
+    \centering
+    \caption{From operational pain points to system-level requirements}
+    \label{tab:painpoint_to_requirement}
+    \begin{tabularx}{\textwidth}{|X|X|X|}
+        \hline
+        Observed pain point & Operational impact & Required system capability \\ \hline
+        Manual visual estimation is inconsistent across shifts. & Queue state interpretation varies between operators, reducing decision reliability. & Standardized per-feed metrics with explicit formulas and stable update cadence. \\ \hline
+        Occupancy-only monitoring is descriptive but not predictive. & Teams react late because no forward-looking wait-time signal is available. & Continuous estimation of $\lambda$, $\mu$, and expected wait time $W$. \\ \hline
+        No confidence indicator accompanies reported metrics. & High-noise periods can produce overconfident decisions. & Uncertainty quantification with interval bounds and qualitative confidence level. \\ \hline
+        Alerting tools are not integrated with runtime analytics. & Escalation depends on manual relay, increasing response latency. & Automated webhook dispatch and workflow-based notification routing. \\ \hline
+    \end{tabularx}
+\end{table}
 
 \subsection{Study of Existing Approaches}
-Recent computer-vision approaches provide strong building blocks for real-time people analysis, notably YOLO-based detection pipelines and robust tracking algorithms such as ByteTrack \cite{ultralytics_docs,bytetrack2022}. In parallel, queueing theory provides established mathematical models for estimating service-system behavior \cite{gross_queueing}. However, many practical deployments remain fragmented: they focus on counting or visualization only, with limited end-to-end integration of wait-time estimation, uncertainty quantification, and operational alerting.
+Recent computer-vision frameworks provide strong building blocks for person perception, notably YOLO-based detection and tracking algorithms such as ByteTrack \cite{ultralytics_docs,bytetrack2022}. Queueing theory, in parallel, offers formal models for service-system behavior, including interpretable relationships between arrival rate, service rate, and expected waiting time \cite{gross_queueing}.
+
+However, many practical deployments remain partial. Some focus on counting without identity continuity, others on visualization without uncertainty semantics, and others on analytics without operational delivery channels. In addition, integration boundaries between perception pipelines, web supervision, and alert automation are frequently treated as separate projects instead of one coherent architecture.
+
+\begin{table}[ht]
+    \centering
+    \caption{Positioning of the proposed solution against common approach families}
+    \label{tab:approach_positioning}
+    \begin{tabularx}{\textwidth}{|l|X|X|}
+        \hline
+        Approach family & Strengths & Typical limitation \\ \hline
+        Manual or occupancy-only monitoring & Simple to deploy and easy to interpret at first glance. & Weak predictive capability and high operator subjectivity. \\ \hline
+        Vision detection without persistent tracking & Fast frame-level counting. & Identity discontinuity can distort arrival and departure logic. \\ \hline
+        Analytical queue models without vision coupling & Strong mathematical interpretability. & Requires reliable event extraction pipeline from real scenes. \\ \hline
+        Proposed integrated pipeline & Couples perception, queue analytics, uncertainty, web monitoring, and automation. & Requires careful multi-layer integration and validation. \\ \hline
+    \end{tabularx}
+\end{table}
 
 \subsection{Proposed Solution}
-The proposed system combines perception, analytics, and integration in one coherent pipeline:
+The proposed system combines perception, analytics, and integration in one modular pipeline:
 \begin{enumerate}
     \item person detection and multi-object tracking from camera feeds,
     \item polygon-based queue-zone filtering,
@@ -45,7 +98,8 @@ The proposed system combines perception, analytics, and integration in one coher
     \item Bayesian uncertainty quantification for key metrics,
     \item real-time web supervision and automation through n8n webhooks and Telegram alerts.
 \end{enumerate}
-This architecture aims to convert video observations into reliable operational actions.
+
+This architecture aims to convert visual observations into operational actions while keeping each layer independently testable. Detection/tracking modules can evolve without rewriting queue formulas; web and automation channels can evolve without changing the core metric contract.
 
 \subsection{Objectives of the Project}
 The project objectives are to:
@@ -58,21 +112,48 @@ The project objectives are to:
     \item expose metrics through web interfaces and automation workflows.
 \end{enumerate}
 
+To keep implementation traceable, objectives are mapped to delivery modules and observable outputs.
+
+\begin{table}[ht]
+    \centering
+    \caption{Objective-to-module traceability}
+    \label{tab:objective_traceability}
+    \begin{tabularx}{\textwidth}{|l|X|l|X|}
+        \hline
+        Objective ID & Objective & Primary module & Observable output \\ \hline
+        OBJ-01 & Real-time detection and tracking & Module A & Stable in-frame detections with persistent tracker IDs. \\ \hline
+        OBJ-02 & Queue-zone counting & Module A & Per-frame in-zone people count and zone-aware overlays. \\ \hline
+        OBJ-03 & Queue metric estimation ($\lambda,\mu,W$) & Module A & Continuous metric payloads from queue analysis pipeline. \\ \hline
+        OBJ-04 & Uncertainty quantification & Module A & Confidence intervals and uncertainty level labels. \\ \hline
+        OBJ-05 & Web monitoring & Module B & Live dashboard with feed controls, KPIs, and stream views. \\ \hline
+        OBJ-06 & Automation integration & Module C & Webhook-based alert routing through n8n and Telegram. \\ \hline
+    \end{tabularx}
+\end{table}
+
+\subsection{Project Scope and Boundaries}
+The implementation scope includes backend perception and analytics modules, API/runtime integration, web monitoring, and external workflow automation. The report deliberately focuses on this web-first operational architecture.
+
+All implementation details and validation narratives are presented through the backend, web, and automation delivery tracks to maintain a consistent production-oriented scope.
+
 \subsection{Target Audience}
-The system targets three main stakeholder groups:
+The system targets three stakeholder groups with complementary goals:
 \begin{itemize}
-    \item \textbf{Operators}, who monitor queue dynamics and react to active alerts,
-    \item \textbf{Managers}, who use historical and live indicators for staffing and service planning,
-    \item \textbf{End users}, who benefit indirectly from reduced waiting time and improved flow management.
+    \item \textbf{Operators}: need low-latency visibility of queue status and actionable alert signals.
+    \item \textbf{Managers}: need interpretable indicators for staffing and service-quality planning.
+    \item \textbf{End users}: benefit indirectly from reduced waiting times and smoother service flow.
 \end{itemize}
+
+This separation is important because each group consumes different levels of abstraction, from per-feed live events to aggregated performance trends.
 
 \section{Project Management Methodology}
 
 \subsection{Choice of Methodology: Agile}
-An Agile approach was selected to deliver functional increments quickly while reducing technical and integration risks early. This choice was especially appropriate for a project combining computer vision, statistical modeling, backend APIs, frontend integration, and external automation services.
+An Agile approach was selected to deliver functional increments quickly while reducing integration risks early. The project combines multiple technical domains (computer vision, queue analytics, backend APIs, frontend workflows, and automation), each with uncertainties that are difficult to resolve using a single monolithic delivery cycle.
+
+Iterative delivery made it possible to validate contracts progressively: first perception outputs, then analytical reliability, then API/runtime integration, then web usability, and finally workflow automation and hardening.
 
 \subsection{SCRUM}
-Development followed sprint-based Scrum planning with iterative validation. For report readability, the implementation is grouped into three logical modules.
+Development followed sprint-based Scrum planning with iterative validation. For report readability and implementation traceability, work is grouped into three logical modules.
 
 \subsubsection{Module A: Backend Core (Sprints 1-3)}
 This module established the vision and analytics backbone:
@@ -100,16 +181,16 @@ This module covered integration hardening and closure:
 \begin{table}[ht]
     \centering
     \caption{Scrum module mapping used in this report}
-    \begin{tabularx}{\textwidth}{l l X}
-        \toprule
-        Module & Sprints & Main focus \\
-        \midrule
-        Module A: Backend Core & 1 to 3 & Vision pipeline, queue analytics, camera connectivity, API services \\
-        Module B: Web Experience & 4 to 5 & Frontend design system, dashboard scaffolding, live integration \\
-        Module C: Automation and Finalization & 6 to 8 & n8n alerting, optimization, validation, and reporting \\
-        \bottomrule
+    \label{tab:scrum_module_mapping}
+    \begin{tabularx}{\textwidth}{|l|l|X|X|}
+        \hline
+        Module & Sprints & Main focus & Validation perspective \\ \hline
+        Module A: Backend Core & 1 to 3 & Vision pipeline, queue analytics, camera connectivity, API services & Technical correctness of perception and metrics contracts. \\ \hline
+        Module B: Web Experience & 4 to 5 & Frontend design system, dashboard scaffolding, live integration & Usability, interaction continuity, and live data rendering stability. \\ \hline
+        Module C: Automation and Finalization & 6 to 8 & n8n alerting, optimization, validation, and reporting & End-to-end operability, alert reliability, and delivery readiness. \\ \hline
     \end{tabularx}
 \end{table}
 
 \section{Conclusion}
-This chapter positioned the project in its organizational and technical context, clarified the addressed problem, and presented the proposed solution and delivery approach. The next chapter formalizes requirements and analysis foundations that guided implementation decisions.
+This chapter positioned the project in its organizational and technical context, formalized the addressed operational problem, and justified the selected delivery strategy. Chapter 2 builds on this baseline by formalizing requirements, architecture constraints, and analysis artifacts used to guide implementation decisions.
+

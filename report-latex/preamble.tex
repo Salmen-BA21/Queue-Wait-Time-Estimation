@@ -29,6 +29,13 @@
 \usepackage{csquotes}
 \usepackage{fancyhdr}
 
+% Improve table readability: more inner padding, taller rows, and clearer grid lines.
+\setlength{\tabcolsep}{8pt}
+\renewcommand{\arraystretch}{1.25}
+\setlength{\extrarowheight}{1.5pt}
+\setlength{\arrayrulewidth}{0.5pt}
+\renewcommand{\tabularxcolumn}[1]{>{\raggedright\arraybackslash}p{#1}}
+
 \usepackage[hidelinks, colorlinks=false, pdfborder={0 0 0}, linktoc=all]{hyperref}
 \usepackage[nameinlink]{cleveref}
 

@@ -12,6 +12,7 @@ This folder contains workflow and domain skills used by GitHub Copilot agents.
 - `queue-metrics-testdata`: payload fixtures and test helpers.
 - `queue-system-dev`: baseline queue-system architecture and invariants.
 - `queue-uncertainty-theory`: statistical model and uncertainty math.
+- `report-ai-authenticity`: detects AI-like report prose patterns and generates rewrite suggestions.
 - `webhook-security`: security hardening for self-hosted webhook ingestion.
 
 ## Using skills

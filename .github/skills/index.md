@@ -12,6 +12,7 @@ This index lists available Copilot skills in this repository with paths and shor
 | queue-metrics-testdata | `.github/skills/queue-metrics-testdata/SKILL.md` | Payload fixtures, generators, replay sequences, and pytest helpers. |
 | queue-system-dev | `.github/skills/queue-system-dev/SKILL.md` | Core queue system architecture, module mapping, and invariants. |
 | queue-uncertainty-theory | `.github/skills/queue-uncertainty-theory/SKILL.md` | Bayesian CI math, queue stability, model switch, drift detection. |
+| report-ai-authenticity | `.github/skills/report-ai-authenticity/SKILL.md` | AI-like report prose risk scoring with humanized rewrite suggestions for LaTeX chapters. |
 | webhook-security | `.github/skills/webhook-security/SKILL.md` | Header auth/hmac/replay protection for n8n webhook ingestion. |
 
 ## Canonical workflow skill

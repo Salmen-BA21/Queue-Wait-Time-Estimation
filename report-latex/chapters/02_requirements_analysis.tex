@@ -2,7 +2,9 @@
 \chaptertoc
 
 \section{Introduction}
-This chapter formalizes system requirements and the main design choices that structure the project implementation. It defines actors, functional and non-functional requirements, product backlog orientation, sprint planning, data model foundations, project environment, and software architecture.
+This chapter formalizes the requirement baseline that guided implementation choices across backend perception, queue analytics, web supervision, and automation workflows. Its role is twofold: define what the system must provide, and justify how architectural decomposition supports those requirements.
+
+The chapter therefore goes beyond feature listing. It introduces requirement traceability, actor responsibilities, quality constraints, sprint-scope mapping, conceptual data entities, and software architecture layers. These elements are used as reference contracts for the sprint implementation chapters.
 
 \section{Requirements Specification}
 
@@ -13,6 +15,21 @@ The system involves three primary actors:
     \item \textbf{Operator}: monitors live queues and reacts to alerts during operations.
     \item \textbf{Manager}: analyzes historical trends and uses indicators for planning decisions.
 \end{itemize}
+
+Although these roles interact with the same platform, they consume different abstractions. Administrators require configuration and diagnostics depth, operators require low-latency situational awareness, and managers require interpretable KPI summaries for decision support.
+
+\begin{table}[ht]
+    \centering
+    \caption{Actor responsibility matrix}
+    \label{tab:actor_responsibility_matrix}
+    \begin{tabularx}{\textwidth}{|l|X|X|}
+        \hline
+        Actor & Main responsibilities & Typical interactions \\ \hline
+        Administrator & Configure feeds, zones, threshold rules, and integration credentials. & Uses setup and settings flows, validates connectivity, and supervises runtime health signals. \\ \hline
+        Operator & Monitor queue status in real time and react to warnings/critical alerts. & Uses dashboard KPIs, live feed views, and alert panels for immediate response. \\ \hline
+        Manager & Review aggregate behavior and support planning decisions. & Consumes historical trends, uncertainty-aware metrics, and performance summaries. \\ \hline
+    \end{tabularx}
+\end{table}
 
 \subsection{Functional Requirements}
 The system must provide the following core functionalities:
@@ -27,6 +44,26 @@ The system must provide the following core functionalities:
     \item historical data logging and analytics.
 \end{itemize}
 
+To support verification and sprint-level accountability, these requirements are formalized in a traceability matrix.
+
+\begin{table}[ht]
+    \centering
+    \caption{Functional requirement traceability matrix}
+    \label{tab:functional_requirement_matrix}
+    \begin{tabularx}{\textwidth}{|l|X|l|X|}
+        \hline
+        ID & Requirement statement & Priority & Verification strategy \\ \hline
+        FR-01 & Detect people from live or recorded video streams in near real time. & High & Validate detector outputs and runtime overlays from \texttt{backend/src/detector.py} integration. \\ \hline
+        FR-02 & Maintain identity continuity through tracking for event-level queue analysis. & High & Validate tracker ID continuity from \texttt{backend/src/tracker.py} in runtime scenarios. \\ \hline
+        FR-03 & Restrict counting to configurable polygon queue zones. & High & Validate zone inclusion logic from \texttt{backend/src/zone\_manager.py}. \\ \hline
+        FR-04 & Compute $\lambda$, $\mu$, and expected wait time from event windows. & High & Validate queue formulas and stability handling in \texttt{backend/src/queue\_analyzer.py}. \\ \hline
+        FR-05 & Compute uncertainty bounds and qualitative confidence levels. & High & Validate interval outputs and fallback behavior in \texttt{backend/src/uncertainty.py}. \\ \hline
+        FR-06 & Expose feed control and live updates through API and websocket channels. & High & Validate endpoint and runtime behavior through API and integration tests. \\ \hline
+        FR-07 & Dispatch alert payloads to external automation workflows. & Medium & Validate webhook dispatch and n8n branch behavior using script-based scenarios. \\ \hline
+        FR-08 & Persist operational metrics and metadata for analysis and auditing. & Medium & Validate CSV and SQLite paths through runtime execution and persistence checks. \\ \hline
+    \end{tabularx}
+\end{table}
+
 \subsection{Non-functional Requirements}
 The main quality constraints are:
 \begin{itemize}
@@ -38,14 +75,46 @@ The main quality constraints are:
     \item \textbf{Maintainability}: keep modular code organization and testable interfaces.
 \end{itemize}
 
+These quality attributes are treated as engineering contracts, not only design intentions.
+
+\begin{table}[ht]
+    \centering
+    \caption{Non-functional requirement quality matrix}
+    \label{tab:nonfunctional_quality_matrix}
+    \begin{tabularx}{\textwidth}{|l|X|X|X|}
+        \hline
+        ID & Quality attribute & Target indicator & Validation approach \\ \hline
+        NFR-01 & Performance & Stable near-real-time loop and bounded alert propagation delay. & Runtime observation under representative feed scenarios. \\ \hline
+        NFR-02 & Scalability & Independent lifecycle control for multiple feed contexts. & Feed registry behavior and state-transition verification. \\ \hline
+        NFR-03 & Reliability & Graceful handling of camera drops and webhook transmission failures. & Reconnect paths and retry/fallback test scenarios. \\ \hline
+        NFR-04 & Usability & Clear setup-to-monitoring flow for non-developer users. & Dashboard integration tests and workflow walkthroughs. \\ \hline
+        NFR-05 & Security & Controlled integration access via shared secret and credential isolation. & Webhook secret validation and credentialized channel checks. \\ \hline
+        NFR-06 & Maintainability & Modular architecture with explicit contracts and targeted tests. & Code organization review and test-suite coverage by module. \\ \hline
+    \end{tabularx}
+\end{table}
+
 \section{Product Backlog}
-The product backlog was prioritized by business value and technical dependency. For implementation governance, items were grouped into three domains:
+The product backlog was prioritized by business value and technical dependency. For implementation governance, backlog items were grouped into three domains:
 \begin{itemize}
     \item \textbf{Backend domain}: perception pipeline, queue analytics, API and stream interfaces.
     \item \textbf{Web domain}: dashboard UX, live monitoring integration, zone editing workflows.
     \item \textbf{Automation domain}: n8n workflow integration, alert routing, webhook reliability.
 \end{itemize}
-Early sprints concentrated on backend foundations to reduce downstream integration risk.
+
+Early execution emphasized backend foundations to reduce downstream integration risk. This sequencing ensured that web and automation layers consumed a stable metric contract rather than moving targets.
+
+\begin{table}[ht]
+    \centering
+    \caption{Backlog domain structuring}
+    \label{tab:backlog_domain_structuring}
+    \begin{tabularx}{\textwidth}{|l|X|X|}
+        \hline
+        Domain & Representative backlog scope & Dependency rationale \\ \hline
+        Backend & Detection/tracking, zone logic, queue formulas, uncertainty, feed runtime services. & Provides source-of-truth metrics consumed by all upper layers. \\ \hline
+        Web & Dashboard pages, typed API integration, websocket synchronization, feed controls. & Depends on stable backend contracts and event schemas. \\ \hline
+        Automation & Webhook payload contract, routing, cooldown, external notifications, archival. & Depends on reliable alert semantics and validated thresholds. \\ \hline
+    \end{tabularx}
+\end{table}
 
 \section{Global Use Case Diagram}
 \begin{figure}[ht]
@@ -55,43 +124,94 @@ Early sprints concentrated on backend foundations to reduce downstream integrati
     \label{fig:global_use_case}
 \end{figure}
 
+At system level, use cases can be organized into four interaction groups: configuration, monitoring, analytics interpretation, and alert handling. The global diagram should reflect these groups and their actor responsibilities.
+
+\begin{table}[ht]
+    \centering
+    \caption{Primary global use cases}
+    \label{tab:global_use_cases}
+    \begin{tabularx}{\textwidth}{|l|X|l|}
+        \hline
+        Use case ID & Use case summary & Primary actor \\ \hline
+        UC-01 & Register and configure a video feed source. & Administrator \\ \hline
+        UC-02 & Define or update queue zone geometry. & Administrator \\ \hline
+        UC-03 & Monitor live queue metrics and feed status. & Operator \\ \hline
+        UC-04 & Receive and interpret warning or critical alerts. & Operator \\ \hline
+        UC-05 & Review trends and performance indicators. & Manager \\ \hline
+        UC-06 & Validate automation workflow behavior for alerts. & Administrator \\ \hline
+    \end{tabularx}
+\end{table}
+
 \section{Sprint Scope Overview}
-The project implementation is organized into eight sprints. Table~\ref{tab:sprint_plan} summarizes sprint scope and expected outcomes.
+The project implementation is organized into eight sprints. Table~\ref{tab:sprint_plan} summarizes sprint scope and expected outcomes without using calendar-based timeline tracking.
 
 \begin{table}[ht]
     \centering
     \caption{Project sprint scope overview}
     \label{tab:sprint_plan}
-    \begin{tabularx}{\textwidth}{l X}
-        \toprule
-        Sprint & Main outcome \\
-        \midrule
-        Sprint 1 & Detection, tracking, and queue-zone perception foundation \\
-        Sprint 2 & Queue analytics and uncertainty quantification \\
-        Sprint 3 & Camera connectivity and backend API exposure \\
-        Sprint 4 & Web design system and frontend scaffolding \\
-        Sprint 5 & Frontend integration and live monitoring \\
-        Sprint 6 & n8n automation and Telegram alerting \\
-        Sprint 7 & Evaluation and optimization \\   
-        Sprint 8 & Final consolidation, reporting, and delivery \\
-        \bottomrule
+    \begin{tabularx}{\textwidth}{|l|X|X|}
+        \hline
+        Sprint & Main outcome & Representative validation lens \\ \hline
+        Sprint 1 & Detection, tracking, and queue-zone perception foundation & Perception correctness and tracker continuity \\ \hline
+        Sprint 2 & Queue analytics and uncertainty quantification & Formula validity and interval consistency \\ \hline
+        Sprint 3 & Camera connectivity and backend API exposure & Runtime control and contract stability \\ \hline
+        Sprint 4 & Web design system and frontend scaffolding & UX structure and component baseline \\ \hline
+        Sprint 5 & Frontend integration and live monitoring & API/websocket synchronization quality \\ \hline
+        Sprint 6 & n8n automation and Telegram alerting & Alert routing and delivery reliability \\ \hline
+        Sprint 7 & Evaluation and optimization & Test depth and runtime hardening \\ \hline
+        Sprint 8 & Final consolidation, reporting, and delivery & End-to-end consistency and documentation quality \\ \hline
     \end{tabularx}
 \end{table}
 
 \section{Data Modeling}
-The data model combines runtime monitoring entities and persistence entities. The main objects are:
+The data model combines runtime monitoring entities and persistence entities. Its design objective is to support both low-latency supervision and post-hoc analysis with minimal contract drift across modules.
+
+\subsection{Core Entities}
+The main objects are:
 \begin{itemize}
     \item \textbf{VideoFeed}: source identity, connectivity, runtime status, and configuration.
     \item \textbf{QueueMetrics}: timestamped indicators (people in zone, $\lambda$, $\mu$, $W$, stability).
     \item \textbf{Alert}: severity, threshold context, and notification payload.
     \item \textbf{Establishment} and \textbf{Caisse}: business metadata used to organize feeds.
 \end{itemize}
-These entities support both live supervision and historical analysis pipelines.
+
+\begin{table}[ht]
+    \centering
+    \caption{Conceptual entity mapping}
+    \label{tab:conceptual_entity_mapping}
+    \begin{tabularx}{\textwidth}{|l|X|X|}
+        \hline
+        Entity & Core semantics & Producer/consumer context \\ \hline
+        VideoFeed & Declares source type, identity, status, and runtime control metadata. & Produced by onboarding/configuration flows; consumed by runtime and dashboard layers. \\ \hline
+        QueueMetrics & Captures analytical outputs used for monitoring and decision support. & Produced by analysis loop; consumed by websocket/API/dashboard and alert logic. \\ \hline
+        Alert & Encodes threshold breach context and notification-ready payload content. & Produced by threshold evaluation; consumed by webhook automation and archival paths. \\ \hline
+        Establishment / Caisse & Binds feeds to business-level organization context. & Produced by metadata management APIs; consumed by setup and filtering interfaces. \\ \hline
+    \end{tabularx}
+\end{table}
+
+\subsection{Data Lifecycle and Persistence Strategy}
+Runtime metrics are generated continuously and distributed through live channels, while selected records are persisted for auditability and trend analysis. This dual-path strategy (stream plus persistence) improves resilience: temporary integration failures do not imply complete data loss.
+
+CSV logging supports rapid observability and portability, while SQLite supports structured metadata and alert archival. Together, these storage paths enable both operational continuity and post-run diagnosis.
 
 \section{Project Environment}
 
 \subsection{Hardware and Software Environment}
-The development workflow uses a Python backend environment, a TypeScript frontend environment, and containerized automation services. The project is designed to run on standard development workstations and can exploit GPU acceleration when CUDA-compatible hardware is available.
+The development workflow combines a Python backend environment, a TypeScript frontend environment, and containerized automation services. The project is designed to run on standard workstations and can exploit hardware acceleration when compatible GPU resources are available.
+
+\begin{table}[ht]
+    \centering
+    \caption{Execution environment profile}
+    \label{tab:execution_environment_profile}
+    \begin{tabularx}{\textwidth}{|l|X|X|}
+        \hline
+        Environment layer & Main tooling & Purpose \\ \hline
+        Backend runtime & Python ecosystem with vision and scientific libraries & Perception, queue analytics, uncertainty, and integration dispatch. \\ \hline
+        Frontend runtime & Node/Bun-based TypeScript toolchain with Vite & Dashboard rendering, interaction workflows, and live-state synchronization. \\ \hline
+        Automation runtime & Self-hosted n8n with webhook endpoints & Alert routing, cooldown logic, and external notifications. \\ \hline
+        Persistence/runtime support & CSV outputs and SQLite metadata store & Historical analysis and system state continuity. \\ \hline
+    \end{tabularx}
+\end{table}
 
 \subsection{Technologies Used}
 The selected technology stack is:
@@ -104,6 +224,8 @@ The selected technology stack is:
     \item \textbf{Persistence}: CSV metrics logging and SQLite metadata.
 \end{itemize}
 
+Technology selection follows a modular criterion: each component must provide clear contract boundaries and practical interoperability with adjacent layers.
+
 \section{Software Architecture}
 
 \subsection{Overall Architecture}
@@ -115,11 +237,34 @@ The system architecture is organized in four layers:
     \item \textbf{Output and integration}: web dashboard, webhook dispatch, and alert automation.
 \end{enumerate}
 
+This layering constrains coupling and simplifies testing. For example, queue formulas depend on perception events, but do not depend on frontend rendering details.
+
+\begin{table}[ht]
+    \centering
+    \caption{Architecture layer-to-module mapping}
+    \label{tab:architecture_layer_mapping}
+    \begin{tabularx}{\textwidth}{|l|X|X|}
+        \hline
+        Layer & Responsibilities & Representative modules \\ \hline
+        Video acquisition & Source opening, stream transport handling, reconnect behavior. & \texttt{video\_capture.py}, \texttt{rtsp\_camera.py}, \texttt{onvif\_client.py} \\ \hline
+        Perception & Person detection, tracking continuity, zone-aware filtering. & \texttt{detector.py}, \texttt{tracker.py}, \texttt{zone\_manager.py} \\ \hline
+        Analysis & Event-window rates, wait-time logic, uncertainty bounds. & \texttt{queue\_analyzer.py}, \texttt{uncertainty.py}, \texttt{threshold\_detector.py} \\ \hline
+        Output/integration & API/websocket exposure, webhook dispatch, persistence, dashboard consumption. & \texttt{api/app.py}, \texttt{api/runtime.py}, \texttt{webhook\_client.py}, frontend hooks/pages \\ \hline
+    \end{tabularx}
+\end{table}
+
 \subsection{Backend Architecture}
-The backend exposes REST and WebSocket interfaces for feed lifecycle control and live metrics. It includes modules for detector orchestration, tracking, queue analysis, threshold detection, webhook delivery, and camera-source management (RTSP and ONVIF). The API contract supports onboarding, runtime control, snapshots, streams, metadata, and integration diagnostics.
+The backend exposes REST and websocket interfaces for feed lifecycle control and live metrics. It includes modules for detector orchestration, tracking, queue analysis, threshold detection, webhook delivery, and camera-source management.
+
+Runtime orchestration is centered around feed-level lifecycle control and event broadcasting. This design supports independent feed state transitions and clear event contracts consumed by the dashboard and automation pipeline.
+
+Persistence and integration are treated as first-class concerns: CSV metrics logging, SQLite metadata state, and webhook dispatch reliability are all part of the operational architecture rather than optional add-ons.
 
 \subsection{Frontend Architecture}
-The frontend follows a component-based architecture with typed API client mapping, feed-oriented dashboard views, and WebSocket-driven state updates. It integrates live stream rendering, per-feed controls, and alert visualization while preserving separation between presentation components and data-access logic.
+The frontend follows a component-based architecture with typed API contract mapping, feed-oriented dashboard composition, and websocket-driven synchronization. It separates data-access concerns (API client and hooks) from presentation concerns (pages and reusable components).
+
+This separation improves maintainability: backend contract adjustments can be localized to integration hooks and API utilities, while visual components remain focused on rendering and interaction logic.
 
 \section{Conclusion}
-This chapter established the requirements baseline and architecture model used throughout implementation. The next chapters present sprint-by-sprint development aligned to this specification and analysis framework.
+This chapter established the detailed requirement baseline and architecture rationale used throughout implementation. The next chapters translate these contracts into sprint-by-sprint technical realization, from perception foundations to integration, automation, and validation outcomes.
+
