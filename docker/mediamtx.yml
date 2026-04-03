@@ -1,0 +1,36 @@
+logLevel: info
+
+authMethod: internal
+authInternalUsers:
+  - user: any
+    permissions:
+      - action: read
+      - action: publish
+      - action: api
+
+api: yes
+apiAddress: :9997
+
+rtsp: yes
+rtspAddress: :8554
+rtspTransports: [udp, tcp]
+rtpAddress: :8000
+rtcpAddress: :8001
+
+hls: yes
+hlsAddress: :8888
+
+webrtc: yes
+webrtcAddress: :8889
+webrtcEncryption: no
+webrtcAllowOrigins:
+  - http://localhost:5173
+  - http://127.0.0.1:5173
+  - http://localhost:3000
+  - http://127.0.0.1:3000
+
+pathDefaults:
+  source: publisher
+  sourceOnDemand: false
+
+paths: {}

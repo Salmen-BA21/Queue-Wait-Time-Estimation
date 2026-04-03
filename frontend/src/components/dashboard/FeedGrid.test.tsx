@@ -62,7 +62,7 @@ function createMetrics(renderFrameJpegBase64: string | null = null): NonNullable
 }
 
 describe("FeedGrid MJPEG transport", () => {
-  it("renders RTSP feeds with the MJPEG endpoint instead of snapshot polling", () => {
+  it("falls back to MJPEG when WebRTC is unavailable", () => {
     render(
       <FeedGrid
         feeds={[createFeed({ latest_metrics: createMetrics() })]}

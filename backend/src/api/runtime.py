@@ -1368,6 +1368,28 @@ class FeedRegistry:
             error=info.get("error") if not ok else None,
         )
 
+    async def resolve_feed_webrtc_source(
+        self,
+        feed_id: str,
+    ) -> tuple[Literal["ok", "not_found", "not_running", "unsupported_source"], str | None]:
+        """Resolve an authenticated RTSP source for WebRTC preview handshakes."""
+        async with self._lock:
+            record = self._feeds.get(feed_id)
+            if record is None:
+                return "not_found", None
+
+            if record.status != "running":
+                return "not_running", None
+
+            source = record.source
+            username = record.rtsp_username
+            password = record.rtsp_password
+
+        if not source.lower().startswith("rtsp://"):
+            return "unsupported_source", None
+
+        return "ok", _build_authenticated_rtsp_source(source, username, password)
+
     async def subscribe_feed_stream(self, feed_id: str) -> Literal["ok", "not_found", "not_running"]:
         async with self._lock:
             record = self._feeds.get(feed_id)

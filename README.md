@@ -100,6 +100,18 @@ npm install
 npm run dev
 ```
 
+Optional WebRTC gateway for live preview (MediaMTX):
+
+```bash
+docker-compose up -d mediamtx
+```
+
+MediaMTX defaults used by the backend:
+
+- WHEP/WebRTC: `http://127.0.0.1:8889`
+- Control API: `http://127.0.0.1:9997`
+- RTSP relay: `rtsp://127.0.0.1:8554/<stream_name>`
+
 ## IP Camera Discovery
 
 The ONVIF discovery and stream-resolution helpers live in `backend/src/onvif_client.py`.
@@ -130,7 +142,7 @@ Detailed guide: [docs/IP_CAMERA_DISCOVERY_README.md](docs/IP_CAMERA_DISCOVERY_RE
 
 ## n8n Integration
 
-Start n8n locally:
+Start local support services (n8n + MediaMTX):
 
 ```bash
 docker-compose up -d
@@ -141,6 +153,12 @@ Open `http://localhost:5678` and import workflow:
 - Recommended: `n8n_workflow_with_telegram.json`
 - Legacy minimal template: `n8n_workflow_template.json`
 
+MediaMTX control and WebRTC endpoints (for debugging):
+
+- Control API: `http://127.0.0.1:9997/v3/paths/list`
+- WebRTC page: `http://127.0.0.1:8889/<path>`
+- WHEP endpoint: `http://127.0.0.1:8889/<path>/whep`
+
 Set secrets/variables in n8n:
 
 - `WEBHOOK_SECRET`
@@ -150,6 +168,12 @@ Set backend environment variables:
 
 - `N8N_WEBHOOK_URL` (default: `http://localhost:5678/webhook/queue-metrics`)
 - `N8N_WEBHOOK_SECRET`
+- `MEDIAMTX_WEBRTC_PREVIEW_ENABLED` (default: `true`)
+- `MEDIAMTX_WHEP_BASE_URL` (default: `http://127.0.0.1:8889`)
+- `MEDIAMTX_CONTROL_API_BASE_URL` (default: `http://127.0.0.1:9997`)
+- `MEDIAMTX_WEBRTC_TIMEOUT_SEC` (default: `8.0`)
+
+If go2rtc is still running locally, stop it before starting MediaMTX to avoid port conflicts.
 
 Automated test runbook: [scripts/TEST_N8N.md](scripts/TEST_N8N.md)
 

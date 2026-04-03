@@ -12,6 +12,7 @@ FeedStatus = Literal["created", "initializing", "running", "stopped", "error"]
 EventType = Literal["snapshot", "feed_status", "metrics_update", "alert_fired", "system_warning"]
 ModelSize = Literal["n", "s", "m", "l", "x"]
 RTSPTransport = Literal["tcp", "udp"]
+WebRTCSessionType = Literal["offer", "answer"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 BatchLaunchMode = Literal["save_only", "create_and_start"]
 BatchLaunchItemStatus = Literal["created", "started", "failed"]
@@ -411,6 +412,38 @@ class FeedSnapshotResult(BaseModel):
     height: int | None = Field(default=None, ge=0)
     image_data_url: str | None = None
     error: str | None = None
+
+
+class WebRTCSessionDescription(BaseModel):
+    """WebRTC session description used for browser-to-gateway signaling."""
+
+    type: WebRTCSessionType
+    sdp: str = Field(min_length=1, max_length=40000)
+
+    @field_validator("sdp")
+    @classmethod
+    def validate_sdp_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("SDP must not be blank.")
+        return value
+
+
+class FeedWebRTCOfferRequest(BaseModel):
+    """Frontend offer payload proxied to the MediaMTX WebRTC gateway."""
+
+    offer: WebRTCSessionDescription
+
+    @model_validator(mode="after")
+    def validate_offer_type(self) -> "FeedWebRTCOfferRequest":
+        if self.offer.type != "offer":
+            raise ValueError("Offer description type must be 'offer'.")
+        return self
+
+
+class FeedWebRTCOfferResponse(BaseModel):
+    """Gateway answer returned to the browser for WebRTC preview."""
+
+    answer: WebRTCSessionDescription
 
 
 class ONVIFDiscoveryRequest(BaseModel):

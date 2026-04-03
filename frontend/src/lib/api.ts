@@ -549,8 +549,30 @@ export interface FeedSnapshotResult {
   error: string | null;
 }
 
+export type WebRTCSessionType = "offer" | "answer";
+
+export interface WebRTCSessionDescription {
+  type: WebRTCSessionType;
+  sdp: string;
+}
+
+export interface FeedWebRtcOfferInput {
+  offer: WebRTCSessionDescription;
+}
+
+export interface FeedWebRtcOfferResult {
+  answer: WebRTCSessionDescription;
+}
+
 export function getFeedSnapshot(feedId: string): Promise<FeedSnapshotResult> {
   return fetchApi<FeedSnapshotResult>(`/api/feeds/${feedId}/snapshot`);
+}
+
+export function submitFeedWebRtcOffer(feedId: string, input: FeedWebRtcOfferInput): Promise<FeedWebRtcOfferResult> {
+  return fetchApi<FeedWebRtcOfferResult>(`/api/feeds/${feedId}/webrtc/offer`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export function getFeedMjpegStreamUrl(feedId: string): string {

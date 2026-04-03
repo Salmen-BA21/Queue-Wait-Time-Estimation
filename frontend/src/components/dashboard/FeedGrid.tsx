@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { useFeedWebRtc } from "@/hooks/use-feed-webrtc";
 import { getFeedMjpegStreamUrl, getFeedSnapshot, resolveApiUrl, type VideoFeed } from "@/lib/api";
 
 export type FeedGridAction = "start" | "stop" | "restart" | "delete";
@@ -104,6 +105,7 @@ function FeedTransportSurface({
   detections,
   renderedFrameJpegBase64,
   isStopping,
+  preferBackendTransport,
   onOpenViewer,
 }: {
   feed: VideoFeed;
@@ -113,6 +115,7 @@ function FeedTransportSurface({
   detections?: number[][] | null;
   renderedFrameJpegBase64?: string | null;
   isStopping: boolean;
+  preferBackendTransport?: boolean;
   onOpenViewer?: () => void;
 }) {
   const [playbackFailed, setPlaybackFailed] = useState(false);
@@ -136,9 +139,25 @@ function FeedTransportSurface({
 
   const transportActive = uiStatus !== "offline" && !isStopping;
   const hasWorkerMetrics = Boolean(feed.latest_metrics);
+  const shouldPreferBackendTransport = Boolean(preferBackendTransport) && transportActive && feed.status === "running";
   const shouldShowWorkerLoading = transportActive
     && (feed.status === "initializing" || (feed.status === "running" && !hasWorkerMetrics));
-  const shouldUseMjpegStream = transportActive && feed.status === "running" && hasWorkerMetrics;
+  const shouldAttemptWebRtc = transportActive
+    && feed.status === "running"
+    && hasWorkerMetrics
+    && !shouldPreferBackendTransport;
+  const {
+    videoRef: webRtcVideoRef,
+    streamReady: webRtcReady,
+    isSupported: webRtcSupported,
+  } = useFeedWebRtc({
+    feedId: feed.feed_id,
+    enabled: shouldAttemptWebRtc,
+  });
+  const showWebRtcFrame = shouldAttemptWebRtc && webRtcSupported && webRtcReady;
+  const shouldUseMjpegStream = transportActive
+    && feed.status === "running"
+    && ((hasWorkerMetrics && !showWebRtcFrame) || shouldPreferBackendTransport);
   const streamUrl = shouldUseMjpegStream
     ? `${getFeedMjpegStreamUrl(feed.feed_id)}?attempt=${streamAttempt}`
     : null;
@@ -218,13 +237,18 @@ function FeedTransportSurface({
   };
 
   const previewUrl = feed.preview_path ? resolveApiUrl(feed.preview_path) : null;
-  const showLiveFrame = Boolean(streamUrl) && !playbackFailed;
-  const showRenderedFrame = transportActive && !showLiveFrame && Boolean(renderedFrameDataUrl);
-  const showFallbackFrame = !showLiveFrame && transportActive && Boolean(fallbackFrameUrl);
-  const showLoadingState = shouldShowWorkerLoading && !showLiveFrame && !showRenderedFrame && !showFallbackFrame;
+  const showMjpegFrame = Boolean(streamUrl) && !playbackFailed;
+  const showRenderedFrame = transportActive && !showWebRtcFrame && !showMjpegFrame && Boolean(renderedFrameDataUrl);
+  const showFallbackFrame = !showWebRtcFrame && !showMjpegFrame && transportActive && Boolean(fallbackFrameUrl);
+  const showLoadingState = shouldShowWorkerLoading
+    && !showWebRtcFrame
+    && !showMjpegFrame
+    && !showRenderedFrame
+    && !showFallbackFrame;
   const showPreview = transportActive
     && !shouldShowWorkerLoading
-    && !showLiveFrame
+    && !showWebRtcFrame
+    && !showMjpegFrame
     && !showFallbackFrame
     && Boolean(previewUrl)
     && !playbackFailed;
@@ -253,7 +277,59 @@ function FeedTransportSurface({
       disabled={!onOpenViewer}
       aria-label={onOpenViewer ? `Open ${feed.name} in expanded view` : undefined}
     >
-      {showRenderedFrame ? (
+      {showWebRtcFrame ? (
+        <>
+          <video
+            ref={webRtcVideoRef}
+            className="h-full w-full object-cover"
+            autoPlay
+            muted
+            playsInline
+            onLoadedMetadata={onVideoLoad}
+          />
+          {/* Tracking overlays (zone polygon + person boxes) */}
+          {videoDims && (zonePolygonPoints || (uiStatus === "online" && detections?.length)) && (
+            <svg
+              className="absolute inset-0 h-full w-full pointer-events-none"
+              viewBox={`0 0 ${videoDims.width} ${videoDims.height}`}
+              preserveAspectRatio="xMidYMid slice"
+            >
+              {zonePolygonPoints && (
+                <>
+                  <polygon
+                    points={zonePolygonPoints}
+                    className="fill-cyan-400/10 stroke-cyan-300"
+                    strokeWidth={3}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <polyline
+                    points={zonePolygonPoints}
+                    className="stroke-cyan-100/70"
+                    strokeWidth={1}
+                    fill="none"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </>
+              )}
+
+              {uiStatus === "online" && detections?.map((det, idx) => {
+                const [x1, y1, x2, y2] = det;
+                return (
+                  <rect
+                    key={idx}
+                    x={x1}
+                    y={y1}
+                    width={x2 - x1}
+                    height={y2 - y1}
+                    className="fill-primary/10 stroke-primary stroke-[2]"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                );
+              })}
+            </svg>
+          )}
+        </>
+      ) : showRenderedFrame ? (
         <img
           className="h-full w-full object-cover"
           src={renderedFrameDataUrl ?? undefined}
@@ -261,7 +337,7 @@ function FeedTransportSurface({
           onLoad={onImageLoad}
           onError={() => setPlaybackFailed(true)}
         />
-      ) : showLiveFrame ? (
+      ) : showMjpegFrame ? (
         <>
           <img
             key={streamUrl}
@@ -519,6 +595,7 @@ function FeedGridComponent({
                 detections={detections}
                 renderedFrameJpegBase64={feed.latest_metrics?.render_frame_jpeg_base64}
                 isStopping={currentAction === "stop"}
+                preferBackendTransport={feeds.length > 1}
                 onOpenViewer={() => setExpandedFeedId(feed.feed_id)}
               />
               <div className="p-3">
@@ -672,6 +749,7 @@ function FeedGridComponent({
               isStopping={
                 activeFeedAction?.feedId === expandedFeed.feed_id && activeFeedAction.action === "stop"
               }
+              preferBackendTransport={feeds.length > 1}
             />
           </DialogContent>
         )}

@@ -72,6 +72,18 @@ def _env_flag(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _env_float(name: str, default: float) -> float:
+    """Read a float environment variable, falling back when parsing fails."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
 DEFAULT_REALTIME_FILE_PLAYBACK: bool = _env_flag("QUEUE_REALTIME_FILE_PLAYBACK", True)
 
 DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY: int = int(
@@ -85,6 +97,19 @@ DASHBOARD_EVENT_EMIT_INTERVAL_SEC: float = float(
 # API runtime tailing interval for worker event files.
 DASHBOARD_EVENT_POLL_INTERVAL_SEC: float = float(
     os.getenv("QUEUE_DASHBOARD_POLL_INTERVAL_SEC", "0.1"),
+)
+
+
+# ─── WebRTC Preview / MediaMTX ─────────────────────────────
+MEDIAMTX_WHEP_BASE_URL: str = os.getenv("MEDIAMTX_WHEP_BASE_URL", "http://127.0.0.1:8889").rstrip("/")
+MEDIAMTX_CONTROL_API_BASE_URL: str = os.getenv(
+    "MEDIAMTX_CONTROL_API_BASE_URL",
+    "http://127.0.0.1:9997",
+).rstrip("/")
+MEDIAMTX_WEBRTC_PREVIEW_ENABLED: bool = _env_flag("MEDIAMTX_WEBRTC_PREVIEW_ENABLED", True)
+MEDIAMTX_WEBRTC_TIMEOUT_SEC: float = max(
+    1.0,
+    _env_float("MEDIAMTX_WEBRTC_TIMEOUT_SEC", 8.0),
 )
 
 

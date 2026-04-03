@@ -58,7 +58,87 @@ def _safe_url(url: str) -> str:
 
 def _apply_rtsp_env(transport: str) -> None:
     """Set OpenCV / FFMPEG environment variables for RTSP transport."""
-    os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", f"rtsp_transport;{transport}")
+    normalized_transport = (transport or "tcp").strip().lower()
+
+    # Hide low-level FFmpeg decoder noise (e.g. transient UDP macroblock errors)
+    # unless the user explicitly overrides it.
+    os.environ.setdefault(
+        "OPENCV_FFMPEG_LOGLEVEL",
+        os.getenv("QUEUE_RTSP_FFMPEG_LOGLEVEL", "8"),
+    )
+
+    # Always refresh capture options so transport changes (tcp/udp) take effect.
+    # UDP can produce decoder errors when buffers are too aggressive, therefore use
+    # a slightly safer profile for UDP and keep the ultra-low-latency profile for TCP.
+    if normalized_transport == "udp":
+        capture_options = (
+            "rtsp_transport;udp"
+            "|fflags;discardcorrupt"
+            "|flags;low_delay"
+            "|reorder_queue_size;32"
+            "|max_delay;200000"
+            "|overrun_nonfatal;1"
+        )
+    else:
+        capture_options = (
+            f"rtsp_transport;{normalized_transport}"
+            "|fflags;nobuffer"
+            "|flags;low_delay"
+            "|reorder_queue_size;0"
+            "|max_delay;0"
+        )
+
+    os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = capture_options
+
+
+def _configure_low_latency_capture(cap: cv2.VideoCapture) -> None:
+    """Best-effort low-latency capture tuning for RTSP streams."""
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+
+def _open_capture_with_probe(
+    *,
+    auth_url: str,
+    safe_url: str,
+    transport: str,
+    timeout: float,
+) -> tuple[cv2.VideoCapture, np.ndarray, str]:
+    """Open RTSP capture and ensure at least one frame is readable.
+
+    If UDP is requested but no frame is received, automatically retry with TCP.
+    """
+    requested_transport = (transport or "tcp").strip().lower()
+    transport_attempts = [requested_transport]
+    if requested_transport == "udp":
+        transport_attempts.append("tcp")
+
+    last_error = f"Could not open stream: {safe_url}"
+
+    for attempt_transport in transport_attempts:
+        _apply_rtsp_env(attempt_transport)
+        cap = cv2.VideoCapture(auth_url, cv2.CAP_FFMPEG)
+        cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, timeout * 1000)
+        cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, timeout * 1000)
+        _configure_low_latency_capture(cap)
+
+        if not cap.isOpened():
+            cap.release()
+            last_error = f"Could not open stream: {safe_url}"
+            continue
+
+        ok, frame = cap.read()
+        if ok and frame is not None:
+            return cap, frame, attempt_transport
+
+        cap.release()
+        last_error = f"Stream opened but could not read a frame: {safe_url}"
+        if attempt_transport == "udp" and "tcp" in transport_attempts:
+            logger.warning(
+                "RTSP UDP session opened but no frames arrived for %s. Retrying with TCP.",
+                safe_url,
+            )
+
+    raise RuntimeError(last_error)
 
 
 # ----------------------------------------------------------------------
@@ -117,15 +197,28 @@ class RTSPCamera:
 
     def open(self) -> "RTSPCamera":
         """Open the RTSP stream. Raises RuntimeError on failure."""
-        _apply_rtsp_env(self._transport)
         safe = _safe_url(self._auth_url)
         logger.info("Connecting to RTSP stream: %s (transport=%s)", safe, self._transport)
-        self._cap = cv2.VideoCapture(self._auth_url, cv2.CAP_FFMPEG)
-        self._cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, RTSP_CONNECTION_TIMEOUT_SEC * 1000)
-        self._cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, RTSP_CONNECTION_TIMEOUT_SEC * 1000)
-        if not self._cap.isOpened():
-            raise RuntimeError(f"Cannot open RTSP stream: {safe}")
-        logger.info("Connected - %dx%d @ %.1f FPS", self.width, self.height, self.fps)
+        self._cap, _, active_transport = _open_capture_with_probe(
+            auth_url=self._auth_url,
+            safe_url=safe,
+            transport=self._transport,
+            timeout=RTSP_CONNECTION_TIMEOUT_SEC,
+        )
+        if active_transport != self._transport:
+            logger.warning(
+                "Falling back to RTSP transport=%s for %s (requested=%s).",
+                active_transport,
+                safe,
+                self._transport,
+            )
+        logger.info(
+            "Connected - %dx%d @ %.1f FPS (transport=%s)",
+            self.width,
+            self.height,
+            self.fps,
+            active_transport,
+        )
         return self
 
     def close(self) -> None:
@@ -189,32 +282,27 @@ class RTSPCamera:
         timeout: float = RTSP_CONNECTION_TIMEOUT_SEC,
     ) -> tuple[bool, dict]:
         """Probe an RTSP URL without starting the full pipeline."""
-        _apply_rtsp_env(transport)
         auth_url = _build_rtsp_url(url, username, password)
         safe = _safe_url(auth_url)
         logger.info("Testing RTSP connection: %s", safe)
 
-        cap = cv2.VideoCapture(auth_url, cv2.CAP_FFMPEG)
-        cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, timeout * 1000)
-        cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, timeout * 1000)
-
-        if not cap.isOpened():
-            cap.release()
-            msg = f"Could not open stream: {safe}"
+        try:
+            cap, _, active_transport = _open_capture_with_probe(
+                auth_url=auth_url,
+                safe_url=safe,
+                transport=transport,
+                timeout=timeout,
+            )
+        except RuntimeError as exc:
+            msg = str(exc)
             logger.warning(msg)
             return False, {"error": msg, "url": url}
 
-        ok, _ = cap.read()
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         raw_fps = float(cap.get(cv2.CAP_PROP_FPS))
         fps = raw_fps if raw_fps > 0 else 30.0
         cap.release()
-
-        if not ok:
-            msg = f"Stream opened but could not read a frame: {safe}"
-            logger.warning(msg)
-            return False, {"error": msg, "url": url}
 
         info = {
             "url": url,
@@ -222,7 +310,7 @@ class RTSPCamera:
             "height": height,
             "fps": fps,
             "resolution": f"{width}x{height}",
-            "transport": transport,
+            "transport": active_transport,
         }
         logger.info("RTSP test OK - %dx%d @ %.1f FPS", width, height, fps)
         return True, info
@@ -237,30 +325,25 @@ class RTSPCamera:
         jpeg_quality: int = 90,
     ) -> tuple[bool, dict]:
         """Capture a single JPEG snapshot from an RTSP source."""
-        _apply_rtsp_env(transport)
         auth_url = _build_rtsp_url(url, username, password)
         safe = _safe_url(auth_url)
         logger.info("Capturing RTSP snapshot: %s", safe)
 
-        cap = cv2.VideoCapture(auth_url, cv2.CAP_FFMPEG)
-        cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, timeout * 1000)
-        cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, timeout * 1000)
-
-        if not cap.isOpened():
-            cap.release()
-            msg = f"Could not open stream: {safe}"
+        try:
+            cap, frame, active_transport = _open_capture_with_probe(
+                auth_url=auth_url,
+                safe_url=safe,
+                transport=transport,
+                timeout=timeout,
+            )
+        except RuntimeError as exc:
+            msg = str(exc)
             logger.warning(msg)
             return False, {"error": msg, "url": url}
 
-        ok, frame = cap.read()
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         cap.release()
-
-        if not ok or frame is None:
-            msg = f"Stream opened but could not read a frame: {safe}"
-            logger.warning(msg)
-            return False, {"error": msg, "url": url}
 
         encoded_ok, buffer = cv2.imencode(
             ".jpg",
@@ -278,7 +361,7 @@ class RTSPCamera:
             "width": width,
             "height": height,
             "resolution": f"{width}x{height}",
-            "transport": transport,
+            "transport": active_transport,
             "image_base64": image_base64,
             "mime_type": "image/jpeg",
         }

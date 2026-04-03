@@ -1,6 +1,20 @@
 version: '3.8'
 
 services:
+  mediamtx:
+    image: bluenviron/mediamtx:1.17.1
+    restart: always
+    ports:
+      - "8554:8554"
+      - "8000:8000/udp"
+      - "8001:8001/udp"
+      - "8888:8888"
+      - "8889:8889"
+      - "8189:8189/udp"
+      - "9997:9997"
+    volumes:
+      - ./docker/mediamtx.yml:/mediamtx.yml:ro
+
   n8n:
     image: n8nio/n8n:latest
     restart: always
