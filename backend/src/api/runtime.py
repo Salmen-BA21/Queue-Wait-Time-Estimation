@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import binascii
 import json
+import logging
 import os
+import socket
+import struct
 import subprocess
 import sys
 import threading
@@ -14,7 +16,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal, Protocol, TextIO, TypedDict, cast
+from typing import Any, Callable, Literal, Protocol, TextIO, TypedDict, cast
 from urllib.parse import urlparse, urlunparse
 from uuid import uuid4
 
@@ -58,6 +60,7 @@ from src.database import (
 )
 from src.config import (
     DASHBOARD_EVENT_POLL_INTERVAL_SEC,
+    DEFAULT_CONFIDENCE,
     DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY,
     DEFAULT_DETECTOR_IMAGE_SIZE,
     DEFAULT_PROCESS_EVERY_N_FRAMES,
@@ -74,7 +77,24 @@ DEFAULT_WORKER_PROCESS_EVERY_N_FRAMES = max(
     int(os.getenv("QUEUE_WORKER_PROCESS_EVERY_N_FRAMES", str(DEFAULT_PROCESS_EVERY_N_FRAMES))),
 )
 DEFAULT_WORKER_DETECTOR_IMAGE_SIZE = max(320, min(640, DEFAULT_DETECTOR_IMAGE_SIZE))
+_raw_worker_confidence = os.getenv("QUEUE_WORKER_DETECTOR_CONFIDENCE", str(DEFAULT_CONFIDENCE)).strip()
+try:
+    _parsed_worker_confidence = float(_raw_worker_confidence)
+except ValueError:
+    _parsed_worker_confidence = DEFAULT_CONFIDENCE
+DEFAULT_WORKER_CONFIDENCE = max(0.05, min(0.95, _parsed_worker_confidence))
 DEFAULT_WORKER_INFERENCE_DEVICE = os.getenv("QUEUE_INFERENCE_DEVICE", "auto").strip() or "auto"
+DEFAULT_FRAME_CHANNEL_BIND_HOST = os.getenv("QUEUE_DASHBOARD_FRAME_CHANNEL_BIND_HOST", "127.0.0.1").strip() or "127.0.0.1"
+MAX_FRAME_CHANNEL_FRAME_BYTES = max(
+    64 * 1024,
+    int(os.getenv("QUEUE_DASHBOARD_FRAME_CHANNEL_MAX_FRAME_BYTES", str(8 * 1024 * 1024))),
+)
+FRAME_CHANNEL_ACTIVITY_TIMEOUT_SEC = max(
+    0.5,
+    float(os.getenv("QUEUE_DASHBOARD_FRAME_CHANNEL_ACTIVITY_TIMEOUT_SEC", "2.0")),
+)
+
+LOGGER = logging.getLogger(__name__)
 
 
 class FeedStateError(RuntimeError):
@@ -637,6 +657,213 @@ class FeedFrameStreamManager:
                 state.condition.notify_all()
 
 
+@dataclass(frozen=True)
+class FrameChannelBinding:
+    """Connection parameters used by one worker to publish encoded frames."""
+
+    host: str
+    port: int
+    token: str
+
+
+class WorkerFrameChannelServer:
+    """Accepts binary JPEG frames from worker processes over a local TCP socket."""
+
+    def __init__(
+        self,
+        *,
+        on_frame: Callable[[str, bytes], None],
+        bind_host: str = DEFAULT_FRAME_CHANNEL_BIND_HOST,
+    ) -> None:
+        self._on_frame = on_frame
+        self._bind_host = bind_host
+        self._server_socket: socket.socket | None = None
+        self._server_host: str | None = None
+        self._server_port: int | None = None
+        self._stop_event = threading.Event()
+        self._lock = threading.Lock()
+        self._accept_thread: threading.Thread | None = None
+        self._client_threads: set[threading.Thread] = set()
+        self._feed_tokens: dict[str, str] = {}
+        self._token_feeds: dict[str, str] = {}
+
+        try:
+            self._start_server()
+        except OSError as exc:
+            LOGGER.warning("Worker frame channel server disabled: %s", exc)
+
+    @property
+    def available(self) -> bool:
+        return self._server_socket is not None and self._server_host is not None and self._server_port is not None
+
+    def register_feed(self, feed_id: str) -> FrameChannelBinding | None:
+        if not self.available:
+            return None
+
+        token = uuid4().hex
+        with self._lock:
+            old_token = self._feed_tokens.pop(feed_id, None)
+            if old_token is not None:
+                self._token_feeds.pop(old_token, None)
+            self._feed_tokens[feed_id] = token
+            self._token_feeds[token] = feed_id
+
+            host = self._server_host
+            port = self._server_port
+
+        if host is None or port is None:
+            return None
+
+        return FrameChannelBinding(host=host, port=port, token=token)
+
+    def unregister_feed(self, feed_id: str) -> None:
+        with self._lock:
+            token = self._feed_tokens.pop(feed_id, None)
+            if token is not None:
+                self._token_feeds.pop(token, None)
+
+    def close(self) -> None:
+        self._stop_event.set()
+
+        if self._server_socket is not None:
+            try:
+                self._server_socket.close()
+            except OSError:
+                pass
+            finally:
+                self._server_socket = None
+
+        if self._accept_thread is not None:
+            self._accept_thread.join(timeout=1.5)
+            self._accept_thread = None
+
+        with self._lock:
+            client_threads = list(self._client_threads)
+
+        for thread in client_threads:
+            thread.join(timeout=1.0)
+
+        with self._lock:
+            self._client_threads.clear()
+            self._feed_tokens.clear()
+            self._token_feeds.clear()
+
+    def _start_server(self) -> None:
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server.bind((self._bind_host, 0))
+        server.listen()
+        server.settimeout(0.5)
+
+        host, port = server.getsockname()[:2]
+        self._server_socket = server
+        self._server_host = str(host)
+        self._server_port = int(port)
+
+        self._accept_thread = threading.Thread(
+            target=self._accept_loop,
+            name="worker-frame-channel",
+            daemon=True,
+        )
+        self._accept_thread.start()
+
+    def _accept_loop(self) -> None:
+        while not self._stop_event.is_set():
+            server = self._server_socket
+            if server is None:
+                return
+
+            try:
+                conn, _ = server.accept()
+            except socket.timeout:
+                continue
+            except OSError:
+                if not self._stop_event.is_set():
+                    LOGGER.debug("Frame channel accept loop stopped due to socket error.")
+                return
+
+            thread = threading.Thread(
+                target=self._handle_client,
+                args=(conn,),
+                name="worker-frame-client",
+                daemon=True,
+            )
+            with self._lock:
+                self._client_threads.add(thread)
+            thread.start()
+
+    def _handle_client(self, conn: socket.socket) -> None:
+        thread = threading.current_thread()
+        conn.settimeout(1.0)
+
+        try:
+            token_len_raw = self._recv_exact(conn, 2)
+            if token_len_raw is None:
+                return
+
+            token_len = struct.unpack(">H", token_len_raw)[0]
+            if token_len <= 0:
+                return
+
+            token_raw = self._recv_exact(conn, token_len)
+            if token_raw is None:
+                return
+
+            token = token_raw.decode("utf-8", errors="ignore")
+            with self._lock:
+                feed_id = self._token_feeds.get(token)
+            if feed_id is None:
+                return
+
+            while not self._stop_event.is_set():
+                with self._lock:
+                    if self._token_feeds.get(token) != feed_id:
+                        return
+
+                frame_len_raw = self._recv_exact(conn, 4)
+                if frame_len_raw is None:
+                    return
+
+                frame_len = struct.unpack(">I", frame_len_raw)[0]
+                if frame_len <= 0 or frame_len > MAX_FRAME_CHANNEL_FRAME_BYTES:
+                    return
+
+                frame_bytes = self._recv_exact(conn, frame_len)
+                if frame_bytes is None:
+                    return
+
+                self._on_frame(feed_id, frame_bytes)
+        finally:
+            try:
+                conn.close()
+            except OSError:
+                pass
+
+            with self._lock:
+                self._client_threads.discard(thread)
+
+    @staticmethod
+    def _recv_exact(conn: socket.socket, byte_count: int) -> bytes | None:
+        chunks: list[bytes] = []
+        received = 0
+
+        while received < byte_count:
+            try:
+                chunk = conn.recv(byte_count - received)
+            except socket.timeout:
+                continue
+            except OSError:
+                return None
+
+            if not chunk:
+                return None
+
+            chunks.append(chunk)
+            received += len(chunk)
+
+        return b"".join(chunks)
+
+
 @dataclass
 class FeedWorkerHandle:
     """Runtime handle for a launched analysis worker."""
@@ -757,6 +984,8 @@ class SubprocessFeedWorkerRunner:
             record.model_size,
             "--device",
             DEFAULT_WORKER_INFERENCE_DEVICE,
+            "--confidence",
+            str(DEFAULT_WORKER_CONFIDENCE),
             "--detector-imgsz",
             str(DEFAULT_WORKER_DETECTOR_IMAGE_SIZE),
             "--process-every-n-frames",
@@ -767,11 +996,27 @@ class SubprocessFeedWorkerRunner:
             str(DEFAULT_RESIZE_SCALE),
             "--events-file",
             str(event_path),
-            "--dashboard-render-frames",
-            "--dashboard-frame-jpeg-quality",
-            str(DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY),
             "--headless",
         ]
+
+        if (
+            record.dashboard_frame_channel_host
+            and record.dashboard_frame_channel_port is not None
+            and record.dashboard_frame_channel_token
+        ):
+            command.extend(
+                [
+                    "--dashboard-render-frames",
+                    "--dashboard-frame-jpeg-quality",
+                    str(DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY),
+                    "--dashboard-frame-channel-host",
+                    record.dashboard_frame_channel_host,
+                    "--dashboard-frame-channel-port",
+                    str(record.dashboard_frame_channel_port),
+                    "--dashboard-frame-channel-token",
+                    record.dashboard_frame_channel_token,
+                ]
+            )
 
         if record.zone is not None:
             command.extend(["--zone-points", json.dumps(serialize_zone_points(record.zone))])
@@ -825,6 +1070,10 @@ class FeedRecord:
     backend_annotations_active: bool = False
     annotated_webrtc_path: str | None = None
     annotated_webrtc_ready: bool = False
+    dashboard_frame_channel_host: str | None = None
+    dashboard_frame_channel_port: int | None = None
+    dashboard_frame_channel_token: str | None = None
+    last_worker_frame_at_monotonic: float | None = None
     last_error: str | None = None
     last_warning: str | None = None
     last_warning_code: str | None = None
@@ -855,19 +1104,11 @@ class FeedRecord:
             webrtc_reason = "feed_not_running"
         elif not is_rtsp_source:
             webrtc_reason = "rtsp_source_required"
-        elif self.annotated_webrtc_ready and self.annotated_webrtc_path:
-            webrtc_enabled = True
-            webrtc_ready = True
-            webrtc_mode = "annotated"
-            webrtc_path_name = self.annotated_webrtc_path
         else:
-            # Fallback mode keeps direct RTSP-backed WebRTC available while
-            # annotated publishing lifecycle is rolled out incrementally.
             webrtc_enabled = True
             webrtc_ready = True
             webrtc_mode = "direct"
             webrtc_path_name = self.feed_id
-            webrtc_reason = "annotated_stream_not_ready"
 
         return FeedTransportCapabilities.model_validate(
             {
@@ -1002,9 +1243,88 @@ class FeedRegistry:
         self._broadcaster = broadcaster
         self._runner = runner or SubprocessFeedWorkerRunner()
         self._frame_streams = FeedFrameStreamManager()
+        self._frame_channel: WorkerFrameChannelServer | None = None
+        if isinstance(self._runner, SubprocessFeedWorkerRunner):
+            self._frame_channel = WorkerFrameChannelServer(on_frame=self._on_frame_channel_frame)
+        self._loop: asyncio.AbstractEventLoop | None = None
         self._feeds: dict[str, FeedRecord] = {}
         self._lock = asyncio.Lock()
         self._load_persisted_feeds()
+
+    def _bind_event_loop(self) -> None:
+        """Capture the running loop so frame-channel threads can enqueue async work."""
+        if self._loop is not None and not self._loop.is_closed():
+            return
+
+        try:
+            self._loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self._loop = None
+
+    def _reserve_frame_channel_binding(self, feed_id: str) -> FrameChannelBinding | None:
+        if self._frame_channel is None:
+            return None
+        return self._frame_channel.register_feed(feed_id)
+
+    def _clear_frame_channel_binding(self, feed_id: str) -> None:
+        if self._frame_channel is not None:
+            self._frame_channel.unregister_feed(feed_id)
+
+    def _on_frame_channel_frame(self, feed_id: str, frame_bytes: bytes) -> None:
+        loop = self._loop
+        if loop is None or loop.is_closed() or not frame_bytes:
+            return
+
+        future = asyncio.run_coroutine_threadsafe(
+            self._ingest_worker_frame(feed_id, frame_bytes),
+            loop,
+        )
+
+        def _consume_result(done_future) -> None:  # noqa: ANN001
+            try:
+                done_future.result()
+            except Exception:
+                LOGGER.debug(
+                    "Failed to ingest worker frame for feed %s.",
+                    feed_id,
+                    exc_info=True,
+                )
+
+        future.add_done_callback(_consume_result)
+
+    async def _ingest_worker_frame(self, feed_id: str, frame_bytes: bytes) -> None:
+        source = ""
+        username: str | None = None
+        password: str | None = None
+        transport: Literal["tcp", "udp"] = "tcp"
+
+        async with self._lock:
+            record = self._feeds.get(feed_id)
+            if record is None:
+                return
+
+            source = record.source
+            username = record.rtsp_username
+            password = record.rtsp_password
+            transport = record.rtsp_transport or "tcp"
+            record.backend_annotations_active = True
+            record.last_worker_frame_at_monotonic = time.monotonic()
+
+            if isinstance(record.latest_metrics, dict):
+                record.latest_metrics["backend_annotations_active"] = True
+                record.latest_metrics["render_frame_jpeg_base64"] = None
+
+        if not source:
+            return
+
+        await self._frame_streams.push_worker_frame(
+            feed_id=feed_id,
+            source=source,
+            username=username,
+            password=password,
+            transport=transport,
+            frame_bytes=frame_bytes,
+        )
 
     async def list_feeds(self) -> list[VideoFeed]:
         async with self._lock:
@@ -1092,6 +1412,7 @@ class FeedRegistry:
         if removed is None:
             return False
 
+        self._clear_frame_channel_binding(feed_id)
         await self._frame_streams.terminate(feed_id)
         await asyncio.to_thread(delete_feed_config, feed_id)
 
@@ -1152,6 +1473,8 @@ class FeedRegistry:
         log_level: LogLevel | None = None,
         webhook_enabled: bool | None = None,
     ) -> VideoFeed | None:
+        self._bind_event_loop()
+
         async with self._lock:
             record = self._feeds.get(feed_id)
             if record is None:
@@ -1174,9 +1497,21 @@ class FeedRegistry:
             record.backend_annotations_active = False
             record.annotated_webrtc_path = None
             record.annotated_webrtc_ready = False
+            record.last_worker_frame_at_monotonic = None
             record.last_error = None
             record.last_warning = None
             record.last_warning_code = None
+
+            frame_binding = self._reserve_frame_channel_binding(record.feed_id)
+            if frame_binding is not None:
+                record.dashboard_frame_channel_host = frame_binding.host
+                record.dashboard_frame_channel_port = frame_binding.port
+                record.dashboard_frame_channel_token = frame_binding.token
+            else:
+                record.dashboard_frame_channel_host = None
+                record.dashboard_frame_channel_port = None
+                record.dashboard_frame_channel_token = None
+
             record.updated_at = utc_now()
             initializing_model = record.to_model()
 
@@ -1197,6 +1532,7 @@ class FeedRegistry:
             if handle is not None:
                 await asyncio.to_thread(self._runner.stop, handle)
                 await asyncio.to_thread(self._runner.close, handle)
+            self._clear_frame_channel_binding(feed_id)
             await self._mark_feed_error(feed_id, str(exc))
             raise
         except Exception as exc:
@@ -1204,6 +1540,7 @@ class FeedRegistry:
                 await asyncio.to_thread(self._runner.stop, handle)
                 await asyncio.to_thread(self._runner.close, handle)
             message = f"Failed to launch feed worker: {exc}"
+            self._clear_frame_channel_binding(feed_id)
             await self._mark_feed_error(feed_id, message)
             raise FeedStartError(message) from exc
 
@@ -1213,6 +1550,7 @@ class FeedRegistry:
                 await asyncio.to_thread(self._runner.stop, handle)
                 await asyncio.to_thread(self._runner.close, handle)
                 await asyncio.to_thread(end_video_session, session_id)
+                self._clear_frame_channel_binding(feed_id)
                 return None
 
             current.worker = handle
@@ -1248,6 +1586,7 @@ class FeedRegistry:
             await asyncio.to_thread(self._runner.close, handle)
             if session_id is not None:
                 await asyncio.to_thread(end_video_session, session_id)
+            self._clear_frame_channel_binding(feed_id)
             await self._frame_streams.terminate(feed_id)
         except Exception as exc:
             message = f"Failed to stop feed worker: {exc}"
@@ -1263,6 +1602,10 @@ class FeedRegistry:
             current.backend_annotations_active = False
             current.annotated_webrtc_path = None
             current.annotated_webrtc_ready = False
+            current.last_worker_frame_at_monotonic = None
+            current.dashboard_frame_channel_host = None
+            current.dashboard_frame_channel_port = None
+            current.dashboard_frame_channel_token = None
             current.last_error = None
             current.updated_at = utc_now()
             stopped_model = current.to_model()
@@ -1514,6 +1857,8 @@ class FeedRegistry:
             self._feeds.clear()
 
         await self._frame_streams.clear()
+        if self._frame_channel is not None:
+            self._frame_channel.close()
 
     def _load_saved_zone(self, caisse_id: int | None) -> ZonePolygon | None:
         if caisse_id is None:
@@ -1605,6 +1950,8 @@ class FeedRegistry:
                 self._persist_record_sync(record)
 
     async def _mark_feed_error(self, feed_id: str, message: str) -> VideoFeed | None:
+        self._clear_frame_channel_binding(feed_id)
+
         async with self._lock:
             record = self._feeds.get(feed_id)
             if record is None:
@@ -1614,6 +1961,10 @@ class FeedRegistry:
             record.backend_annotations_active = False
             record.annotated_webrtc_path = None
             record.annotated_webrtc_ready = False
+            record.last_worker_frame_at_monotonic = None
+            record.dashboard_frame_channel_host = None
+            record.dashboard_frame_channel_port = None
+            record.dashboard_frame_channel_token = None
             record.last_error = message
             record.last_warning = None
             record.last_warning_code = None
@@ -1626,48 +1977,29 @@ class FeedRegistry:
         return model
 
     async def _apply_metrics_update(self, feed_id: str, metrics: QueueMetricsModel) -> None:
-        worker_frame_payload = metrics.render_frame_jpeg_base64
-        frame_bytes = b""
-        if isinstance(worker_frame_payload, str) and worker_frame_payload:
-            try:
-                frame_bytes = base64.b64decode(worker_frame_payload, validate=True)
-            except (ValueError, binascii.Error):
-                frame_bytes = b""
-
-        backend_annotations_active = bool(frame_bytes)
         metrics_without_frame = metrics.model_copy(
             update={
                 "render_frame_jpeg_base64": None,
-                "backend_annotations_active": backend_annotations_active,
             }
         )
-
-        source: str | None = None
-        username: str | None = None
-        password: str | None = None
-        transport: Literal["tcp", "udp"] = "tcp"
 
         async with self._lock:
             record = self._feeds.get(feed_id)
             if record is None:
                 return
 
-            record.latest_metrics = metrics_without_frame.model_dump(mode="python")
-            record.backend_annotations_active = backend_annotations_active
-            source = record.source
-            username = record.rtsp_username
-            password = record.rtsp_password
-            transport = record.rtsp_transport or "tcp"
-
-        if frame_bytes and source is not None:
-            await self._frame_streams.push_worker_frame(
-                feed_id=feed_id,
-                source=source,
-                username=username,
-                password=password,
-                transport=transport,
-                frame_bytes=frame_bytes,
+            now_monotonic = time.monotonic()
+            backend_annotations_active = bool(
+                record.last_worker_frame_at_monotonic is not None
+                and (now_monotonic - record.last_worker_frame_at_monotonic) <= FRAME_CHANNEL_ACTIVITY_TIMEOUT_SEC
             )
+            record.backend_annotations_active = backend_annotations_active
+            metrics_without_frame = metrics_without_frame.model_copy(
+                update={
+                    "backend_annotations_active": backend_annotations_active,
+                }
+            )
+            record.latest_metrics = metrics_without_frame.model_dump(mode="python")
 
         await self._broadcaster.broadcast_metrics_event(feed_id=feed_id, metrics=metrics_without_frame)
 
@@ -1816,6 +2148,10 @@ class FeedRegistry:
                 record.backend_annotations_active = False
                 record.annotated_webrtc_path = None
                 record.annotated_webrtc_ready = False
+                record.last_worker_frame_at_monotonic = None
+                record.dashboard_frame_channel_host = None
+                record.dashboard_frame_channel_port = None
+                record.dashboard_frame_channel_token = None
 
                 model = record.to_model()
 
@@ -1824,6 +2160,7 @@ class FeedRegistry:
             if session_id is not None:
                 await asyncio.to_thread(end_video_session, session_id)
 
+            self._clear_frame_channel_binding(feed_id)
             await self._frame_streams.terminate(feed_id)
 
             await self._broadcaster.broadcast_feed_event(action="updated", feed=model)

@@ -539,6 +539,9 @@ class TestQueueVisionApi(unittest.TestCase):
         )
 
         record = app.state.registry._feeds[feed.feed_id]
+        record.dashboard_frame_channel_host = "127.0.0.1"
+        record.dashboard_frame_channel_port = 32123
+        record.dashboard_frame_channel_token = "test-frame-channel-token"
         runner = SubprocessFeedWorkerRunner()
 
         command = runner._build_command(record, Path("dummy.events.jsonl"))
@@ -551,10 +554,17 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertIn("--rtsp-transport", command)
         self.assertIn("udp", command)
         self.assertIn("--device", command)
+        self.assertIn("--confidence", command)
         self.assertIn("--detector-imgsz", command)
         self.assertIn("--process-every-n-frames", command)
         self.assertIn("--dashboard-render-frames", command)
         self.assertIn("--dashboard-frame-jpeg-quality", command)
+        self.assertIn("--dashboard-frame-channel-host", command)
+        self.assertIn("127.0.0.1", command)
+        self.assertIn("--dashboard-frame-channel-port", command)
+        self.assertIn("32123", command)
+        self.assertIn("--dashboard-frame-channel-token", command)
+        self.assertIn("test-frame-channel-token", command)
 
     def test_feed_snapshot_uses_saved_rtsp_credentials(self) -> None:
         response = self.client.post(
@@ -629,6 +639,58 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["detail"], "Feed not found.")
 
+    def test_feed_transport_reports_created_feed_capabilities(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "Camera Created Transport",
+                "source": "rtsp://192.168.1.107/live/main",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        transport_response = self.client.get(f"/api/feeds/{feed['feed_id']}/transport")
+        self.assertEqual(transport_response.status_code, 200)
+
+        payload = transport_response.json()["data"]
+        self.assertFalse(payload["webrtc"]["enabled"])
+        self.assertFalse(payload["webrtc"]["ready"])
+        self.assertEqual(payload["webrtc"]["source_mode"], "none")
+        self.assertEqual(payload["webrtc"]["reason"], "feed_not_running")
+        self.assertTrue(payload["mjpeg"]["enabled"])
+        self.assertFalse(payload["mjpeg"]["ready"])
+        self.assertEqual(payload["mjpeg"]["reason"], "feed_not_running")
+
+    def test_feed_transport_reports_stopped_feed_capabilities(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "Camera Stopped Transport",
+                "source": "rtsp://192.168.1.108/live/main",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
+        self.assertEqual(start_response.status_code, 200)
+
+        stop_response = self.client.post(f"/api/feeds/{feed['feed_id']}/stop")
+        self.assertEqual(stop_response.status_code, 200)
+
+        transport_response = self.client.get(f"/api/feeds/{feed['feed_id']}/transport")
+        self.assertEqual(transport_response.status_code, 200)
+
+        payload = transport_response.json()["data"]
+        self.assertFalse(payload["webrtc"]["enabled"])
+        self.assertFalse(payload["webrtc"]["ready"])
+        self.assertEqual(payload["webrtc"]["source_mode"], "none")
+        self.assertEqual(payload["webrtc"]["reason"], "feed_not_running")
+        self.assertTrue(payload["mjpeg"]["enabled"])
+        self.assertFalse(payload["mjpeg"]["ready"])
+        self.assertEqual(payload["mjpeg"]["reason"], "feed_not_running")
+
     def test_feed_transport_reports_running_rtsp_capabilities(self) -> None:
         response = self.client.post(
             "/api/feeds",
@@ -652,7 +714,7 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertTrue(payload["webrtc"]["ready"])
         self.assertEqual(payload["webrtc"]["source_mode"], "direct")
         self.assertEqual(payload["webrtc"]["path_name"], feed["feed_id"])
-        self.assertEqual(payload["webrtc"]["reason"], "annotated_stream_not_ready")
+        self.assertIsNone(payload["webrtc"]["reason"])
         self.assertTrue(payload["mjpeg"]["enabled"])
         self.assertTrue(payload["mjpeg"]["ready"])
 

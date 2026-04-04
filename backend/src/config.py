@@ -25,7 +25,12 @@ YOLO_MODEL_MAP: dict[str, str] = {
 PERSON_CLASS_ID: int = 0
 
 # Minimum detection confidence to keep
-DEFAULT_CONFIDENCE: float = 0.35
+_raw_detector_confidence = os.getenv("QUEUE_DETECTOR_CONFIDENCE", "0.30").strip()
+try:
+    _parsed_detector_confidence = float(_raw_detector_confidence)
+except ValueError:
+    _parsed_detector_confidence = 0.30
+DEFAULT_CONFIDENCE: float = max(0.05, min(0.95, _parsed_detector_confidence))
 # Inference image size passed to YOLO (smaller = faster, lower detail)
 DEFAULT_DETECTOR_IMAGE_SIZE: int = int(os.getenv("QUEUE_DETECTOR_IMGSZ", "512"))
 DEFAULT_INFERENCE_DEVICE: str = os.getenv("QUEUE_INFERENCE_DEVICE", "auto").strip() or "auto"
@@ -93,6 +98,10 @@ DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY: int = int(
 # Emit metrics/update events frequently so web overlays track detections closely.
 DASHBOARD_EVENT_EMIT_INTERVAL_SEC: float = float(
     os.getenv("QUEUE_DASHBOARD_EMIT_INTERVAL_SEC", "0.2"),
+)
+# Emit rendered dashboard frames on an independent cadence from metrics updates.
+DASHBOARD_FRAME_EMIT_INTERVAL_SEC: float = float(
+    os.getenv("QUEUE_DASHBOARD_FRAME_EMIT_INTERVAL_SEC", "0.067"),
 )
 # API runtime tailing interval for worker event files.
 DASHBOARD_EVENT_POLL_INTERVAL_SEC: float = float(
@@ -163,6 +172,9 @@ class AppConfig:
     events_file: Optional[str] = None
     dashboard_render_frames: bool = False
     dashboard_frame_jpeg_quality: int = DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY
+    dashboard_frame_channel_host: Optional[str] = None
+    dashboard_frame_channel_port: Optional[int] = None
+    dashboard_frame_channel_token: Optional[str] = None
     headless: bool = False
 
     @property

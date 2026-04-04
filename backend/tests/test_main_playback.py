@@ -10,7 +10,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from src.config import DEFAULT_PROCESS_EVERY_N_FRAMES, DEFAULT_REALTIME_FILE_PLAYBACK
+from src.config import DEFAULT_CONFIDENCE, DEFAULT_PROCESS_EVERY_N_FRAMES, DEFAULT_REALTIME_FILE_PLAYBACK
 from src.main import _compute_playback_target_fps, _is_file_source, build_parser
 
 
@@ -23,6 +23,7 @@ class TestMainPlaybackFlags(unittest.TestCase):
 
         self.assertEqual(args.process_every_n_frames, DEFAULT_PROCESS_EVERY_N_FRAMES)
         self.assertEqual(args.realtime_file_playback, DEFAULT_REALTIME_FILE_PLAYBACK)
+        self.assertAlmostEqual(args.confidence, DEFAULT_CONFIDENCE)
 
     def test_parser_accepts_realtime_toggle_flags(self) -> None:
         parser = build_parser()

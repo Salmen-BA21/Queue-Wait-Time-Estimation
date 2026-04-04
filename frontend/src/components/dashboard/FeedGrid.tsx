@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Camera, Loader2, Play, RotateCcw, Square, Trash2, Wifi, WifiOff, Users } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -7,9 +7,16 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useFeedWebRtc } from "@/hooks/use-feed-webrtc";
-import { getFeedMjpegStreamUrl, getFeedSnapshot, resolveApiUrl, type VideoFeed } from "@/lib/api";
+import { getFeedMjpegStreamUrl, resolveApiUrl, type VideoFeed } from "@/lib/api";
 
 export type FeedGridAction = "start" | "stop" | "restart" | "delete";
+type FeedTransportState =
+  | "idle"
+  | "worker-loading"
+  | "webrtc-connecting"
+  | "webrtc-live"
+  | "mjpeg-live"
+  | "preview";
 
 function mapFeedStatus(status: "created" | "initializing" | "running" | "stopped" | "error") {
   if (status === "running") {
@@ -103,9 +110,7 @@ function FeedTransportSurface({
   peopleInZone,
   waitTimeSeconds,
   detections,
-  renderedFrameJpegBase64,
   isStopping,
-  preferBackendTransport,
   onOpenViewer,
 }: {
   feed: VideoFeed;
@@ -113,29 +118,19 @@ function FeedTransportSurface({
   peopleInZone: number;
   waitTimeSeconds: number | undefined | null;
   detections?: number[][] | null;
-  renderedFrameJpegBase64?: string | null;
   isStopping: boolean;
-  preferBackendTransport?: boolean;
   onOpenViewer?: () => void;
 }) {
   const [playbackFailed, setPlaybackFailed] = useState(false);
   const [videoDims, setVideoDims] = useState<{ width: number; height: number } | null>(null);
-  const [fallbackFrameUrl, setFallbackFrameUrl] = useState<string | null>(null);
   const [streamAttempt, setStreamAttempt] = useState(0);
   const [streamErrorCount, setStreamErrorCount] = useState(0);
   const previousStatusRef = useRef(feed.status);
-  const hadRenderedFrameRef = useRef(Boolean(renderedFrameJpegBase64));
-  const requestedBootstrapSnapshotRef = useRef(false);
   const lastForcedReconnectAtRef = useRef(0);
-  const renderedFrameDataUrl = renderedFrameJpegBase64
-    ? `data:image/jpeg;base64,${renderedFrameJpegBase64}`
-    : null;
 
   useEffect(() => {
     setPlaybackFailed(false);
     previousStatusRef.current = feed.status;
-    hadRenderedFrameRef.current = Boolean(renderedFrameJpegBase64);
-    requestedBootstrapSnapshotRef.current = false;
     lastForcedReconnectAtRef.current = 0;
   }, [feed.feed_id, feed.preview_path]);
 
@@ -178,17 +173,6 @@ function FeedTransportSurface({
     ? `${getFeedMjpegStreamUrl(feed.feed_id)}?attempt=${streamAttempt}`
     : null;
 
-  const captureSnapshotFallback = useCallback(async () => {
-    try {
-      const snapshot = await getFeedSnapshot(feed.feed_id);
-      if (snapshot.captured && snapshot.image_data_url) {
-        setFallbackFrameUrl(snapshot.image_data_url);
-      }
-    } catch {
-      // Keep the current fallback state when one-shot snapshot capture fails.
-    }
-  }, [feed.feed_id]);
-
   useEffect(() => {
     const previousStatus = previousStatusRef.current;
     const enteredRunning = previousStatus !== "running" && feed.status === "running";
@@ -200,7 +184,6 @@ function FeedTransportSurface({
         lastForcedReconnectAtRef.current = now;
         setPlaybackFailed(false);
         setStreamErrorCount(0);
-        setFallbackFrameUrl(null);
         setStreamAttempt((attempt) => attempt + 1);
       }
     }
@@ -209,31 +192,9 @@ function FeedTransportSurface({
   }, [feed.status, shouldUseMjpegStream]);
 
   useEffect(() => {
-    const hadRenderedFrame = hadRenderedFrameRef.current;
-    const nowHasRenderedFrame = Boolean(renderedFrameJpegBase64);
-
-    if (shouldUseMjpegStream && !hadRenderedFrame && nowHasRenderedFrame) {
-      const now = Date.now();
-      const reconnectCooldownMs = 1_500;
-      if (now - lastForcedReconnectAtRef.current >= reconnectCooldownMs) {
-        lastForcedReconnectAtRef.current = now;
-        setPlaybackFailed(false);
-        setStreamErrorCount(0);
-        setFallbackFrameUrl(null);
-        setStreamAttempt((attempt) => attempt + 1);
-      }
-    }
-
-    hadRenderedFrameRef.current = nowHasRenderedFrame;
-  }, [renderedFrameJpegBase64, shouldUseMjpegStream]);
-
-  useEffect(() => {
     if (!shouldUseMjpegStream) {
       setStreamAttempt(0);
       setStreamErrorCount(0);
-      setFallbackFrameUrl(null);
-      hadRenderedFrameRef.current = false;
-      requestedBootstrapSnapshotRef.current = false;
       lastForcedReconnectAtRef.current = 0;
       return;
     }
@@ -253,85 +214,62 @@ function FeedTransportSurface({
     };
   }, [shouldUseMjpegStream, streamErrorCount]);
 
-  useEffect(() => {
-    if (!shouldAttemptWebRtc || showWebRtcFrame || shouldUseMjpegStream) {
-      requestedBootstrapSnapshotRef.current = false;
-      return;
-    }
-
-    if (fallbackFrameUrl || renderedFrameDataUrl || requestedBootstrapSnapshotRef.current) {
-      return;
-    }
-
-    requestedBootstrapSnapshotRef.current = true;
-    void captureSnapshotFallback();
-  }, [
-    captureSnapshotFallback,
-    fallbackFrameUrl,
-    renderedFrameDataUrl,
-    shouldAttemptWebRtc,
-    shouldUseMjpegStream,
-    showWebRtcFrame,
-  ]);
-
   const previewUrl = feed.preview_path ? resolveApiUrl(feed.preview_path) : null;
   const showMjpegFrame = Boolean(streamUrl) && !playbackFailed;
-  const showRenderedFrame = transportActive && !showWebRtcFrame && !showMjpegFrame && Boolean(renderedFrameDataUrl);
-  const showFallbackFrame = !showWebRtcFrame && !showMjpegFrame && transportActive && Boolean(fallbackFrameUrl);
   const showWebRtcLoadingState = shouldAttemptWebRtc
     && !showWebRtcFrame
-    && !showMjpegFrame
-    && !showRenderedFrame
-    && !showFallbackFrame;
+    && !showMjpegFrame;
   const showLoadingState = shouldShowWorkerLoading
-    ? !showWebRtcFrame && !showMjpegFrame && !showRenderedFrame && !showFallbackFrame
+    ? !showWebRtcFrame && !showMjpegFrame
     : showWebRtcLoadingState;
   const showPreview = transportActive
     && !shouldShowWorkerLoading
     && !showWebRtcFrame
     && !showMjpegFrame
-    && !showFallbackFrame
     && Boolean(previewUrl)
     && !playbackFailed;
+  const transportState: FeedTransportState = (() => {
+    if (showWebRtcFrame) {
+      return "webrtc-live";
+    }
+    if (showMjpegFrame) {
+      return "mjpeg-live";
+    }
+    if (showPreview) {
+      return "preview";
+    }
+    if (showWebRtcLoadingState) {
+      return "webrtc-connecting";
+    }
+    if (showLoadingState) {
+      return "worker-loading";
+    }
+    return "idle";
+  })();
   const shouldSuppressClientDetectionsOnWebRtc = Boolean(
-    showWebRtcFrame
+    transportState === "webrtc-live"
     && backendAnnotationsActive
     && webrtcCapability?.source_mode === "annotated",
   );
   const transportDebugLabel = (() => {
-    if (showWebRtcFrame) {
-      return webrtcCapability?.source_mode === "annotated" ? "WEBRTC ANN" : "WEBRTC DIR";
+    switch (transportState) {
+      case "webrtc-live":
+        return webrtcCapability?.source_mode === "annotated" ? "WEBRTC ANN" : "WEBRTC DIR";
+      case "mjpeg-live":
+        return shouldAttemptWebRtc ? "MJPEG FB" : "MJPEG";
+      case "preview":
+        return "PREVIEW";
+      case "webrtc-connecting":
+        return "WEBRTC...";
+      case "worker-loading":
+        return "LOADING";
+      default:
+        return "IDLE";
     }
-
-    if (showMjpegFrame) {
-      return shouldAttemptWebRtc ? "MJPEG FB" : "MJPEG";
-    }
-
-    if (showRenderedFrame) {
-      return "RENDERED";
-    }
-
-    if (showFallbackFrame) {
-      return "SNAPSHOT";
-    }
-
-    if (showPreview) {
-      return "PREVIEW";
-    }
-
-    if (showWebRtcLoadingState) {
-      return "WEBRTC...";
-    }
-
-    if (showLoadingState) {
-      return "LOADING";
-    }
-
-    return "IDLE";
   })();
-  const transportDebugBadgeClassName = showWebRtcFrame
+  const transportDebugBadgeClassName = transportState === "webrtc-live"
     ? "border-emerald-300/50 bg-emerald-500/20 text-emerald-100"
-    : showMjpegFrame
+    : transportState === "mjpeg-live"
     ? "border-amber-300/50 bg-amber-500/20 text-amber-100"
     : "border-border/70 bg-background/80 text-foreground/80";
   const zonePoints = feed.zone?.points ?? [];
@@ -359,7 +297,7 @@ function FeedTransportSurface({
       disabled={!onOpenViewer}
       aria-label={onOpenViewer ? `Open ${feed.name} in expanded view` : undefined}
     >
-      {showWebRtcFrame ? (
+      {transportState === "webrtc-live" ? (
         <>
           <video
             ref={webRtcVideoRef}
@@ -412,15 +350,7 @@ function FeedTransportSurface({
             </svg>
           )}
         </>
-      ) : showRenderedFrame ? (
-        <img
-          className="h-full w-full object-cover"
-          src={renderedFrameDataUrl ?? undefined}
-          alt={`${feed.name} rendered tracking frame`}
-          onLoad={onImageLoad}
-          onError={() => setPlaybackFailed(true)}
-        />
-      ) : showMjpegFrame ? (
+      ) : transportState === "mjpeg-live" ? (
         <>
           <img
             key={streamUrl}
@@ -430,13 +360,11 @@ function FeedTransportSurface({
             onLoad={(event) => {
               setPlaybackFailed(false);
               setStreamErrorCount(0);
-              setFallbackFrameUrl(null);
               onImageLoad(event);
             }}
             onError={() => {
               setPlaybackFailed(true);
               setStreamErrorCount((count) => count + 1);
-              void captureSnapshotFallback();
             }}
           />
           {/* Zone polygon overlay only – detection boxes are already drawn by the backend pipeline */}
@@ -462,59 +390,7 @@ function FeedTransportSurface({
             </svg>
           )}
         </>
-      ) : showFallbackFrame ? (
-        <>
-          <img
-            className="h-full w-full object-cover"
-            src={fallbackFrameUrl ?? undefined}
-            alt={`${feed.name} fallback frame`}
-            onLoad={onImageLoad}
-            onError={() => setFallbackFrameUrl(null)}
-          />
-          {/* Tracking overlays (zone polygon + person boxes) */}
-          {videoDims && (zonePolygonPoints || (uiStatus === "online" && detections?.length)) && (
-            <svg
-              className="absolute inset-0 h-full w-full pointer-events-none"
-              viewBox={`0 0 ${videoDims.width} ${videoDims.height}`}
-              preserveAspectRatio="xMidYMid slice"
-            >
-              {zonePolygonPoints && (
-                <>
-                  <polygon
-                    points={zonePolygonPoints}
-                    className="fill-cyan-400/10 stroke-cyan-300"
-                    strokeWidth={3}
-                    vectorEffect="non-scaling-stroke"
-                  />
-                  <polyline
-                    points={zonePolygonPoints}
-                    className="stroke-cyan-100/70"
-                    strokeWidth={1}
-                    fill="none"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                </>
-              )}
-
-              {uiStatus === "online" && detections?.map((det, idx) => {
-                const [x1, y1, x2, y2] = det;
-                return (
-                  <rect
-                    data-testid="detection-box"
-                    key={idx}
-                    x={x1}
-                    y={y1}
-                    width={x2 - x1}
-                    height={y2 - y1}
-                    className="fill-primary/10 stroke-primary stroke-[2]"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                );
-              })}
-            </svg>
-          )}
-        </>
-      ) : showPreview ? (
+      ) : transportState === "preview" ? (
         <>
           <video
             key={previewUrl}
@@ -571,20 +447,20 @@ function FeedTransportSurface({
             </svg>
           )}
         </>
-      ) : showLoadingState ? (
+      ) : transportState === "worker-loading" || transportState === "webrtc-connecting" ? (
         <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-background/90 px-4 text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground/80">
             {feed.status === "initializing"
               ? "Initializing worker"
-              : showWebRtcLoadingState
+              : transportState === "webrtc-connecting"
               ? "Connecting WebRTC"
               : "Preparing live stream"}
           </p>
           <p className="text-[11px] text-muted-foreground">
             {feed.status === "initializing"
               ? "Starting model and tracker before the first analyzed frame is emitted."
-              : showWebRtcLoadingState
+              : transportState === "webrtc-connecting"
               ? "Loading the latest backend frame while the live WebRTC stream is negotiated."
               : "Waiting for the first analyzed frame from the backend worker."}
           </p>
@@ -690,9 +566,7 @@ function FeedGridComponent({
                 peopleInZone={peopleInZone}
                 waitTimeSeconds={wait_time_seconds}
                 detections={detections}
-                renderedFrameJpegBase64={feed.latest_metrics?.render_frame_jpeg_base64}
                 isStopping={currentAction === "stop"}
-                preferBackendTransport={feeds.length > 1}
                 onOpenViewer={() => setExpandedFeedId(feed.feed_id)}
               />
               <div className="p-3">
@@ -842,11 +716,9 @@ function FeedGridComponent({
               peopleInZone={expandedFeed.latest_metrics?.people_in_zone ?? 0}
               waitTimeSeconds={expandedFeed.latest_metrics?.wait_time_seconds}
               detections={expandedFeed.latest_metrics?.detections}
-              renderedFrameJpegBase64={expandedFeed.latest_metrics?.render_frame_jpeg_base64}
               isStopping={
                 activeFeedAction?.feedId === expandedFeed.feed_id && activeFeedAction.action === "stop"
               }
-              preferBackendTransport={feeds.length > 1}
             />
           </DialogContent>
         )}
