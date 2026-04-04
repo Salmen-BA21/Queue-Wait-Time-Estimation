@@ -64,6 +64,29 @@ export interface QueueMetrics {
   queue_stable: boolean;
   detections?: number[][] | null;
   render_frame_jpeg_base64?: string | null;
+  backend_annotations_active?: boolean;
+}
+
+export type FeedWebRtcSourceMode = "annotated" | "direct" | "none";
+
+export interface FeedWebRtcTransportCapability {
+  enabled: boolean;
+  ready: boolean;
+  source_mode: FeedWebRtcSourceMode;
+  path_name: string | null;
+  reason: string | null;
+}
+
+export interface FeedMjpegTransportCapability {
+  enabled: boolean;
+  ready: boolean;
+  reason: string | null;
+}
+
+export interface FeedTransportCapabilities {
+  backend_annotations: boolean;
+  webrtc: FeedWebRtcTransportCapability;
+  mjpeg: FeedMjpegTransportCapability;
 }
 
 export interface QueueAlert {
@@ -91,6 +114,7 @@ export interface VideoFeed {
   zone: ZonePolygon | null;
   queue_length_warning: number;
   latest_metrics: QueueMetrics | null;
+  transport?: FeedTransportCapabilities | null;
   last_error: string | null;
   last_warning: string | null;
   last_warning_code: string | null;
@@ -573,6 +597,10 @@ export function submitFeedWebRtcOffer(feedId: string, input: FeedWebRtcOfferInpu
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export function getFeedTransportCapabilities(feedId: string): Promise<FeedTransportCapabilities> {
+  return fetchApi<FeedTransportCapabilities>(`/api/feeds/${feedId}/transport`);
 }
 
 export function getFeedMjpegStreamUrl(feedId: string): string {

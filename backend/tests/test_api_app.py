@@ -623,6 +623,64 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertEqual(stream_response.status_code, 409)
         self.assertEqual(stream_response.json()["detail"], "Feed must be running before opening the stream.")
 
+    def test_feed_transport_returns_not_found_for_missing_feed(self) -> None:
+        response = self.client.get("/api/feeds/missing-feed/transport")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Feed not found.")
+
+    def test_feed_transport_reports_running_rtsp_capabilities(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "Camera Transport",
+                "source": "rtsp://192.168.1.106/live/main",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
+        self.assertEqual(start_response.status_code, 200)
+
+        transport_response = self.client.get(f"/api/feeds/{feed['feed_id']}/transport")
+        self.assertEqual(transport_response.status_code, 200)
+
+        payload = transport_response.json()["data"]
+        self.assertFalse(payload["backend_annotations"])
+        self.assertTrue(payload["webrtc"]["enabled"])
+        self.assertTrue(payload["webrtc"]["ready"])
+        self.assertEqual(payload["webrtc"]["source_mode"], "direct")
+        self.assertEqual(payload["webrtc"]["path_name"], feed["feed_id"])
+        self.assertEqual(payload["webrtc"]["reason"], "annotated_stream_not_ready")
+        self.assertTrue(payload["mjpeg"]["enabled"])
+        self.assertTrue(payload["mjpeg"]["ready"])
+
+    def test_feed_transport_reports_non_rtsp_webrtc_unavailable(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "USB Transport",
+                "source": "0",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
+        self.assertEqual(start_response.status_code, 200)
+
+        transport_response = self.client.get(f"/api/feeds/{feed['feed_id']}/transport")
+        self.assertEqual(transport_response.status_code, 200)
+
+        payload = transport_response.json()["data"]
+        self.assertFalse(payload["webrtc"]["enabled"])
+        self.assertFalse(payload["webrtc"]["ready"])
+        self.assertEqual(payload["webrtc"]["source_mode"], "none")
+        self.assertEqual(payload["webrtc"]["reason"], "rtsp_source_required")
+        self.assertTrue(payload["mjpeg"]["enabled"])
+        self.assertTrue(payload["mjpeg"]["ready"])
+
     def test_feed_webrtc_offer_returns_not_found_for_missing_feed(self) -> None:
         response = self.client.post(
             "/api/feeds/missing-feed/webrtc/offer",

@@ -38,6 +38,7 @@ from src.api.models import (
     ModelSize,
     MetricsUpdateEvent,
     MetricsUpdateEventPayload,
+    FeedTransportCapabilities,
     QueueMetricsModel,
     SystemWarningEvent,
     SystemWarningEventPayload,
@@ -821,6 +822,9 @@ class FeedRecord:
     caisse_id: int | None = None
     zone: ZonePolygon | None = None
     latest_metrics: dict | None = None
+    backend_annotations_active: bool = False
+    annotated_webrtc_path: str | None = None
+    annotated_webrtc_ready: bool = False
     last_error: str | None = None
     last_warning: str | None = None
     last_warning_code: str | None = None
@@ -831,6 +835,58 @@ class FeedRecord:
         """Return a frontend-safe source string without embedded credentials."""
         return sanitize_source(self.source)
 
+    def to_transport_capabilities(self) -> FeedTransportCapabilities:
+        """Build transport readiness details used by frontend playback routing."""
+        is_rtsp_source = self.source.lower().startswith("rtsp://")
+        is_running = self.status == "running"
+
+        mjpeg_ready = self.status in {"running", "initializing"}
+        mjpeg_reason: str | None = None
+        if not mjpeg_ready:
+            mjpeg_reason = "feed_not_running"
+
+        webrtc_enabled = False
+        webrtc_ready = False
+        webrtc_mode: Literal["annotated", "direct", "none"] = "none"
+        webrtc_path_name: str | None = None
+        webrtc_reason: str | None = None
+
+        if not is_running:
+            webrtc_reason = "feed_not_running"
+        elif not is_rtsp_source:
+            webrtc_reason = "rtsp_source_required"
+        elif self.annotated_webrtc_ready and self.annotated_webrtc_path:
+            webrtc_enabled = True
+            webrtc_ready = True
+            webrtc_mode = "annotated"
+            webrtc_path_name = self.annotated_webrtc_path
+        else:
+            # Fallback mode keeps direct RTSP-backed WebRTC available while
+            # annotated publishing lifecycle is rolled out incrementally.
+            webrtc_enabled = True
+            webrtc_ready = True
+            webrtc_mode = "direct"
+            webrtc_path_name = self.feed_id
+            webrtc_reason = "annotated_stream_not_ready"
+
+        return FeedTransportCapabilities.model_validate(
+            {
+                "backend_annotations": self.backend_annotations_active,
+                "webrtc": {
+                    "enabled": webrtc_enabled,
+                    "ready": webrtc_ready,
+                    "source_mode": webrtc_mode,
+                    "path_name": webrtc_path_name,
+                    "reason": webrtc_reason,
+                },
+                "mjpeg": {
+                    "enabled": True,
+                    "ready": mjpeg_ready,
+                    "reason": mjpeg_reason,
+                },
+            }
+        )
+
     def to_model(self) -> VideoFeed:
         """Convert the internal dataclass into the public API model."""
         return VideoFeed.model_validate(
@@ -838,6 +894,7 @@ class FeedRecord:
                 **self.__dict__,
                 "source": self.public_source(),
                 "preview_path": build_preview_path(self.source),
+                "transport": self.to_transport_capabilities(),
             }
         )
 
@@ -958,6 +1015,14 @@ class FeedRegistry:
         async with self._lock:
             record = self._feeds.get(feed_id)
             return record.to_model() if record else None
+
+    async def get_feed_transport_capabilities(self, feed_id: str) -> FeedTransportCapabilities | None:
+        """Return frontend playback capability details for one feed."""
+        async with self._lock:
+            record = self._feeds.get(feed_id)
+            if record is None:
+                return None
+            return record.to_transport_capabilities()
 
     async def create_feed(
         self,
@@ -1106,6 +1171,9 @@ class FeedRegistry:
                 record.webhook_enabled = webhook_enabled
 
             record.status = "initializing"
+            record.backend_annotations_active = False
+            record.annotated_webrtc_path = None
+            record.annotated_webrtc_ready = False
             record.last_error = None
             record.last_warning = None
             record.last_warning_code = None
@@ -1192,6 +1260,9 @@ class FeedRegistry:
                 return None
 
             current.status = "stopped"
+            current.backend_annotations_active = False
+            current.annotated_webrtc_path = None
+            current.annotated_webrtc_ready = False
             current.last_error = None
             current.updated_at = utc_now()
             stopped_model = current.to_model()
@@ -1540,6 +1611,9 @@ class FeedRegistry:
                 return None
 
             record.status = "error"
+            record.backend_annotations_active = False
+            record.annotated_webrtc_path = None
+            record.annotated_webrtc_ready = False
             record.last_error = message
             record.last_warning = None
             record.last_warning_code = None
@@ -1553,7 +1627,20 @@ class FeedRegistry:
 
     async def _apply_metrics_update(self, feed_id: str, metrics: QueueMetricsModel) -> None:
         worker_frame_payload = metrics.render_frame_jpeg_base64
-        metrics_without_frame = metrics.model_copy(update={"render_frame_jpeg_base64": None})
+        frame_bytes = b""
+        if isinstance(worker_frame_payload, str) and worker_frame_payload:
+            try:
+                frame_bytes = base64.b64decode(worker_frame_payload, validate=True)
+            except (ValueError, binascii.Error):
+                frame_bytes = b""
+
+        backend_annotations_active = bool(frame_bytes)
+        metrics_without_frame = metrics.model_copy(
+            update={
+                "render_frame_jpeg_base64": None,
+                "backend_annotations_active": backend_annotations_active,
+            }
+        )
 
         source: str | None = None
         username: str | None = None
@@ -1566,26 +1653,21 @@ class FeedRegistry:
                 return
 
             record.latest_metrics = metrics_without_frame.model_dump(mode="python")
+            record.backend_annotations_active = backend_annotations_active
             source = record.source
             username = record.rtsp_username
             password = record.rtsp_password
             transport = record.rtsp_transport or "tcp"
 
-        if isinstance(worker_frame_payload, str) and worker_frame_payload:
-            try:
-                frame_bytes = base64.b64decode(worker_frame_payload, validate=True)
-            except (ValueError, binascii.Error):
-                frame_bytes = b""
-
-            if frame_bytes and source is not None:
-                await self._frame_streams.push_worker_frame(
-                    feed_id=feed_id,
-                    source=source,
-                    username=username,
-                    password=password,
-                    transport=transport,
-                    frame_bytes=frame_bytes,
-                )
+        if frame_bytes and source is not None:
+            await self._frame_streams.push_worker_frame(
+                feed_id=feed_id,
+                source=source,
+                username=username,
+                password=password,
+                transport=transport,
+                frame_bytes=frame_bytes,
+            )
 
         await self._broadcaster.broadcast_metrics_event(feed_id=feed_id, metrics=metrics_without_frame)
 
@@ -1730,6 +1812,10 @@ class FeedRegistry:
                 else:
                     record.status = "error"
                     record.last_error = self._runner.exit_details(handle, exit_code)
+
+                record.backend_annotations_active = False
+                record.annotated_webrtc_path = None
+                record.annotated_webrtc_ready = False
 
                 model = record.to_model()
 

@@ -29,6 +29,7 @@ from src.api.models import (
     Establishment,
     FeedWebRTCOfferRequest,
     FeedWebRTCOfferResponse,
+    FeedTransportCapabilities,
     FeedSnapshotResult,
     FeedSnapshotEvent,
     QueueAlertArchiveRequest,
@@ -814,6 +815,14 @@ async def get_feed_status(feed_id: str) -> ApiResponse[VideoFeed]:
     return ApiResponse(data=feed)
 
 
+@app.get("/api/feeds/{feed_id}/transport", response_model=ApiResponse[FeedTransportCapabilities])
+async def get_feed_transport(feed_id: str) -> ApiResponse[FeedTransportCapabilities]:
+    capabilities = await get_registry().get_feed_transport_capabilities(feed_id)
+    if capabilities is None:
+        raise HTTPException(status_code=404, detail="Feed not found.")
+    return ApiResponse(data=capabilities)
+
+
 @app.post("/api/feeds/{feed_id}/webrtc/offer", response_model=ApiResponse[FeedWebRTCOfferResponse])
 async def create_feed_webrtc_offer(
     feed_id: str,
@@ -838,15 +847,29 @@ async def create_feed_webrtc_offer(
     if source is None:
         raise HTTPException(status_code=500, detail="WebRTC source resolution failed unexpectedly.")
 
-    try:
-        path_name = build_mediamtx_path_name(feed_id)
-        await asyncio.to_thread(
-            ensure_mediamtx_path_configuration,
-            path_name=path_name,
-            source=source,
-            control_api_base_url=MEDIAMTX_CONTROL_API_BASE_URL,
-            timeout_seconds=MEDIAMTX_WEBRTC_TIMEOUT_SEC,
+    transport = await get_registry().get_feed_transport_capabilities(feed_id)
+    if transport is None:
+        raise HTTPException(status_code=404, detail="Feed not found.")
+
+    webrtc_transport = transport.webrtc
+    if not webrtc_transport.enabled or not webrtc_transport.ready:
+        reason = webrtc_transport.reason or "webrtc_not_ready"
+        raise HTTPException(
+            status_code=409,
+            detail=f"WebRTC transport unavailable: {reason}",
         )
+
+    path_name = build_mediamtx_path_name(webrtc_transport.path_name or feed_id)
+
+    try:
+        if webrtc_transport.source_mode == "direct":
+            await asyncio.to_thread(
+                ensure_mediamtx_path_configuration,
+                path_name=path_name,
+                source=source,
+                control_api_base_url=MEDIAMTX_CONTROL_API_BASE_URL,
+                timeout_seconds=MEDIAMTX_WEBRTC_TIMEOUT_SEC,
+            )
         answer_sdp = await asyncio.to_thread(
             run_mediamtx_webrtc_offer,
             path_name=path_name,

@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Camera, Loader2, Play, RotateCcw, Square, Trash2, Wifi, WifiOff, Users } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -125,6 +125,7 @@ function FeedTransportSurface({
   const [streamErrorCount, setStreamErrorCount] = useState(0);
   const previousStatusRef = useRef(feed.status);
   const hadRenderedFrameRef = useRef(Boolean(renderedFrameJpegBase64));
+  const requestedBootstrapSnapshotRef = useRef(false);
   const lastForcedReconnectAtRef = useRef(0);
   const renderedFrameDataUrl = renderedFrameJpegBase64
     ? `data:image/jpeg;base64,${renderedFrameJpegBase64}`
@@ -134,33 +135,59 @@ function FeedTransportSurface({
     setPlaybackFailed(false);
     previousStatusRef.current = feed.status;
     hadRenderedFrameRef.current = Boolean(renderedFrameJpegBase64);
+    requestedBootstrapSnapshotRef.current = false;
     lastForcedReconnectAtRef.current = 0;
   }, [feed.feed_id, feed.preview_path]);
 
   const transportActive = uiStatus !== "offline" && !isStopping;
   const hasWorkerMetrics = Boolean(feed.latest_metrics);
-  const shouldPreferBackendTransport = Boolean(preferBackendTransport) && transportActive && feed.status === "running";
+  const transportCapabilities = feed.transport ?? null;
+  const webrtcCapability = transportCapabilities?.webrtc;
+  const backendAnnotationsActive = Boolean(
+    transportCapabilities?.backend_annotations ?? feed.latest_metrics?.backend_annotations_active,
+  );
+  const canUseWebRtc = Boolean(
+    webrtcCapability?.enabled
+    && webrtcCapability?.ready
+    && webrtcCapability?.source_mode !== "none",
+  );
   const shouldShowWorkerLoading = transportActive
     && (feed.status === "initializing" || (feed.status === "running" && !hasWorkerMetrics));
   const shouldAttemptWebRtc = transportActive
     && feed.status === "running"
     && hasWorkerMetrics
-    && !shouldPreferBackendTransport;
+    && canUseWebRtc;
   const {
     videoRef: webRtcVideoRef,
     streamReady: webRtcReady,
+    connectionError: webRtcConnectionError,
     isSupported: webRtcSupported,
   } = useFeedWebRtc({
     feedId: feed.feed_id,
     enabled: shouldAttemptWebRtc,
   });
   const showWebRtcFrame = shouldAttemptWebRtc && webRtcSupported && webRtcReady;
+  const shouldUseMjpegFallback = !shouldAttemptWebRtc
+    || !webRtcSupported
+    || Boolean(webRtcConnectionError);
   const shouldUseMjpegStream = transportActive
     && feed.status === "running"
-    && ((hasWorkerMetrics && !showWebRtcFrame) || shouldPreferBackendTransport);
+    && hasWorkerMetrics
+    && shouldUseMjpegFallback;
   const streamUrl = shouldUseMjpegStream
     ? `${getFeedMjpegStreamUrl(feed.feed_id)}?attempt=${streamAttempt}`
     : null;
+
+  const captureSnapshotFallback = useCallback(async () => {
+    try {
+      const snapshot = await getFeedSnapshot(feed.feed_id);
+      if (snapshot.captured && snapshot.image_data_url) {
+        setFallbackFrameUrl(snapshot.image_data_url);
+      }
+    } catch {
+      // Keep the current fallback state when one-shot snapshot capture fails.
+    }
+  }, [feed.feed_id]);
 
   useEffect(() => {
     const previousStatus = previousStatusRef.current;
@@ -206,6 +233,7 @@ function FeedTransportSurface({
       setStreamErrorCount(0);
       setFallbackFrameUrl(null);
       hadRenderedFrameRef.current = false;
+      requestedBootstrapSnapshotRef.current = false;
       lastForcedReconnectAtRef.current = 0;
       return;
     }
@@ -225,26 +253,39 @@ function FeedTransportSurface({
     };
   }, [shouldUseMjpegStream, streamErrorCount]);
 
-  const captureSnapshotFallback = async () => {
-    try {
-      const snapshot = await getFeedSnapshot(feed.feed_id);
-      if (snapshot.captured && snapshot.image_data_url) {
-        setFallbackFrameUrl(snapshot.image_data_url);
-      }
-    } catch {
-      // Keep the current fallback state when one-shot snapshot capture fails.
+  useEffect(() => {
+    if (!shouldAttemptWebRtc || showWebRtcFrame || shouldUseMjpegStream) {
+      requestedBootstrapSnapshotRef.current = false;
+      return;
     }
-  };
+
+    if (fallbackFrameUrl || renderedFrameDataUrl || requestedBootstrapSnapshotRef.current) {
+      return;
+    }
+
+    requestedBootstrapSnapshotRef.current = true;
+    void captureSnapshotFallback();
+  }, [
+    captureSnapshotFallback,
+    fallbackFrameUrl,
+    renderedFrameDataUrl,
+    shouldAttemptWebRtc,
+    shouldUseMjpegStream,
+    showWebRtcFrame,
+  ]);
 
   const previewUrl = feed.preview_path ? resolveApiUrl(feed.preview_path) : null;
   const showMjpegFrame = Boolean(streamUrl) && !playbackFailed;
   const showRenderedFrame = transportActive && !showWebRtcFrame && !showMjpegFrame && Boolean(renderedFrameDataUrl);
   const showFallbackFrame = !showWebRtcFrame && !showMjpegFrame && transportActive && Boolean(fallbackFrameUrl);
-  const showLoadingState = shouldShowWorkerLoading
+  const showWebRtcLoadingState = shouldAttemptWebRtc
     && !showWebRtcFrame
     && !showMjpegFrame
     && !showRenderedFrame
     && !showFallbackFrame;
+  const showLoadingState = shouldShowWorkerLoading
+    ? !showWebRtcFrame && !showMjpegFrame && !showRenderedFrame && !showFallbackFrame
+    : showWebRtcLoadingState;
   const showPreview = transportActive
     && !shouldShowWorkerLoading
     && !showWebRtcFrame
@@ -252,6 +293,47 @@ function FeedTransportSurface({
     && !showFallbackFrame
     && Boolean(previewUrl)
     && !playbackFailed;
+  const shouldSuppressClientDetectionsOnWebRtc = Boolean(
+    showWebRtcFrame
+    && backendAnnotationsActive
+    && webrtcCapability?.source_mode === "annotated",
+  );
+  const transportDebugLabel = (() => {
+    if (showWebRtcFrame) {
+      return webrtcCapability?.source_mode === "annotated" ? "WEBRTC ANN" : "WEBRTC DIR";
+    }
+
+    if (showMjpegFrame) {
+      return shouldAttemptWebRtc ? "MJPEG FB" : "MJPEG";
+    }
+
+    if (showRenderedFrame) {
+      return "RENDERED";
+    }
+
+    if (showFallbackFrame) {
+      return "SNAPSHOT";
+    }
+
+    if (showPreview) {
+      return "PREVIEW";
+    }
+
+    if (showWebRtcLoadingState) {
+      return "WEBRTC...";
+    }
+
+    if (showLoadingState) {
+      return "LOADING";
+    }
+
+    return "IDLE";
+  })();
+  const transportDebugBadgeClassName = showWebRtcFrame
+    ? "border-emerald-300/50 bg-emerald-500/20 text-emerald-100"
+    : showMjpegFrame
+    ? "border-amber-300/50 bg-amber-500/20 text-amber-100"
+    : "border-border/70 bg-background/80 text-foreground/80";
   const zonePoints = feed.zone?.points ?? [];
   const zonePolygonPoints = videoDims
     ? zonePoints
@@ -287,8 +369,8 @@ function FeedTransportSurface({
             playsInline
             onLoadedMetadata={onVideoLoad}
           />
-          {/* Tracking overlays (zone polygon + person boxes) */}
-          {videoDims && (zonePolygonPoints || (uiStatus === "online" && detections?.length)) && (
+          {/* Keep zone overlay visible. Suppress browser detection boxes only when annotated WebRTC already contains backend-drawn boxes. */}
+          {videoDims && (zonePolygonPoints || (uiStatus === "online" && detections?.length && !shouldSuppressClientDetectionsOnWebRtc)) && (
             <svg
               className="absolute inset-0 h-full w-full pointer-events-none"
               viewBox={`0 0 ${videoDims.width} ${videoDims.height}`}
@@ -312,10 +394,11 @@ function FeedTransportSurface({
                 </>
               )}
 
-              {uiStatus === "online" && detections?.map((det, idx) => {
+              {uiStatus === "online" && !shouldSuppressClientDetectionsOnWebRtc && detections?.map((det, idx) => {
                 const [x1, y1, x2, y2] = det;
                 return (
                   <rect
+                    data-testid="detection-box"
                     key={idx}
                     x={x1}
                     y={y1}
@@ -417,6 +500,7 @@ function FeedTransportSurface({
                 const [x1, y1, x2, y2] = det;
                 return (
                   <rect
+                    data-testid="detection-box"
                     key={idx}
                     x={x1}
                     y={y1}
@@ -473,6 +557,7 @@ function FeedTransportSurface({
                 const [x1, y1, x2, y2] = det;
                 return (
                   <rect
+                    data-testid="detection-box"
                     key={idx}
                     x={x1}
                     y={y1}
@@ -490,11 +575,17 @@ function FeedTransportSurface({
         <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-background/90 px-4 text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground/80">
-            {feed.status === "initializing" ? "Initializing worker" : "Preparing live stream"}
+            {feed.status === "initializing"
+              ? "Initializing worker"
+              : showWebRtcLoadingState
+              ? "Connecting WebRTC"
+              : "Preparing live stream"}
           </p>
           <p className="text-[11px] text-muted-foreground">
             {feed.status === "initializing"
               ? "Starting model and tracker before the first analyzed frame is emitted."
+              : showWebRtcLoadingState
+              ? "Loading the latest backend frame while the live WebRTC stream is negotiated."
               : "Waiting for the first analyzed frame from the backend worker."}
           </p>
         </div>
@@ -515,6 +606,12 @@ function FeedTransportSurface({
       )}
       <div className="absolute left-2 top-2">
         <StatusBadge status={uiStatus} label={feed.status} />
+      </div>
+      <div
+        data-testid="transport-badge"
+        className={`absolute left-2 top-10 rounded border px-2 py-0.5 text-[10px] font-mono uppercase tracking-[0.14em] ${transportDebugBadgeClassName}`}
+      >
+        {transportDebugLabel}
       </div>
       <div className="absolute right-2 top-2 rounded bg-background/80 px-2 py-0.5 text-xs font-mono text-foreground">
         Model {feed.model_size.toUpperCase()}

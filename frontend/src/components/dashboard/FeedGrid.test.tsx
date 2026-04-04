@@ -4,6 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FeedGrid } from "@/components/dashboard/FeedGrid";
 import { getFeedMjpegStreamUrl, getFeedSnapshot, type VideoFeed } from "@/lib/api";
 
+const mockUseFeedWebRtc = vi.fn();
+
+vi.mock("@/hooks/use-feed-webrtc", () => ({
+  useFeedWebRtc: (args: unknown) => mockUseFeedWebRtc(args),
+}));
+
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   return {
@@ -16,6 +22,13 @@ vi.mock("@/lib/api", async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockUseFeedWebRtc.mockReturnValue({
+    videoRef: { current: null },
+    streamReady: false,
+    isConnecting: false,
+    isSupported: false,
+    connectionError: null,
+  });
 });
 
 function createFeed(overrides: Partial<VideoFeed> = {}): VideoFeed {
@@ -39,6 +52,21 @@ function createFeed(overrides: Partial<VideoFeed> = {}): VideoFeed {
     },
     queue_length_warning: 8,
     latest_metrics: null,
+    transport: {
+      backend_annotations: false,
+      webrtc: {
+        enabled: false,
+        ready: false,
+        source_mode: "none",
+        path_name: null,
+        reason: "feed_not_running",
+      },
+      mjpeg: {
+        enabled: true,
+        ready: true,
+        reason: null,
+      },
+    },
     last_error: null,
     last_warning: null,
     last_warning_code: null,
@@ -79,6 +107,299 @@ describe("FeedGrid MJPEG transport", () => {
     expect(liveFrame.src).toContain("/api/feeds/feed-1/stream?attempt=0");
     expect(getFeedMjpegStreamUrl).toHaveBeenCalledWith("feed-1");
     expect(getFeedSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("enables WebRTC when backend transport reports a ready WebRTC source", () => {
+    const { rerender } = render(
+      <FeedGrid
+        feeds={[createFeed({ latest_metrics: createMetrics() })]}
+        emptyState={false}
+        activeFeedAction={null}
+        onEditZone={() => {}}
+        onFeedAction={() => {}}
+        onSaveThresholds={async () => {}}
+        isSavingThresholds={false}
+      />,
+    );
+
+    expect(mockUseFeedWebRtc).toHaveBeenLastCalledWith({ feedId: "feed-1", enabled: false });
+
+    rerender(
+      <FeedGrid
+        feeds={[
+          createFeed({
+            latest_metrics: createMetrics(),
+            transport: {
+              backend_annotations: false,
+              webrtc: {
+                enabled: true,
+                ready: true,
+                source_mode: "direct",
+                path_name: "feed-1",
+                reason: null,
+              },
+              mjpeg: {
+                enabled: true,
+                ready: true,
+                reason: null,
+              },
+            },
+          }),
+        ]}
+        emptyState={false}
+        activeFeedAction={null}
+        onEditZone={() => {}}
+        onFeedAction={() => {}}
+        onSaveThresholds={async () => {}}
+        isSavingThresholds={false}
+      />,
+    );
+
+    expect(mockUseFeedWebRtc).toHaveBeenLastCalledWith({ feedId: "feed-1", enabled: true });
+  });
+
+  it("shows WEBRTC DIR badge when WebRTC playback is active", () => {
+    mockUseFeedWebRtc.mockReturnValue({
+      videoRef: { current: null },
+      streamReady: true,
+      isConnecting: false,
+      isSupported: true,
+      connectionError: null,
+    });
+
+    render(
+      <FeedGrid
+        feeds={[
+          createFeed({
+            latest_metrics: createMetrics(),
+            transport: {
+              backend_annotations: false,
+              webrtc: {
+                enabled: true,
+                ready: true,
+                source_mode: "direct",
+                path_name: "feed-1",
+                reason: null,
+              },
+              mjpeg: {
+                enabled: true,
+                ready: true,
+                reason: null,
+              },
+            },
+          }),
+        ]}
+        emptyState={false}
+        activeFeedAction={null}
+        onEditZone={() => {}}
+        onFeedAction={() => {}}
+        onSaveThresholds={async () => {}}
+        isSavingThresholds={false}
+      />,
+    );
+
+    expect(screen.getByTestId("transport-badge")).toHaveTextContent("WEBRTC DIR");
+  });
+
+  it("shows browser detection boxes on WEBRTC DIR even if backend annotations metadata is true", () => {
+    mockUseFeedWebRtc.mockReturnValue({
+      videoRef: { current: null },
+      streamReady: true,
+      isConnecting: false,
+      isSupported: true,
+      connectionError: null,
+    });
+
+    render(
+      <FeedGrid
+        feeds={[
+          createFeed({
+            latest_metrics: createMetrics(),
+            transport: {
+              backend_annotations: true,
+              webrtc: {
+                enabled: true,
+                ready: true,
+                source_mode: "direct",
+                path_name: "feed-1",
+                reason: null,
+              },
+              mjpeg: {
+                enabled: true,
+                ready: true,
+                reason: null,
+              },
+            },
+          }),
+        ]}
+        emptyState={false}
+        activeFeedAction={null}
+        onEditZone={() => {}}
+        onFeedAction={() => {}}
+        onSaveThresholds={async () => {}}
+        isSavingThresholds={false}
+      />,
+    );
+
+    const videoEl = document.querySelector("video") as HTMLVideoElement | null;
+    expect(videoEl).not.toBeNull();
+
+    Object.defineProperty(videoEl, "videoWidth", { configurable: true, value: 1280 });
+    Object.defineProperty(videoEl, "videoHeight", { configurable: true, value: 720 });
+    fireEvent.loadedMetadata(videoEl!);
+
+    expect(screen.queryAllByTestId("detection-box")).toHaveLength(1);
+  });
+
+  it("shows MJPEG FB badge when WebRTC falls back to MJPEG", () => {
+    mockUseFeedWebRtc.mockReturnValue({
+      videoRef: { current: null },
+      streamReady: false,
+      isConnecting: false,
+      isSupported: true,
+      connectionError: "WebRTC failed",
+    });
+
+    render(
+      <FeedGrid
+        feeds={[
+          createFeed({
+            latest_metrics: createMetrics(),
+            transport: {
+              backend_annotations: false,
+              webrtc: {
+                enabled: true,
+                ready: true,
+                source_mode: "direct",
+                path_name: "feed-1",
+                reason: null,
+              },
+              mjpeg: {
+                enabled: true,
+                ready: true,
+                reason: null,
+              },
+            },
+          }),
+        ]}
+        emptyState={false}
+        activeFeedAction={null}
+        onEditZone={() => {}}
+        onFeedAction={() => {}}
+        onSaveThresholds={async () => {}}
+        isSavingThresholds={false}
+      />,
+    );
+
+    expect(screen.getByTestId("transport-badge")).toHaveTextContent("MJPEG FB");
+    expect(screen.getByAltText("Checkout 1 live frame")).toBeInTheDocument();
+  });
+
+  it("loads one backend snapshot first while WebRTC is connecting", async () => {
+    mockUseFeedWebRtc.mockReturnValue({
+      videoRef: { current: null },
+      streamReady: false,
+      isConnecting: true,
+      isSupported: true,
+      connectionError: null,
+    });
+    vi.mocked(getFeedSnapshot).mockResolvedValue({
+      feed_id: "feed-1",
+      source: "rtsp://camera-1/live",
+      captured: true,
+      resolution: "1280x720",
+      width: 1280,
+      height: 720,
+      image_data_url: "data:image/jpeg;base64,ZmFrZS13ZWJydGMtYm9vdHN0cmFw",
+      error: null,
+    });
+
+    render(
+      <FeedGrid
+        feeds={[
+          createFeed({
+            latest_metrics: createMetrics(),
+            transport: {
+              backend_annotations: false,
+              webrtc: {
+                enabled: true,
+                ready: true,
+                source_mode: "direct",
+                path_name: "feed-1",
+                reason: null,
+              },
+              mjpeg: {
+                enabled: true,
+                ready: true,
+                reason: null,
+              },
+            },
+          }),
+        ]}
+        emptyState={false}
+        activeFeedAction={null}
+        onEditZone={() => {}}
+        onFeedAction={() => {}}
+        onSaveThresholds={async () => {}}
+        isSavingThresholds={false}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(getFeedSnapshot).toHaveBeenCalledWith("feed-1");
+    });
+    expect(await screen.findByAltText("Checkout 1 fallback frame")).toBeInTheDocument();
+    expect(screen.queryByAltText("Checkout 1 live frame")).not.toBeInTheDocument();
+  });
+
+  it("suppresses browser detection boxes when backend annotations are active on WEBRTC ANN", () => {
+    mockUseFeedWebRtc.mockReturnValue({
+      videoRef: { current: null },
+      streamReady: true,
+      isConnecting: false,
+      isSupported: true,
+      connectionError: null,
+    });
+
+    render(
+      <FeedGrid
+        feeds={[
+          createFeed({
+            latest_metrics: createMetrics(),
+            transport: {
+              backend_annotations: true,
+              webrtc: {
+                enabled: true,
+                ready: true,
+                source_mode: "annotated",
+                path_name: "feed-1-annotated",
+                reason: null,
+              },
+              mjpeg: {
+                enabled: true,
+                ready: true,
+                reason: null,
+              },
+            },
+          }),
+        ]}
+        emptyState={false}
+        activeFeedAction={null}
+        onEditZone={() => {}}
+        onFeedAction={() => {}}
+        onSaveThresholds={async () => {}}
+        isSavingThresholds={false}
+      />,
+    );
+
+    const videoEl = document.querySelector("video") as HTMLVideoElement | null;
+    expect(videoEl).not.toBeNull();
+
+    Object.defineProperty(videoEl, "videoWidth", { configurable: true, value: 1280 });
+    Object.defineProperty(videoEl, "videoHeight", { configurable: true, value: 720 });
+    fireEvent.loadedMetadata(videoEl!);
+
+    expect(screen.queryAllByTestId("detection-box")).toHaveLength(0);
   });
 
   it("falls back to one-shot snapshot if MJPEG stream fails", async () => {
