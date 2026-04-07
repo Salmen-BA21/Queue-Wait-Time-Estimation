@@ -1,9 +1,24 @@
 # Project Progress Report - Queue Wait-Time Estimation System
 
-**Current Date:** March 31, 2026
-**Last Updated:** March 31, 2026  
+**Current Date:** April 7, 2026
+**Last Updated:** April 7, 2026  
 
 This report assesses the completion status of each sprint based on the project structure, documentation, and daily logs.
+
+## Current-State Addendum (April 2026)
+
+The transport layer has evolved beyond the March sprint snapshot:
+
+- Live dashboard playback now uses WebRTC-first routing for running RTSP feeds.
+- Backend transport APIs now include:
+  - `GET /api/feeds/{feed_id}/transport`
+  - `POST /api/feeds/{feed_id}/webrtc/offer`
+- Frontend playback policy is now:
+  - WebRTC when capability is ready
+  - MJPEG fallback when WebRTC is unavailable or fails
+  - Snapshot for zone/re-zoning and non-live preview workflows
+
+Historical sprint sections below are preserved as delivered at the end of March 2026.
 
 ## ✅ Completed Sprints
 

@@ -4,7 +4,10 @@ Canonical contract for the web dashboard frontend.
 
 - Backend REST base: `/api`
 - WebSocket endpoint: `/ws/metrics`
+- Last validated against code: April 7, 2026
 - Source of truth: `backend/src/api/app.py`, `backend/src/api/models.py`, `frontend/src/lib/api.ts`
+
+For transport architecture and MediaMTX setup details, see `WEBRTC_PREVIEW_SETUP.md`.
 
 ## Response Envelope
 
@@ -18,7 +21,16 @@ Most REST endpoints return:
 }
 ```
 
-Streaming endpoint `/api/feeds/{feed_id}/stream` returns MJPEG bytes and does not use the envelope.
+The live MJPEG endpoint `/api/feeds/{feed_id}/stream` returns `multipart/x-mixed-replace` bytes and does not use the envelope.
+
+## Playback Transport Strategy
+
+For running feeds, the dashboard should route transport in this order:
+
+1. Query `/api/feeds/{feed_id}/transport`.
+2. If `webrtc.enabled == true`, `webrtc.ready == true`, and `webrtc.source_mode != "none"`, start WebRTC offer/answer via `/api/feeds/{feed_id}/webrtc/offer`.
+3. If WebRTC is unavailable or connect fails, use MJPEG `/api/feeds/{feed_id}/stream`.
+4. Keep `/api/feeds/{feed_id}/snapshot` for zone workflows and non-live preview use, not as the primary steady-state live transport.
 
 ## Feed Endpoints
 
@@ -28,6 +40,8 @@ Streaming endpoint `/api/feeds/{feed_id}/stream` returns MJPEG bytes and does no
 | POST | `/api/feeds` | `CreateFeedRequest` | `VideoFeed` |
 | POST | `/api/feeds/batch-launch` | `BatchFeedLaunchRequest` | `BatchFeedLaunchResponse` |
 | GET | `/api/feeds/{feed_id}/status` | None | `VideoFeed` |
+| GET | `/api/feeds/{feed_id}/transport` | None | `FeedTransportCapabilities` |
+| POST | `/api/feeds/{feed_id}/webrtc/offer` | `FeedWebRTCOfferRequest` | `FeedWebRTCOfferResponse` |
 | POST | `/api/feeds/{feed_id}/start` | None | `VideoFeed` |
 | POST | `/api/feeds/{feed_id}/stop` | None | `VideoFeed` |
 | POST | `/api/feeds/{feed_id}/restart` | None | `VideoFeed` |
@@ -37,17 +51,27 @@ Streaming endpoint `/api/feeds/{feed_id}/stream` returns MJPEG bytes and does no
 | POST | `/api/feeds/{feed_id}/zone` | `ZoneUpdateRequest` | `VideoFeed` |
 | POST | `/api/feeds/{feed_id}/thresholds` | `QueueThresholdUpdateRequest` | `VideoFeed` |
 
-### MJPEG Stream Status Codes
+### Transport Endpoint Status Codes
 
-- `200`: feed streaming
+`GET /api/feeds/{feed_id}/transport`:
+
+- `200`: transport capabilities returned
+- `404`: feed id not found
+
+`POST /api/feeds/{feed_id}/webrtc/offer`:
+
+- `200`: SDP offer proxied and answer returned
+- `404`: feed id not found
+- `409`: feed not running, unsupported source, or transport not ready
+- `422`: invalid offer payload
+- `502`: MediaMTX upstream error
+- `503`: WebRTC preview disabled or MediaMTX unavailable
+
+`GET /api/feeds/{feed_id}/stream`:
+
+- `200`: feed streaming over MJPEG
 - `404`: feed id not found
 - `409`: feed exists but is not running/initializing
-
-Recommended frontend strategy:
-
-1. Use `/api/feeds/{feed_id}/stream` for live cards.
-2. Fallback to `/api/feeds/{feed_id}/snapshot` on transient stream failures.
-3. Keep snapshot endpoint for zone editor and re-zoning workflows.
 
 ## Video Upload Endpoints
 
@@ -111,6 +135,60 @@ Recommended frontend strategy:
 }
 ```
 
+### FeedTransportCapabilities
+
+```json
+{
+  "backend_annotations": true,
+  "webrtc": {
+    "enabled": true,
+    "ready": true,
+    "source_mode": "direct",
+    "path_name": "feed_123",
+    "reason": null
+  },
+  "mjpeg": {
+    "enabled": true,
+    "ready": true,
+    "reason": null
+  }
+}
+```
+
+`source_mode` values:
+
+- `direct`: RTSP source relayed directly through MediaMTX
+- `annotated`: backend-annotated frames are expected on a dedicated path
+- `none`: WebRTC not available for this feed
+
+Common `reason` values include:
+
+- `feed_not_running`
+- `rtsp_source_required`
+- `webrtc_not_ready`
+
+### FeedWebRTCOfferRequest
+
+```json
+{
+  "offer": {
+    "type": "offer",
+    "sdp": "v=0\r\no=- 123..."
+  }
+}
+```
+
+### FeedWebRTCOfferResponse
+
+```json
+{
+  "answer": {
+    "type": "answer",
+    "sdp": "v=0\r\no=- 456..."
+  }
+}
+```
+
 ### ZoneUpdateRequest
 
 ```json
@@ -147,7 +225,8 @@ Recommended frontend strategy:
   "uncertainty_level": "Low",
   "queue_stable": true,
   "detections": [[12, 44, 130, 312, 0.94, 0, 53]],
-  "render_frame_jpeg_base64": null
+  "render_frame_jpeg_base64": null,
+  "backend_annotations_active": false
 }
 ```
 
@@ -239,10 +318,12 @@ When integrating n8n, use the runtime webhook payload as the incoming contract u
 
 ## Frontend Client Mapping
 
-The frontend already maps these routes in `frontend/src/lib/api.ts`, including:
+The frontend maps these routes in `frontend/src/lib/api.ts`, including:
 
+- `getFeedTransportCapabilities()`
+- `submitFeedWebRtcOffer()`
+- `getFeedMjpegStreamUrl()`
 - `updateFeedThresholds()`
 - `getWebhookIntegrationStatus()`
 - `testWebhookIntegration()`
-- `getFeedMjpegStreamUrl()`
 - websocket types for all five event families

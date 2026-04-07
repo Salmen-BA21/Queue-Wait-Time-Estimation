@@ -1,5 +1,7 @@
 # MJPEG Streaming Migration (Snapshot Polling Replacement)
 
+> Historical note (April 2026): this document records the first transport migration slice (snapshot polling to MJPEG). The current dashboard transport policy is WebRTC-first with MJPEG fallback. See `../WEBRTC_PREVIEW_SETUP.md` and `../API_FOR_FRONTEND.md` for current contract details.
+
 ## Summary
 
 This document records the first implementation slice that replaced per-feed snapshot polling with backend MJPEG streaming for live RTSP/webcam cards in the dashboard.
@@ -93,7 +95,7 @@ Updated feed surface behavior:
 
 Files:
 
-- `docs/API_FOR_FRONTEND.md`
+- `../API_FOR_FRONTEND.md`
 - `backend/tests/test_api_app.py`
 - `frontend/src/components/dashboard/FeedGrid.test.tsx`
 
@@ -183,11 +185,16 @@ Note:
 - Streamed frames are sourced directly from capture input, while overlays still come from latest metrics updates.
   - This can create slight timing drift between boxes/zone overlays and the underlying image.
 - No dedicated stream auth token is added yet; endpoint relies on current API access model.
-- This slice uses MJPEG, not WebRTC.
+- At the time of this slice, live playback used MJPEG only. Current live transport adds WebRTC-first routing and MJPEG fallback.
 
 ## Follow-up Path (Phase 2)
 
-If stricter low-latency targets are required later:
+The WebRTC transport follow-up is now tracked in:
+
+- `../WEBRTC_PREVIEW_SETUP.md`
+- `../API_FOR_FRONTEND.md`
+
+Remaining future improvements are still relevant:
 
 - move to WebSocket binary frame transport with canvas rendering
 - optionally emit annotated frames directly from worker pipeline

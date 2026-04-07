@@ -106,6 +106,17 @@ Optional WebRTC gateway for live preview (MediaMTX):
 docker-compose up -d mediamtx
 ```
 
+Dashboard live playback policy:
+
+- WebRTC first when transport capability is ready.
+- MJPEG fallback if WebRTC is unavailable or fails.
+- Snapshot is reserved for zone/re-zoning and non-live preview workflows.
+
+Canonical references:
+
+- `docs/API_FOR_FRONTEND.md`
+- `docs/WEBRTC_PREVIEW_SETUP.md`
+
 MediaMTX defaults used by the backend:
 
 - WHEP/WebRTC: `http://127.0.0.1:8889`
@@ -207,6 +218,7 @@ Queue-Wait-Time-Estimation/
 
 - [docs/README.md](docs/README.md)
 - [docs/API_FOR_FRONTEND.md](docs/API_FOR_FRONTEND.md)
+- [docs/WEBRTC_PREVIEW_SETUP.md](docs/WEBRTC_PREVIEW_SETUP.md)
 - [docs/IP_CAMERA_DISCOVERY_README.md](docs/IP_CAMERA_DISCOVERY_README.md)
 - [docs/tracking/MJPEG_STREAMING_MIGRATION.md](docs/tracking/MJPEG_STREAMING_MIGRATION.md)
 
