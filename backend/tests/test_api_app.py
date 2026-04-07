@@ -539,6 +539,9 @@ class TestQueueVisionApi(unittest.TestCase):
         )
 
         record = app.state.registry._feeds[feed.feed_id]
+        record.dashboard_frame_channel_host = "127.0.0.1"
+        record.dashboard_frame_channel_port = 32123
+        record.dashboard_frame_channel_token = "test-frame-channel-token"
         runner = SubprocessFeedWorkerRunner()
 
         command = runner._build_command(record, Path("dummy.events.jsonl"))
@@ -551,10 +554,17 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertIn("--rtsp-transport", command)
         self.assertIn("udp", command)
         self.assertIn("--device", command)
+        self.assertIn("--confidence", command)
         self.assertIn("--detector-imgsz", command)
         self.assertIn("--process-every-n-frames", command)
         self.assertIn("--dashboard-render-frames", command)
         self.assertIn("--dashboard-frame-jpeg-quality", command)
+        self.assertIn("--dashboard-frame-channel-host", command)
+        self.assertIn("127.0.0.1", command)
+        self.assertIn("--dashboard-frame-channel-port", command)
+        self.assertIn("32123", command)
+        self.assertIn("--dashboard-frame-channel-token", command)
+        self.assertIn("test-frame-channel-token", command)
 
     def test_feed_snapshot_uses_saved_rtsp_credentials(self) -> None:
         response = self.client.post(
@@ -622,6 +632,393 @@ class TestQueueVisionApi(unittest.TestCase):
         stream_response = self.client.get(f"/api/feeds/{feed['feed_id']}/stream")
         self.assertEqual(stream_response.status_code, 409)
         self.assertEqual(stream_response.json()["detail"], "Feed must be running before opening the stream.")
+
+    def test_feed_transport_returns_not_found_for_missing_feed(self) -> None:
+        response = self.client.get("/api/feeds/missing-feed/transport")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Feed not found.")
+
+    def test_feed_transport_reports_created_feed_capabilities(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "Camera Created Transport",
+                "source": "rtsp://192.168.1.107/live/main",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        transport_response = self.client.get(f"/api/feeds/{feed['feed_id']}/transport")
+        self.assertEqual(transport_response.status_code, 200)
+
+        payload = transport_response.json()["data"]
+        self.assertFalse(payload["webrtc"]["enabled"])
+        self.assertFalse(payload["webrtc"]["ready"])
+        self.assertEqual(payload["webrtc"]["source_mode"], "none")
+        self.assertEqual(payload["webrtc"]["reason"], "feed_not_running")
+        self.assertTrue(payload["mjpeg"]["enabled"])
+        self.assertFalse(payload["mjpeg"]["ready"])
+        self.assertEqual(payload["mjpeg"]["reason"], "feed_not_running")
+
+    def test_feed_transport_reports_stopped_feed_capabilities(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "Camera Stopped Transport",
+                "source": "rtsp://192.168.1.108/live/main",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
+        self.assertEqual(start_response.status_code, 200)
+
+        stop_response = self.client.post(f"/api/feeds/{feed['feed_id']}/stop")
+        self.assertEqual(stop_response.status_code, 200)
+
+        transport_response = self.client.get(f"/api/feeds/{feed['feed_id']}/transport")
+        self.assertEqual(transport_response.status_code, 200)
+
+        payload = transport_response.json()["data"]
+        self.assertFalse(payload["webrtc"]["enabled"])
+        self.assertFalse(payload["webrtc"]["ready"])
+        self.assertEqual(payload["webrtc"]["source_mode"], "none")
+        self.assertEqual(payload["webrtc"]["reason"], "feed_not_running")
+        self.assertTrue(payload["mjpeg"]["enabled"])
+        self.assertFalse(payload["mjpeg"]["ready"])
+        self.assertEqual(payload["mjpeg"]["reason"], "feed_not_running")
+
+    def test_feed_transport_reports_running_rtsp_capabilities(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "Camera Transport",
+                "source": "rtsp://192.168.1.106/live/main",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
+        self.assertEqual(start_response.status_code, 200)
+
+        transport_response = self.client.get(f"/api/feeds/{feed['feed_id']}/transport")
+        self.assertEqual(transport_response.status_code, 200)
+
+        payload = transport_response.json()["data"]
+        self.assertFalse(payload["backend_annotations"])
+        self.assertTrue(payload["webrtc"]["enabled"])
+        self.assertTrue(payload["webrtc"]["ready"])
+        self.assertEqual(payload["webrtc"]["source_mode"], "direct")
+        self.assertEqual(payload["webrtc"]["path_name"], feed["feed_id"])
+        self.assertIsNone(payload["webrtc"]["reason"])
+        self.assertTrue(payload["mjpeg"]["enabled"])
+        self.assertTrue(payload["mjpeg"]["ready"])
+
+    def test_feed_transport_reports_non_rtsp_webrtc_unavailable(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "USB Transport",
+                "source": "0",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
+        self.assertEqual(start_response.status_code, 200)
+
+        transport_response = self.client.get(f"/api/feeds/{feed['feed_id']}/transport")
+        self.assertEqual(transport_response.status_code, 200)
+
+        payload = transport_response.json()["data"]
+        self.assertFalse(payload["webrtc"]["enabled"])
+        self.assertFalse(payload["webrtc"]["ready"])
+        self.assertEqual(payload["webrtc"]["source_mode"], "none")
+        self.assertEqual(payload["webrtc"]["reason"], "rtsp_source_required")
+        self.assertTrue(payload["mjpeg"]["enabled"])
+        self.assertTrue(payload["mjpeg"]["ready"])
+
+    def test_feed_webrtc_offer_returns_not_found_for_missing_feed(self) -> None:
+        response = self.client.post(
+            "/api/feeds/missing-feed/webrtc/offer",
+            json={
+                "offer": {
+                    "type": "offer",
+                    "sdp": "v=0\r\na=recvonly\r\n",
+                }
+            },
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Feed not found.")
+
+    def test_feed_webrtc_offer_requires_running_feed(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "Camera WebRTC",
+                "source": "rtsp://192.168.1.98/live/main",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        offer_response = self.client.post(
+            f"/api/feeds/{feed['feed_id']}/webrtc/offer",
+            json={
+                "offer": {
+                    "type": "offer",
+                    "sdp": "v=0\r\na=recvonly\r\n",
+                }
+            },
+        )
+
+        self.assertEqual(offer_response.status_code, 409)
+        self.assertEqual(
+            offer_response.json()["detail"],
+            "Feed must be running before creating a WebRTC preview session.",
+        )
+
+    def test_feed_webrtc_offer_rejects_non_rtsp_source(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "USB Camera",
+                "source": "0",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
+        self.assertEqual(start_response.status_code, 200)
+
+        offer_response = self.client.post(
+            f"/api/feeds/{feed['feed_id']}/webrtc/offer",
+            json={
+                "offer": {
+                    "type": "offer",
+                    "sdp": "v=0\r\na=recvonly\r\n",
+                }
+            },
+        )
+
+        self.assertEqual(offer_response.status_code, 409)
+        self.assertEqual(
+            offer_response.json()["detail"],
+            "WebRTC preview currently supports RTSP feed sources only.",
+        )
+
+    def test_feed_webrtc_offer_proxies_sdp_without_mutation(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "Secure WebRTC",
+                "source": "rtsp://192.168.1.99/live/main",
+                "rtsp_username": "viewer",
+                "rtsp_password": "secret",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
+        self.assertEqual(start_response.status_code, 200)
+
+        offer_sdp = "v=0\r\na=recvonly\r\n\r\n"
+        answer_sdp = "v=0\r\na=sendonly\r\n\r\n"
+
+        with patch("src.api.app.ensure_mediamtx_path_configuration") as mocked_path_config, patch(
+            "src.api.app.run_mediamtx_webrtc_offer",
+            return_value=answer_sdp,
+        ) as mocked_offer:
+            offer_response = self.client.post(
+                f"/api/feeds/{feed['feed_id']}/webrtc/offer",
+                json={
+                    "offer": {
+                        "type": "offer",
+                        "sdp": offer_sdp,
+                    }
+                },
+            )
+
+        self.assertEqual(offer_response.status_code, 200)
+        payload = offer_response.json()["data"]
+        self.assertEqual(payload["answer"]["type"], "answer")
+        self.assertEqual(payload["answer"]["sdp"], answer_sdp)
+        mocked_path_config.assert_called_once_with(
+            path_name=feed["feed_id"],
+            source="rtsp://viewer:secret@192.168.1.99/live/main",
+            control_api_base_url=api_app.MEDIAMTX_CONTROL_API_BASE_URL,
+            timeout_seconds=api_app.MEDIAMTX_WEBRTC_TIMEOUT_SEC,
+        )
+        mocked_offer.assert_called_once_with(
+            path_name=feed["feed_id"],
+            offer_sdp=offer_sdp,
+            whep_base_url=api_app.MEDIAMTX_WHEP_BASE_URL,
+            timeout_seconds=api_app.MEDIAMTX_WEBRTC_TIMEOUT_SEC,
+        )
+
+    def test_feed_webrtc_offer_maps_mediamtx_connection_errors(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "Gateway Offline",
+                "source": "rtsp://192.168.1.100/live/main",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
+        self.assertEqual(start_response.status_code, 200)
+
+        with patch("src.api.app.ensure_mediamtx_path_configuration"), patch(
+            "src.api.app.run_mediamtx_webrtc_offer",
+            side_effect=api_app.MediaMTXConnectionError("MediaMTX is unreachable."),
+        ):
+            offer_response = self.client.post(
+                f"/api/feeds/{feed['feed_id']}/webrtc/offer",
+                json={
+                    "offer": {
+                        "type": "offer",
+                        "sdp": "v=0\r\na=recvonly\r\n",
+                    }
+                },
+            )
+
+        self.assertEqual(offer_response.status_code, 503)
+        self.assertEqual(offer_response.json()["detail"], "MediaMTX is unreachable.")
+
+    def test_feed_webrtc_offer_maps_mediamtx_path_configuration_connection_errors(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "Gateway Config Offline",
+                "source": "rtsp://192.168.1.103/live/main",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
+        self.assertEqual(start_response.status_code, 200)
+
+        with patch(
+            "src.api.app.ensure_mediamtx_path_configuration",
+            side_effect=api_app.MediaMTXConnectionError("MediaMTX Control API is unreachable."),
+        ):
+            offer_response = self.client.post(
+                f"/api/feeds/{feed['feed_id']}/webrtc/offer",
+                json={
+                    "offer": {
+                        "type": "offer",
+                        "sdp": "v=0\r\na=recvonly\r\n",
+                    }
+                },
+            )
+
+        self.assertEqual(offer_response.status_code, 503)
+        self.assertEqual(offer_response.json()["detail"], "MediaMTX Control API is unreachable.")
+
+    def test_feed_webrtc_offer_maps_mediamtx_upstream_errors(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "Gateway Upstream Failure",
+                "source": "rtsp://192.168.1.101/live/main",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
+        self.assertEqual(start_response.status_code, 200)
+
+        with patch("src.api.app.ensure_mediamtx_path_configuration"), patch(
+            "src.api.app.run_mediamtx_webrtc_offer",
+            side_effect=api_app.MediaMTXUpstreamError(status_code=500, detail="EOF"),
+        ):
+            offer_response = self.client.post(
+                f"/api/feeds/{feed['feed_id']}/webrtc/offer",
+                json={
+                    "offer": {
+                        "type": "offer",
+                        "sdp": "v=0\r\na=recvonly\r\n",
+                    }
+                },
+            )
+
+        self.assertEqual(offer_response.status_code, 502)
+        self.assertEqual(
+            offer_response.json()["detail"],
+            "MediaMTX WebRTC upstream error (500): EOF",
+        )
+
+    def test_feed_webrtc_offer_maps_mediamtx_path_configuration_upstream_errors(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "Gateway Config Invalid",
+                "source": "rtsp://192.168.1.104/live/main",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
+        self.assertEqual(start_response.status_code, 200)
+
+        with patch(
+            "src.api.app.ensure_mediamtx_path_configuration",
+            side_effect=api_app.MediaMTXUpstreamError(status_code=400, detail="invalid path config"),
+        ):
+            offer_response = self.client.post(
+                f"/api/feeds/{feed['feed_id']}/webrtc/offer",
+                json={
+                    "offer": {
+                        "type": "offer",
+                        "sdp": "v=0\r\na=recvonly\r\n",
+                    }
+                },
+            )
+
+        self.assertEqual(offer_response.status_code, 502)
+        self.assertEqual(
+            offer_response.json()["detail"],
+            "MediaMTX WebRTC upstream error (400): invalid path config",
+        )
+
+    def test_feed_webrtc_offer_rejects_blank_sdp(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "Blank SDP",
+                "source": "rtsp://192.168.1.102/live/main",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
+        self.assertEqual(start_response.status_code, 200)
+
+        offer_response = self.client.post(
+            f"/api/feeds/{feed['feed_id']}/webrtc/offer",
+            json={
+                "offer": {
+                    "type": "offer",
+                    "sdp": "   ",
+                }
+            },
+        )
+
+        self.assertEqual(offer_response.status_code, 422)
 
     def test_feed_stream_yields_mjpeg_chunks(self) -> None:
         response = self.client.post(

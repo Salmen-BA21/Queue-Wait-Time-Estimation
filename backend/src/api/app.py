@@ -9,9 +9,10 @@ import sqlite3
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import quote, urlparse, urlunparse
 from uuid import uuid4
 
+import requests
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
@@ -26,6 +27,9 @@ from src.api.models import (
     CreateCaisseRequest,
     CreateEstablishmentRequest,
     Establishment,
+    FeedWebRTCOfferRequest,
+    FeedWebRTCOfferResponse,
+    FeedTransportCapabilities,
     FeedSnapshotResult,
     FeedSnapshotEvent,
     QueueAlertArchiveRequest,
@@ -46,6 +50,7 @@ from src.api.models import (
     SystemHealth,
     UploadVideoResponse,
     VideoFeed,
+    WebRTCSessionDescription,
     ZoneUpdateRequest,
     coerce_zone_polygon,
 )
@@ -60,7 +65,15 @@ from src.database import (
     get_establishments,
     init_db,
 )
-from src.config import N8N_WEBHOOK_SECRET, N8N_WEBHOOK_URL, WEBHOOK_ENABLED
+from src.config import (
+    MEDIAMTX_CONTROL_API_BASE_URL,
+    MEDIAMTX_WEBRTC_PREVIEW_ENABLED,
+    MEDIAMTX_WEBRTC_TIMEOUT_SEC,
+    MEDIAMTX_WHEP_BASE_URL,
+    N8N_WEBHOOK_SECRET,
+    N8N_WEBHOOK_URL,
+    WEBHOOK_ENABLED,
+)
 from src.queue_analyzer import QueueMetrics
 from src.webhook_client import WebhookClient
 
@@ -83,6 +96,19 @@ DEFAULT_CORS_ORIGIN_REGEX = (
 )
 
 
+class MediaMTXConnectionError(RuntimeError):
+    """Raised when the API cannot reach MediaMTX."""
+
+
+class MediaMTXUpstreamError(RuntimeError):
+    """Raised when MediaMTX rejects a signaling request."""
+
+    def __init__(self, status_code: int, detail: str) -> None:
+        super().__init__(detail)
+        self.status_code = status_code
+        self.detail = detail
+
+
 def parse_csv_env(value: str | None) -> list[str]:
     """Parse a comma-separated environment variable into a list of values."""
     if not value:
@@ -93,6 +119,36 @@ def parse_csv_env(value: str | None) -> list[str]:
 def build_upload_preview_path(file_path: Path) -> str:
     """Return the frontend-consumable API path for an uploaded video."""
     return f"/api/uploads/files/{file_path.name}"
+
+
+def build_mediamtx_path_name(feed_id: str) -> str:
+    """Build a stable MediaMTX path name from a feed identifier."""
+    normalized = "".join(
+        char if char.isalnum() or char in {"-", "_", "."} else "-"
+        for char in feed_id.strip().lower()
+    ).strip("-")
+
+    if not normalized:
+        raise ValueError("Feed identifier cannot be converted into a valid MediaMTX path.")
+
+    return normalized
+
+
+def extract_mediamtx_error_detail(response: requests.Response) -> str:
+    """Extract a readable MediaMTX error payload from HTTP responses."""
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = None
+
+    if isinstance(payload, dict):
+        for key in ("error", "message", "detail"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+    fallback = response.text.strip()
+    return fallback or f"MediaMTX returned HTTP {response.status_code}."
 
 
 def run_rtsp_connection_test(
@@ -168,6 +224,118 @@ def run_onvif_stream_resolution(
         ) from exc
 
     return get_rtsp_urls_from_onvif_device(device, username=username, password=password)
+
+
+def ensure_mediamtx_path_configuration(
+    *,
+    path_name: str,
+    source: str,
+    control_api_base_url: str,
+    timeout_seconds: float,
+) -> None:
+    """Ensure a MediaMTX path exists and points to the RTSP source."""
+    if not path_name.strip():
+        raise ValueError("MediaMTX path name must not be blank.")
+
+    encoded_path = quote(path_name.strip(), safe="")
+    base_url = control_api_base_url.rstrip("/")
+    patch_endpoint = f"{base_url}/v3/config/paths/patch/{encoded_path}"
+    add_endpoint = f"{base_url}/v3/config/paths/add/{encoded_path}"
+    path_payload = {
+        "source": source,
+        "sourceOnDemand": True,
+        "sourceOnDemandStartTimeout": "10s",
+        "sourceOnDemandCloseAfter": "10s",
+        "rtspTransport": "tcp",
+    }
+
+    try:
+        patch_response = requests.patch(
+            patch_endpoint,
+            json=path_payload,
+            timeout=timeout_seconds,
+        )
+    except requests.Timeout as exc:
+        raise MediaMTXConnectionError(
+            "MediaMTX Control API timed out while preparing the stream path."
+        ) from exc
+    except requests.RequestException as exc:
+        raise MediaMTXConnectionError(
+            "MediaMTX Control API could not be reached while preparing the stream path."
+        ) from exc
+
+    if patch_response.status_code == 200:
+        return
+
+    if patch_response.status_code != 404:
+        detail = extract_mediamtx_error_detail(patch_response)
+        raise MediaMTXUpstreamError(
+            status_code=patch_response.status_code,
+            detail=f"path patch failed: {detail}",
+        )
+
+    try:
+        add_response = requests.post(
+            add_endpoint,
+            json=path_payload,
+            timeout=timeout_seconds,
+        )
+    except requests.Timeout as exc:
+        raise MediaMTXConnectionError(
+            "MediaMTX Control API timed out while creating the stream path."
+        ) from exc
+    except requests.RequestException as exc:
+        raise MediaMTXConnectionError(
+            "MediaMTX Control API could not be reached while creating the stream path."
+        ) from exc
+
+    if add_response.status_code >= 400:
+        detail = extract_mediamtx_error_detail(add_response)
+        raise MediaMTXUpstreamError(
+            status_code=add_response.status_code,
+            detail=f"path creation failed: {detail}",
+        )
+
+
+def run_mediamtx_webrtc_offer(
+    *,
+    path_name: str,
+    offer_sdp: str,
+    whep_base_url: str,
+    timeout_seconds: float,
+) -> str:
+    """Proxy a browser SDP offer to MediaMTX WHEP and return the SDP answer."""
+    if not offer_sdp.strip():
+        raise ValueError("WebRTC SDP offer must not be blank.")
+    if not path_name.strip():
+        raise ValueError("MediaMTX path name must not be blank.")
+
+    endpoint = f"{whep_base_url.rstrip('/')}/{quote(path_name.strip(), safe='')}/whep"
+
+    try:
+        response = requests.post(
+            endpoint,
+            data=offer_sdp.encode("utf-8"),
+            headers={
+                "Content-Type": "application/sdp",
+                "Accept": "application/sdp, text/plain, application/json",
+            },
+            timeout=timeout_seconds,
+        )
+    except requests.Timeout as exc:
+        raise MediaMTXConnectionError("MediaMTX timed out while creating a WebRTC preview session.") from exc
+    except requests.RequestException as exc:
+        raise MediaMTXConnectionError("MediaMTX could not be reached for WebRTC preview.") from exc
+
+    if response.status_code not in {200, 201}:
+        detail = extract_mediamtx_error_detail(response)
+        raise MediaMTXUpstreamError(status_code=response.status_code, detail=detail)
+
+    answer_sdp = response.text
+    if not answer_sdp.strip():
+        raise MediaMTXUpstreamError(status_code=502, detail="MediaMTX returned an empty SDP answer.")
+
+    return answer_sdp
 
 
 @asynccontextmanager
@@ -645,6 +813,86 @@ async def get_feed_status(feed_id: str) -> ApiResponse[VideoFeed]:
     if feed is None:
         raise HTTPException(status_code=404, detail="Feed not found.")
     return ApiResponse(data=feed)
+
+
+@app.get("/api/feeds/{feed_id}/transport", response_model=ApiResponse[FeedTransportCapabilities])
+async def get_feed_transport(feed_id: str) -> ApiResponse[FeedTransportCapabilities]:
+    capabilities = await get_registry().get_feed_transport_capabilities(feed_id)
+    if capabilities is None:
+        raise HTTPException(status_code=404, detail="Feed not found.")
+    return ApiResponse(data=capabilities)
+
+
+@app.post("/api/feeds/{feed_id}/webrtc/offer", response_model=ApiResponse[FeedWebRTCOfferResponse])
+async def create_feed_webrtc_offer(
+    feed_id: str,
+    request: FeedWebRTCOfferRequest,
+) -> ApiResponse[FeedWebRTCOfferResponse]:
+    if not MEDIAMTX_WEBRTC_PREVIEW_ENABLED:
+        raise HTTPException(status_code=503, detail="WebRTC preview is disabled on this backend.")
+
+    source_status, source = await get_registry().resolve_feed_webrtc_source(feed_id)
+    if source_status == "not_found":
+        raise HTTPException(status_code=404, detail="Feed not found.")
+    if source_status == "not_running":
+        raise HTTPException(
+            status_code=409,
+            detail="Feed must be running before creating a WebRTC preview session.",
+        )
+    if source_status == "unsupported_source":
+        raise HTTPException(
+            status_code=409,
+            detail="WebRTC preview currently supports RTSP feed sources only.",
+        )
+    if source is None:
+        raise HTTPException(status_code=500, detail="WebRTC source resolution failed unexpectedly.")
+
+    transport = await get_registry().get_feed_transport_capabilities(feed_id)
+    if transport is None:
+        raise HTTPException(status_code=404, detail="Feed not found.")
+
+    webrtc_transport = transport.webrtc
+    if not webrtc_transport.enabled or not webrtc_transport.ready:
+        reason = webrtc_transport.reason or "webrtc_not_ready"
+        raise HTTPException(
+            status_code=409,
+            detail=f"WebRTC transport unavailable: {reason}",
+        )
+
+    path_name = build_mediamtx_path_name(webrtc_transport.path_name or feed_id)
+
+    try:
+        if webrtc_transport.source_mode == "direct":
+            await asyncio.to_thread(
+                ensure_mediamtx_path_configuration,
+                path_name=path_name,
+                source=source,
+                control_api_base_url=MEDIAMTX_CONTROL_API_BASE_URL,
+                timeout_seconds=MEDIAMTX_WEBRTC_TIMEOUT_SEC,
+            )
+        answer_sdp = await asyncio.to_thread(
+            run_mediamtx_webrtc_offer,
+            path_name=path_name,
+            offer_sdp=request.offer.sdp,
+            whep_base_url=MEDIAMTX_WHEP_BASE_URL,
+            timeout_seconds=MEDIAMTX_WEBRTC_TIMEOUT_SEC,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except MediaMTXConnectionError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except MediaMTXUpstreamError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"MediaMTX WebRTC upstream error ({exc.status_code}): {exc.detail}",
+        ) from exc
+
+    return ApiResponse(
+        data=FeedWebRTCOfferResponse(
+            answer=WebRTCSessionDescription(type="answer", sdp=answer_sdp),
+        ),
+        message="WebRTC offer proxied successfully.",
+    )
 
 
 @app.get("/api/feeds/{feed_id}/snapshot", response_model=ApiResponse[FeedSnapshotResult])

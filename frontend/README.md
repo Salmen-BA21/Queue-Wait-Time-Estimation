@@ -61,8 +61,21 @@ The client includes support for:
 - Feed lifecycle (`create`, `start`, `stop`, `restart`, `delete`)
 - Feed zone and threshold updates
 - RTSP/ONVIF source onboarding
-- MJPEG stream transport (`/api/feeds/{feed_id}/stream`)
+- Feed transport capability discovery (`/api/feeds/{feed_id}/transport`)
+- WebRTC offer/answer signaling (`/api/feeds/{feed_id}/webrtc/offer`)
+- MJPEG fallback transport (`/api/feeds/{feed_id}/stream`)
 - Webhook integration status and test endpoints
+
+Playback policy in dashboard feed cards:
+
+- WebRTC first when the backend reports ready capability.
+- MJPEG fallback when WebRTC is unavailable, unsupported, or fails.
+- Snapshot endpoints are used for zone/re-zoning and non-live preview workflows.
+
+Canonical transport and API references:
+
+- `../docs/API_FOR_FRONTEND.md`
+- `../docs/WEBRTC_PREVIEW_SETUP.md`
 
 ## Key Files
 
@@ -74,4 +87,5 @@ The client includes support for:
 
 - If API calls fail, confirm backend is running on `http://localhost:8000` and CORS is enabled.
 - If live updates fail, verify websocket connection to `/ws/metrics` from browser devtools.
-- If MJPEG cards are blank, check feed status and test `/api/feeds/{feed_id}/snapshot` as fallback.
+- If WebRTC does not start, inspect `/api/feeds/{feed_id}/transport` and check `webrtc.ready` plus `webrtc.reason`.
+- If cards fall back to MJPEG unexpectedly, check `/api/feeds/{feed_id}/webrtc/offer` response status and backend MediaMTX configuration.

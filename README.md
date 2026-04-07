@@ -100,6 +100,29 @@ npm install
 npm run dev
 ```
 
+Optional WebRTC gateway for live preview (MediaMTX):
+
+```bash
+docker-compose up -d mediamtx
+```
+
+Dashboard live playback policy:
+
+- WebRTC first when transport capability is ready.
+- MJPEG fallback if WebRTC is unavailable or fails.
+- Snapshot is reserved for zone/re-zoning and non-live preview workflows.
+
+Canonical references:
+
+- `docs/API_FOR_FRONTEND.md`
+- `docs/WEBRTC_PREVIEW_SETUP.md`
+
+MediaMTX defaults used by the backend:
+
+- WHEP/WebRTC: `http://127.0.0.1:8889`
+- Control API: `http://127.0.0.1:9997`
+- RTSP relay: `rtsp://127.0.0.1:8554/<stream_name>`
+
 ## IP Camera Discovery
 
 The ONVIF discovery and stream-resolution helpers live in `backend/src/onvif_client.py`.
@@ -130,7 +153,7 @@ Detailed guide: [docs/IP_CAMERA_DISCOVERY_README.md](docs/IP_CAMERA_DISCOVERY_RE
 
 ## n8n Integration
 
-Start n8n locally:
+Start local support services (n8n + MediaMTX):
 
 ```bash
 docker-compose up -d
@@ -141,6 +164,12 @@ Open `http://localhost:5678` and import workflow:
 - Recommended: `n8n_workflow_with_telegram.json`
 - Legacy minimal template: `n8n_workflow_template.json`
 
+MediaMTX control and WebRTC endpoints (for debugging):
+
+- Control API: `http://127.0.0.1:9997/v3/paths/list`
+- WebRTC page: `http://127.0.0.1:8889/<path>`
+- WHEP endpoint: `http://127.0.0.1:8889/<path>/whep`
+
 Set secrets/variables in n8n:
 
 - `WEBHOOK_SECRET`
@@ -150,6 +179,12 @@ Set backend environment variables:
 
 - `N8N_WEBHOOK_URL` (default: `http://localhost:5678/webhook/queue-metrics`)
 - `N8N_WEBHOOK_SECRET`
+- `MEDIAMTX_WEBRTC_PREVIEW_ENABLED` (default: `true`)
+- `MEDIAMTX_WHEP_BASE_URL` (default: `http://127.0.0.1:8889`)
+- `MEDIAMTX_CONTROL_API_BASE_URL` (default: `http://127.0.0.1:9997`)
+- `MEDIAMTX_WEBRTC_TIMEOUT_SEC` (default: `8.0`)
+
+If go2rtc is still running locally, stop it before starting MediaMTX to avoid port conflicts.
 
 Automated test runbook: [scripts/TEST_N8N.md](scripts/TEST_N8N.md)
 
@@ -183,6 +218,7 @@ Queue-Wait-Time-Estimation/
 
 - [docs/README.md](docs/README.md)
 - [docs/API_FOR_FRONTEND.md](docs/API_FOR_FRONTEND.md)
+- [docs/WEBRTC_PREVIEW_SETUP.md](docs/WEBRTC_PREVIEW_SETUP.md)
 - [docs/IP_CAMERA_DISCOVERY_README.md](docs/IP_CAMERA_DISCOVERY_README.md)
 - [docs/tracking/MJPEG_STREAMING_MIGRATION.md](docs/tracking/MJPEG_STREAMING_MIGRATION.md)
 

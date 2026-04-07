@@ -12,6 +12,8 @@ FeedStatus = Literal["created", "initializing", "running", "stopped", "error"]
 EventType = Literal["snapshot", "feed_status", "metrics_update", "alert_fired", "system_warning"]
 ModelSize = Literal["n", "s", "m", "l", "x"]
 RTSPTransport = Literal["tcp", "udp"]
+WebRTCSessionType = Literal["offer", "answer"]
+WebRTCTransportSourceMode = Literal["annotated", "direct", "none"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 BatchLaunchMode = Literal["save_only", "create_and_start"]
 BatchLaunchItemStatus = Literal["created", "started", "failed"]
@@ -183,6 +185,33 @@ class QueueMetricsModel(BaseModel):
     queue_stable: bool
     detections: list[list[float]] | None = None
     render_frame_jpeg_base64: str | None = None
+    backend_annotations_active: bool = False
+
+
+class FeedWebRTCTransportCapability(BaseModel):
+    """WebRTC transport readiness for a single feed."""
+
+    enabled: bool = False
+    ready: bool = False
+    source_mode: WebRTCTransportSourceMode = "none"
+    path_name: str | None = None
+    reason: str | None = None
+
+
+class FeedMJPEGTransportCapability(BaseModel):
+    """MJPEG transport readiness for a single feed."""
+
+    enabled: bool = True
+    ready: bool = False
+    reason: str | None = None
+
+
+class FeedTransportCapabilities(BaseModel):
+    """Frontend-facing transport capability contract for one feed."""
+
+    backend_annotations: bool = False
+    webrtc: FeedWebRTCTransportCapability = Field(default_factory=FeedWebRTCTransportCapability)
+    mjpeg: FeedMJPEGTransportCapability = Field(default_factory=FeedMJPEGTransportCapability)
 
 
 class AlertModel(BaseModel):
@@ -214,6 +243,7 @@ class VideoFeed(BaseModel):
     zone: ZonePolygon | None = None
     queue_length_warning: int = Field(default=8, ge=0)
     latest_metrics: QueueMetricsModel | None = None
+    transport: FeedTransportCapabilities = Field(default_factory=FeedTransportCapabilities)
     last_error: str | None = None
     last_warning: str | None = None
     last_warning_code: str | None = None
@@ -411,6 +441,38 @@ class FeedSnapshotResult(BaseModel):
     height: int | None = Field(default=None, ge=0)
     image_data_url: str | None = None
     error: str | None = None
+
+
+class WebRTCSessionDescription(BaseModel):
+    """WebRTC session description used for browser-to-gateway signaling."""
+
+    type: WebRTCSessionType
+    sdp: str = Field(min_length=1, max_length=40000)
+
+    @field_validator("sdp")
+    @classmethod
+    def validate_sdp_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("SDP must not be blank.")
+        return value
+
+
+class FeedWebRTCOfferRequest(BaseModel):
+    """Frontend offer payload proxied to the MediaMTX WebRTC gateway."""
+
+    offer: WebRTCSessionDescription
+
+    @model_validator(mode="after")
+    def validate_offer_type(self) -> "FeedWebRTCOfferRequest":
+        if self.offer.type != "offer":
+            raise ValueError("Offer description type must be 'offer'.")
+        return self
+
+
+class FeedWebRTCOfferResponse(BaseModel):
+    """Gateway answer returned to the browser for WebRTC preview."""
+
+    answer: WebRTCSessionDescription
 
 
 class ONVIFDiscoveryRequest(BaseModel):

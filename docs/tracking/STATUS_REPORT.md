@@ -1,8 +1,42 @@
 # Queue Wait-Time Estimation System - Status Report
 
-**Last Updated:** March 31, 2026
+**Last Updated:** April 7, 2026
 
-> Note: This file is a cumulative status log. Some older sections preserve historical context from before the `backend/` + `frontend/` restructure and may reference legacy paths. For the current runtime contract, use `README.md` and `docs/API_FOR_FRONTEND.md`.
+> Note: This file is a cumulative status log. Some older sections preserve historical context from before the `backend/` + `frontend/` restructure and may reference legacy paths. For the current runtime contract, use `../../README.md`, `../API_FOR_FRONTEND.md`, and `../WEBRTC_PREVIEW_SETUP.md`.
+
+## ✅ FIXED: WebRTC-First Live Transport Layer
+
+### Overview
+Implemented a WebRTC-first transport path for running RTSP feeds in the web dashboard while keeping MJPEG as the live fallback path.
+
+### What Changed
+- **Backend feed transport contract**
+  - Added `GET /api/feeds/{feed_id}/transport`.
+  - Added `POST /api/feeds/{feed_id}/webrtc/offer`.
+  - Added explicit transport readiness and reason fields for frontend routing.
+- **Frontend playback routing**
+  - Running feed cards now attempt WebRTC first when capability is ready.
+  - MJPEG remains the fallback transport when WebRTC is unsupported, unavailable, or fails.
+  - Snapshot remains for zone/re-zoning and non-live preview workflows.
+- **Media relay integration**
+  - Added MediaMTX WHEP and Control API integration through backend env-configured endpoints.
+
+### Files Updated
+- `backend/src/api/app.py`
+- `backend/src/api/models.py`
+- `backend/src/api/runtime.py`
+- `backend/src/config.py`
+- `frontend/src/hooks/use-feed-webrtc.ts`
+- `frontend/src/components/dashboard/FeedGrid.tsx`
+- `frontend/src/lib/api.ts`
+- `backend/tests/test_api_app.py`
+- `frontend/src/hooks/use-feed-webrtc.test.tsx`
+- `frontend/src/components/dashboard/FeedGrid.test.tsx`
+
+### Verification
+- Backend API transport tests passed for feed-state/source gating and error-path handling.
+- Frontend tests passed for WebRTC hook behavior and playback fallback routing.
+- API contract and transport docs updated in `../API_FOR_FRONTEND.md` and `../WEBRTC_PREVIEW_SETUP.md`.
 
 ## ✅ FIXED: Runtime Smoothness, GPU Selection, And Playback Pacing
 

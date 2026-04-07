@@ -15,9 +15,11 @@ import sys
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
+from urllib.parse import quote, unquote, urlparse, urlunparse
 
 import cv2
 import numpy as np
+import requests
 from PIL import Image, ImageTk
 
 # Ensure the backend root is in sys.path so imports work from anywhere
@@ -32,6 +34,76 @@ DEFAULT_GUI_PROCESS_EVERY_N_FRAMES = max(
     int(os.getenv("QUEUE_GUI_PROCESS_EVERY_N_FRAMES", "1")),
 )
 DEFAULT_GUI_INFERENCE_DEVICE = os.getenv("QUEUE_INFERENCE_DEVICE", "auto").strip() or "auto"
+DEFAULT_GUI_MEDIAMTX_HOST = os.getenv("QUEUE_GUI_MEDIAMTX_HOST", "127.0.0.1").strip() or "127.0.0.1"
+try:
+    DEFAULT_GUI_MEDIAMTX_RTSP_PORT = int(os.getenv("QUEUE_GUI_MEDIAMTX_RTSP_PORT", "8554"))
+except ValueError:
+    DEFAULT_GUI_MEDIAMTX_RTSP_PORT = 8554
+try:
+    DEFAULT_GUI_MEDIAMTX_API_PORT = int(os.getenv("QUEUE_GUI_MEDIAMTX_API_PORT", "9997"))
+except ValueError:
+    DEFAULT_GUI_MEDIAMTX_API_PORT = 9997
+
+
+def _build_webrtc_relay_rtsp_url(host: str, rtsp_port: int, stream_name: str) -> str:
+    """Build the MediaMTX RTSP relay URL for a WebRTC stream name."""
+    normalized_stream = stream_name.strip().lstrip("/")
+    return f"rtsp://{host}:{rtsp_port}/{normalized_stream}"
+
+
+def _split_rtsp_url_credentials(url: str) -> tuple[str, str | None, str | None]:
+    """Return RTSP URL without userinfo plus extracted username/password."""
+    parsed = urlparse(url)
+    username = unquote(parsed.username) if parsed.username else None
+    password = unquote(parsed.password) if parsed.password else None
+
+    hostname = parsed.hostname or ""
+    if parsed.port:
+        hostname = f"{hostname}:{parsed.port}"
+
+    sanitized_url = urlunparse(parsed._replace(netloc=hostname))
+    return sanitized_url, username, password
+
+
+def _resolve_mediamtx_path_source(
+    *,
+    gateway_host: str,
+    stream_name: str,
+    api_port: int = DEFAULT_GUI_MEDIAMTX_API_PORT,
+    timeout_sec: float = 2.5,
+) -> tuple[str, str | None, str | None] | None:
+    """Resolve a configured MediaMTX path to its upstream RTSP source."""
+    normalized_stream = stream_name.strip().lstrip("/")
+    if not normalized_stream:
+        return None
+
+    endpoint = (
+        f"http://{gateway_host}:{api_port}"
+        f"/v3/config/paths/get/{quote(normalized_stream, safe='')}"
+    )
+
+    try:
+        response = requests.get(endpoint, timeout=timeout_sec)
+    except requests.RequestException:
+        return None
+
+    if response.status_code != 200:
+        return None
+
+    try:
+        payload = response.json()
+    except ValueError:
+        return None
+
+    source = payload.get("source") if isinstance(payload, dict) else None
+    if not isinstance(source, str):
+        return None
+
+    source = source.strip()
+    if not source.lower().startswith("rtsp://"):
+        return None
+
+    return _split_rtsp_url_credentials(source)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -254,6 +326,7 @@ class MainWindow:
         self.video_count = tk.IntVar(value=1)
         self.video_count.trace_add("write", self._on_video_count_change)
         self.video_paths: list[str] = []
+        self.source_protocol_map: dict[str, str] = {}
         self.current_video_index: int = 0
         self.zone_points_map: dict[str, list[list[int]]] = {}
         # Per-video job information: maps video path -> {"establishment_id", "caisse_id"}
@@ -285,6 +358,15 @@ class MainWindow:
         self.rtsp_pass_var = tk.StringVar()
         self.rtsp_transport_var = tk.StringVar(value="tcp")
         self.rtsp_status_var = tk.StringVar(value="")
+
+        # WebRTC (MediaMTX relay) form tk vars (populated in show_step1)
+        self.webrtc_stream_var = tk.StringVar()
+        self.webrtc_gateway_host_var = tk.StringVar(value=DEFAULT_GUI_MEDIAMTX_HOST)
+        self.webrtc_gateway_rtsp_port_var = tk.StringVar(value=str(DEFAULT_GUI_MEDIAMTX_RTSP_PORT))
+        self.webrtc_user_var = tk.StringVar()
+        self.webrtc_pass_var = tk.StringVar()
+        self.webrtc_transport_var = tk.StringVar(value="udp")
+        self.webrtc_status_var = tk.StringVar(value="")
 
         # Database hierarchy cache (will be populated on startup)
         self.db_hierarchy: dict = {}
@@ -469,7 +551,72 @@ class MainWindow:
                                            font=("Arial", 9))
         self.rtsp_status_label.grid(row=r, column=0, columnspan=5,
                                     sticky=tk.W, pady=(3, 0))
-        # Tab 3 – IP Camera Discovery
+
+        # Tab 3 – WebRTC (MediaMTX relay)
+        webrtc_tab = ttk.Frame(notebook, padding=8)
+        notebook.add(webrtc_tab, text="  WebRTC (MediaMTX)  ")
+
+        wr = 0
+        ttk.Label(webrtc_tab, text="Stream name:", font=("Arial", 9)).grid(
+            row=wr, column=0, sticky=tk.W, padx=(0, 5), pady=3)
+        ttk.Entry(webrtc_tab, textvariable=self.webrtc_stream_var, width=28,
+                  font=("Arial", 9)).grid(row=wr, column=1, sticky=tk.W, pady=3)
+        ttk.Label(webrtc_tab, text="e.g. cam_01 or checkout_lane_3",
+                  font=("Arial", 8), foreground="gray").grid(
+            row=wr, column=2, columnspan=3, sticky=tk.W, padx=(5, 0), pady=3)
+
+        wr += 1
+        ttk.Label(webrtc_tab, text="Gateway host:", font=("Arial", 9)).grid(
+            row=wr, column=0, sticky=tk.W, padx=(0, 5), pady=3)
+        ttk.Entry(webrtc_tab, textvariable=self.webrtc_gateway_host_var, width=20,
+                  font=("Arial", 9)).grid(row=wr, column=1, sticky=tk.W, pady=3)
+        ttk.Label(webrtc_tab, text="RTSP port:", font=("Arial", 9)).grid(
+            row=wr, column=2, sticky=tk.W, padx=(10, 5), pady=3)
+        ttk.Entry(webrtc_tab, textvariable=self.webrtc_gateway_rtsp_port_var, width=8,
+                  font=("Arial", 9)).grid(row=wr, column=3, sticky=tk.W, pady=3)
+
+        wr += 1
+        ttk.Label(webrtc_tab, text="Username:", font=("Arial", 9)).grid(
+            row=wr, column=0, sticky=tk.W, padx=(0, 5), pady=3)
+        ttk.Entry(webrtc_tab, textvariable=self.webrtc_user_var, width=18,
+                  font=("Arial", 9)).grid(row=wr, column=1, sticky=tk.W, pady=3)
+        ttk.Label(webrtc_tab, text="Password:", font=("Arial", 9)).grid(
+            row=wr, column=2, sticky=tk.W, padx=(10, 5), pady=3)
+        ttk.Entry(webrtc_tab, textvariable=self.webrtc_pass_var, width=18,
+                  show="*", font=("Arial", 9)).grid(row=wr, column=3, sticky=tk.W, pady=3)
+
+        wr += 1
+        ttk.Label(webrtc_tab, text="Transport:", font=("Arial", 9)).grid(
+            row=wr, column=0, sticky=tk.W, padx=(0, 5), pady=3)
+        ttk.Combobox(webrtc_tab, textvariable=self.webrtc_transport_var,
+                     values=["udp", "tcp"], state="readonly",
+                     width=6, font=("Arial", 9)).grid(row=wr, column=1, sticky=tk.W, pady=3)
+        ttk.Label(webrtc_tab, text="(udp = low-latency, tcp = reliable)",
+                  font=("Arial", 8), foreground="gray").grid(
+            row=wr, column=2, columnspan=3, sticky=tk.W, padx=(10, 0), pady=3)
+
+        wr += 1
+        ttk.Label(
+            webrtc_tab,
+            text="This mode resolves to rtsp://<host>:<port>/<stream> for detector input.",
+            font=("Arial", 8),
+            foreground="gray",
+        ).grid(row=wr, column=0, columnspan=5, sticky=tk.W, pady=(0, 4))
+
+        wr += 1
+        webrtc_btn_row = ttk.Frame(webrtc_tab)
+        webrtc_btn_row.grid(row=wr, column=0, columnspan=5, sticky=tk.W, pady=(4, 0))
+        ttk.Button(webrtc_btn_row, text="Test Connection",
+                   command=self._test_webrtc_from_form).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(webrtc_btn_row, text="+ Add WebRTC Source",
+                   command=self._add_webrtc_from_form).pack(side=tk.LEFT)
+
+        self.webrtc_status_label = ttk.Label(webrtc_tab, textvariable=self.webrtc_status_var,
+                                             font=("Arial", 9))
+        self.webrtc_status_label.grid(row=wr + 1, column=0, columnspan=5,
+                                      sticky=tk.W, pady=(3, 0))
+
+        # Tab 4 – IP Camera Discovery
         onvif_tab = ttk.Frame(notebook, padding=8)
         notebook.add(onvif_tab, text="  IP Camera Discovery  ")
 
@@ -552,6 +699,7 @@ class MainWindow:
         )
         if filename and filename not in self.video_paths:
             self.video_paths.append(filename)
+            self.source_protocol_map[filename] = "file"
             self._refresh_listbox()
 
     def _remove_video(self):
@@ -565,6 +713,9 @@ class MainWindow:
         idx = sel[0]
         path = self.video_paths.pop(idx)
         self.zone_points_map.pop(path, None)
+        self.video_metadata_map.pop(path, None)
+        self.rtsp_credentials.pop(path, None)
+        self.source_protocol_map.pop(path, None)
         self._refresh_listbox()
 
     def _refresh_listbox(self):
@@ -573,7 +724,10 @@ class MainWindow:
             return
         self.video_listbox.delete(0, tk.END)
         for i, p in enumerate(self.video_paths):
-            if p.lower().startswith("rtsp://"):
+            protocol = self.source_protocol_map.get(p)
+            if protocol == "webrtc":
+                label = f"{i+1}.  [WEBRTC] {p}"
+            elif p.lower().startswith("rtsp://"):
                 label = f"{i+1}.  [CAM] {p}"
             else:
                 label = f"{i+1}.  {Path(p).name}"
@@ -593,6 +747,7 @@ class MainWindow:
         self.video_paths.clear()
         self.zone_points_map.clear()
         self.rtsp_credentials.clear()
+        self.source_protocol_map.clear()
         self.video_path.set("")
         self._refresh_listbox()
 
@@ -627,9 +782,137 @@ class MainWindow:
             "password": self.rtsp_pass_var.get().strip() or None,
             "transport": self.rtsp_transport_var.get() or "tcp",
         }
+        self.source_protocol_map[url] = "rtsp"
         self.video_paths.append(url)
         self._refresh_listbox()
         self.rtsp_status_var.set("")
+
+    def _resolve_webrtc_form_to_rtsp_source(self) -> tuple[str, dict[str, str | None]] | None:
+        """Resolve the WebRTC form values into an RTSP source for analysis.
+
+        Prefers MediaMTX path upstream source when exposed by the control API,
+        and falls back to the local MediaMTX RTSP relay URL otherwise.
+        """
+        stream_name = self.webrtc_stream_var.get().strip()
+        if not stream_name:
+            messagebox.showerror("Missing stream", "Please enter a WebRTC stream name.")
+            return None
+
+        gateway_host = self.webrtc_gateway_host_var.get().strip()
+        if not gateway_host:
+            messagebox.showerror("Missing host", "Please enter the MediaMTX gateway host.")
+            return None
+
+        raw_port = self.webrtc_gateway_rtsp_port_var.get().strip()
+        try:
+            gateway_port = int(raw_port)
+        except ValueError:
+            messagebox.showerror("Invalid port", "RTSP port must be an integer.")
+            return None
+
+        if gateway_port < 1 or gateway_port > 65535:
+            messagebox.showerror("Invalid port", "RTSP port must be between 1 and 65535.")
+            return None
+
+        transport = (self.webrtc_transport_var.get().strip() or "udp").lower()
+        if transport not in {"udp", "tcp"}:
+            messagebox.showerror("Invalid transport", "Transport must be udp or tcp.")
+            return None
+
+        relay_source = _build_webrtc_relay_rtsp_url(gateway_host, gateway_port, stream_name)
+        creds = {
+            "username": self.webrtc_user_var.get().strip() or None,
+            "password": self.webrtc_pass_var.get().strip() or None,
+            "transport": transport,
+            "origin": "mediamtx-relay",
+        }
+
+        resolved_source = _resolve_mediamtx_path_source(
+            gateway_host=gateway_host,
+            stream_name=stream_name,
+        )
+        if resolved_source is not None:
+            direct_source, resolved_user, resolved_pass = resolved_source
+            relay_source = direct_source
+            if creds["username"] is None and resolved_user:
+                creds["username"] = resolved_user
+            if creds["password"] is None and resolved_pass:
+                creds["password"] = resolved_pass
+            creds["origin"] = "mediamtx-upstream"
+
+        return relay_source, creds
+
+    def _add_webrtc_from_form(self):
+        """Validate the WebRTC form and add the MediaMTX relay as a source."""
+        expected = self.video_count.get()
+        if len(self.video_paths) >= expected:
+            messagebox.showwarning(
+                "Limit reached",
+                f"You already have {expected} source(s) selected.\n"
+                "Remove one first or increase the count.",
+            )
+            return
+
+        resolved = self._resolve_webrtc_form_to_rtsp_source()
+        if resolved is None:
+            return
+
+        relay_source, creds = resolved
+        if relay_source in self.video_paths:
+            messagebox.showwarning("Duplicate", "This WebRTC relay source is already in the list.")
+            return
+
+        self.rtsp_credentials[relay_source] = creds
+        self.source_protocol_map[relay_source] = "webrtc"
+        self.video_paths.append(relay_source)
+        self._refresh_listbox()
+        self.webrtc_status_var.set("")
+
+    def _test_webrtc_from_form(self):
+        """Test the WebRTC MediaMTX relay (RTSP endpoint) entered in the form."""
+        resolved = self._resolve_webrtc_form_to_rtsp_source()
+        if resolved is None:
+            return
+
+        relay_source, creds = resolved
+        self.webrtc_status_var.set("Testing connection...")
+        if hasattr(self, "webrtc_status_label"):
+            self.webrtc_status_label.config(foreground="blue")
+        self.root.update_idletasks()
+
+        try:
+            from src.rtsp_camera import RTSPCamera
+            ok, info = RTSPCamera.test_connection(
+                relay_source,
+                username=creds.get("username"),
+                password=creds.get("password"),
+                transport=str(creds.get("transport") or "udp"),
+            )
+        except Exception as exc:
+            ok, info = False, {"error": str(exc)}
+
+        if ok:
+            resolved_mode = "upstream RTSP" if creds.get("origin") == "mediamtx-upstream" else "MediaMTX relay"
+            msg = (
+                f"Connection successful!\n\n"
+                f"Relay source: {relay_source}\n"
+                f"Mode        : {resolved_mode}\n"
+                f"Resolution  : {info['resolution']}\n"
+                f"FPS         : {info['fps']:.1f}\n"
+                f"Transport   : {info['transport']}"
+            )
+            self.webrtc_status_var.set(
+                f"OK  {info['resolution']} @ {info['fps']:.1f} FPS"
+            )
+            if hasattr(self, "webrtc_status_label"):
+                self.webrtc_status_label.config(foreground="green")
+            messagebox.showinfo("WebRTC Relay Test - OK", msg)
+        else:
+            err = info.get("error", "Unknown error")
+            self.webrtc_status_var.set(f"FAILED  {err}")
+            if hasattr(self, "webrtc_status_label"):
+                self.webrtc_status_label.config(foreground="red")
+            messagebox.showerror("WebRTC Relay Test - Failed", f"Could not connect:\n\n{err}")
 
     def _test_rtsp_from_form(self):
         """Test the RTSP URL entered in the form and show the result."""
@@ -937,6 +1220,7 @@ class MainWindow:
                         "password": credentials["password"],
                         "transport": "tcp",  # Default to TCP for reliability
                     }
+                    self.source_protocol_map[rtsp_url] = "rtsp"
                     self.video_paths.append(rtsp_url)
                     added_count += 1
                 else:
@@ -1357,8 +1641,14 @@ class MainWindow:
 
         # Per-video info
         for idx, path in enumerate(self.video_paths, start=1):
+            source_protocol = self.source_protocol_map.get(path)
             is_rtsp = path.lower().startswith("rtsp://")
-            kind = "Camera (RTSP)" if is_rtsp else "Video"
+            if source_protocol == "webrtc":
+                kind = "Camera (WebRTC via MediaMTX)"
+            elif is_rtsp:
+                kind = "Camera (RTSP)"
+            else:
+                kind = "Video"
             ttk.Label(summary_frame, text=f"Source {idx}  [{kind}]:",
                       font=("Arial", 10, "bold")).pack(anchor=tk.W, pady=(10, 2))
             ttk.Label(summary_frame, text=path,

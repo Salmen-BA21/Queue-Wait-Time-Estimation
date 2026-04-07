@@ -11,10 +11,11 @@ Run with::
 from __future__ import annotations
 
 import argparse
-import base64
 import json
 import logging
 import math
+import socket
+import struct
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -28,6 +29,7 @@ import supervision as sv
 
 from src.config import (
     AppConfig,
+    DEFAULT_CONFIDENCE,
     DEFAULT_INFERENCE_DEVICE,
     DEFAULT_DETECTOR_IMAGE_SIZE,
     DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY,
@@ -36,6 +38,7 @@ from src.config import (
     DEFAULT_PROCESS_EVERY_N_FRAMES,
     DEFAULT_REALTIME_FILE_PLAYBACK,
     DASHBOARD_EVENT_EMIT_INTERVAL_SEC,
+    DASHBOARD_FRAME_EMIT_INTERVAL_SEC,
     WINDOW_NAME,
     N8N_WEBHOOK_URL,
     N8N_WEBHOOK_SECRET,
@@ -77,6 +80,74 @@ class DashboardEventWriter:
     def close(self) -> None:
         if self._stream is not None and not self._stream.closed:
             self._stream.close()
+
+
+class DashboardFrameChannelClient:
+    """Pushes encoded dashboard frames to the API runtime over a local binary socket."""
+
+    def __init__(self, *, host: str | None, port: int | None, token: str | None) -> None:
+        self._host = host.strip() if isinstance(host, str) else ""
+        self._port = int(port) if isinstance(port, int) else None
+        self._token = token.strip() if isinstance(token, str) else ""
+        self._socket: socket.socket | None = None
+
+    @property
+    def configured(self) -> bool:
+        return bool(self._host and self._port and self._token)
+
+    def send_frame(self, frame_bytes: bytes) -> None:
+        if not self.configured or not frame_bytes:
+            return
+
+        if self._socket is None and not self._connect():
+            return
+
+        payload = struct.pack(">I", len(frame_bytes)) + frame_bytes
+        sock = self._socket
+        if sock is None:
+            return
+
+        try:
+            sock.sendall(payload)
+        except OSError:
+            self._close_socket()
+
+    def close(self) -> None:
+        self._close_socket()
+
+    def _connect(self) -> bool:
+        if not self.configured:
+            return False
+
+        port = self._port
+        if port is None:
+            return False
+
+        try:
+            sock = socket.create_connection((self._host, port), timeout=0.4)
+            sock.settimeout(0.4)
+            token_bytes = self._token.encode("utf-8")
+            if len(token_bytes) > 65535:
+                sock.close()
+                return False
+
+            sock.sendall(struct.pack(">H", len(token_bytes)) + token_bytes)
+            self._socket = sock
+            return True
+        except OSError:
+            self._close_socket()
+            return False
+
+    def _close_socket(self) -> None:
+        if self._socket is None:
+            return
+
+        try:
+            self._socket.close()
+        except OSError:
+            pass
+        finally:
+            self._socket = None
 
 
 @dataclass(frozen=True)
@@ -227,6 +298,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--confidence",
+        type=float,
+        default=DEFAULT_CONFIDENCE,
+        help=(
+            "Detector confidence threshold (0-1). "
+            f"Lower values can recover more RTSP detections. (default: {DEFAULT_CONFIDENCE:.2f})"
+        ),
+    )
+    parser.add_argument(
         "--process-every-n-frames",
         type=int,
         default=DEFAULT_PROCESS_EVERY_N_FRAMES,
@@ -372,6 +452,24 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--dashboard-frame-channel-host",
+        type=str,
+        default=None,
+        help="Optional host for local binary dashboard frame transport.",
+    )
+    parser.add_argument(
+        "--dashboard-frame-channel-port",
+        type=int,
+        default=None,
+        help="Optional TCP port for local binary dashboard frame transport.",
+    )
+    parser.add_argument(
+        "--dashboard-frame-channel-token",
+        type=str,
+        default=None,
+        help="Optional shared token used to authenticate the binary dashboard frame channel.",
+    )
+    parser.add_argument(
         "--headless",
         action="store_true",
         help="Run without opening any GUI windows (cv2.imshow). (default: False)",
@@ -449,6 +547,11 @@ def run(cfg: AppConfig) -> None:
         webhook_client = WebhookClient(N8N_WEBHOOK_URL, webhook_secret=N8N_WEBHOOK_SECRET) if cfg.webhook_enabled else None
         webhook_dispatcher = AsyncWebhookDispatcher(webhook_client) if webhook_client else None
         event_writer = DashboardEventWriter(cfg.events_file)
+        frame_channel = DashboardFrameChannelClient(
+            host=cfg.dashboard_frame_channel_host,
+            port=cfg.dashboard_frame_channel_port,
+            token=cfg.dashboard_frame_channel_token,
+        )
 
         # Multi-stream identity for webhook payloads; fallback to source string
         feed_identifier = (
@@ -475,6 +578,7 @@ def run(cfg: AppConfig) -> None:
         last_log_time = time.monotonic()
         last_webhook_time = time.monotonic()
         last_dashboard_event_time = time.monotonic()
+        last_dashboard_frame_time = time.monotonic()
         last_warning_message: str | None = None
         last_warning_webhook_time = 0.0
         frame_count = 0
@@ -594,32 +698,37 @@ def run(cfg: AppConfig) -> None:
 
                 # 7. Periodic logging and event emission
                 now = time.monotonic()
+                if (
+                    cfg.dashboard_render_frames
+                    and frame_channel.configured
+                    and (now - last_dashboard_frame_time) >= DASHBOARD_FRAME_EMIT_INTERVAL_SEC
+                ):
+                    if rendered_display_frame is not None:
+                        render_frame = rendered_display_frame
+                    else:
+                        render_frame = frame.copy()
+                        render_frame = draw_detections(render_frame, detections, annotators, labels)
+                        render_frame = zone_mgr.annotate(render_frame)
+                        render_frame = draw_metrics_overlay(render_frame, _metrics_dict(metrics))
+
+                        if cfg.resize_scale != 1.0:
+                            render_frame = cv2.resize(
+                                render_frame,
+                                (0, 0),
+                                fx=cfg.resize_scale,
+                                fy=cfg.resize_scale,
+                            )
+
+                    encoded_ok, encoded_frame = cv2.imencode(
+                        ".jpg",
+                        render_frame,
+                        [int(cv2.IMWRITE_JPEG_QUALITY), dashboard_jpeg_quality],
+                    )
+                    if encoded_ok:
+                        frame_channel.send_frame(encoded_frame.tobytes())
+                    last_dashboard_frame_time = now
+
                 if (now - last_dashboard_event_time) >= DASHBOARD_EVENT_EMIT_INTERVAL_SEC:
-                    render_frame_jpeg_base64: str | None = None
-                    if cfg.dashboard_render_frames:
-                        if rendered_display_frame is not None:
-                            render_frame = rendered_display_frame
-                        else:
-                            render_frame = frame.copy()
-                            render_frame = draw_detections(render_frame, detections, annotators, labels)
-                            render_frame = zone_mgr.annotate(render_frame)
-                            render_frame = draw_metrics_overlay(render_frame, _metrics_dict(metrics))
-
-                            if cfg.resize_scale != 1.0:
-                                render_frame = cv2.resize(
-                                    render_frame,
-                                    (0, 0),
-                                    fx=cfg.resize_scale,
-                                    fy=cfg.resize_scale,
-                                )
-
-                        encoded_ok, encoded_frame = cv2.imencode(
-                            ".jpg",
-                            render_frame,
-                            [int(cv2.IMWRITE_JPEG_QUALITY), dashboard_jpeg_quality],
-                        )
-                        if encoded_ok:
-                            render_frame_jpeg_base64 = base64.b64encode(encoded_frame.tobytes()).decode("ascii")
 
                     event_writer.emit(
                         "metrics_update",
@@ -628,7 +737,6 @@ def run(cfg: AppConfig) -> None:
                                 metrics,
                                 event_timestamp,
                                 detections,
-                                render_frame_jpeg_base64=render_frame_jpeg_base64,
                             )
                         },
                     )
@@ -707,6 +815,7 @@ def run(cfg: AppConfig) -> None:
             if webhook_client:
                 webhook_client.close()
             event_writer.close()
+            frame_channel.close()
 
     cv2.destroyAllWindows()
     logger.info("Pipeline finished. Processed %d frames.", frame_count)
@@ -816,7 +925,6 @@ def _dashboard_metrics_payload(
     m: QueueMetrics,
     timestamp: float,
     detections: sv.Detections | None = None,
-    render_frame_jpeg_base64: str | None = None,
 ) -> dict[str, object]:
     """Convert runtime metrics into the frontend websocket contract."""
     wait_time_seconds: float | None = m.estimated_wait_sec if m.queue_stable else None
@@ -846,7 +954,6 @@ def _dashboard_metrics_payload(
         "uncertainty_level": m.uncertainty_level,
         "queue_stable": m.queue_stable,
         "detections": det_list,
-        "render_frame_jpeg_base64": render_frame_jpeg_base64,
     }
 
 
@@ -882,6 +989,7 @@ def main() -> None:
     cfg = AppConfig(
         source=args.source,
         model_size=args.model_size,
+        confidence=max(0.05, min(0.95, float(args.confidence))),
         inference_device=(args.device or "auto").strip() or "auto",
         zone_points=zone_pts,
         output_fps=args.output_fps,
@@ -901,6 +1009,9 @@ def main() -> None:
         events_file=args.events_file,
         dashboard_render_frames=args.dashboard_render_frames,
         dashboard_frame_jpeg_quality=args.dashboard_frame_jpeg_quality,
+        dashboard_frame_channel_host=args.dashboard_frame_channel_host,
+        dashboard_frame_channel_port=args.dashboard_frame_channel_port,
+        dashboard_frame_channel_token=args.dashboard_frame_channel_token,
         headless=args.headless,
     )
 

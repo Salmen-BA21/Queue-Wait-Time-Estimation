@@ -122,6 +122,55 @@ class TestGetAnalysisCommands(unittest.TestCase):
         self.assertEqual(cmds, [])
         win.root.destroy()
 
+    # ── webrtc source via MediaMTX relay ────────────────────
+
+    def test_webrtc_relay_url_builder(self):
+        from backend.src.gui.app import _build_webrtc_relay_rtsp_url
+
+        relay = _build_webrtc_relay_rtsp_url("127.0.0.1", 8554, "checkout_lane_3")
+        self.assertEqual(relay, "rtsp://127.0.0.1:8554/checkout_lane_3")
+
+    def test_webrtc_source_builds_rtsp_command_with_credentials(self):
+        from backend.src.gui.app import _build_webrtc_relay_rtsp_url
+
+        win = self._make_window()
+        relay = _build_webrtc_relay_rtsp_url("127.0.0.1", 8554, "cam_01")
+        win.video_paths = [relay]
+        win.source_protocol_map[relay] = "webrtc"
+        win.rtsp_credentials[relay] = {
+            "username": "viewer",
+            "password": "secret",
+            "transport": "tcp",
+        }
+        win.model_size.set("s")
+        win.log_level.set("INFO")
+        win.queue_length_warning.set(7)
+
+        cmds = win.get_analysis_commands()
+        self.assertEqual(len(cmds), 1)
+
+        cmd = cmds[0]
+        self.assertEqual(cmd[cmd.index("--source") + 1], relay)
+        self.assertIn("--rtsp-user", cmd)
+        self.assertEqual(cmd[cmd.index("--rtsp-user") + 1], "viewer")
+        self.assertIn("--rtsp-pass", cmd)
+        self.assertEqual(cmd[cmd.index("--rtsp-pass") + 1], "secret")
+        self.assertIn("--rtsp-transport", cmd)
+        self.assertEqual(cmd[cmd.index("--rtsp-transport") + 1], "tcp")
+        self.assertEqual(cmd[cmd.index("--queue-length-warning") + 1], "7")
+        win.root.destroy()
+
+    def test_split_rtsp_url_credentials(self):
+        from backend.src.gui.app import _split_rtsp_url_credentials
+
+        sanitized, username, password = _split_rtsp_url_credentials(
+            "rtsp://viewer:secret@192.168.1.19:554/profile1"
+        )
+
+        self.assertEqual(sanitized, "rtsp://192.168.1.19:554/profile1")
+        self.assertEqual(username, "viewer")
+        self.assertEqual(password, "secret")
+
 
 if __name__ == "__main__":
     unittest.main()
