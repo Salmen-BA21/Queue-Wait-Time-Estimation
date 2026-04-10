@@ -1,0 +1,68 @@
+<mxfile host="app.diagrams.net" modified="2026-04-10T12:08:00.000Z" agent="GitHub Copilot" version="26.2.7" editor="draw.io">
+  <diagram id="sprint1-activity" name="Sprint1 Activity">
+    <mxGraphModel dx="1200" dy="700" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Sprint 1 Activity Flow - Frame Ingestion to Queue-Zone Updates" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="340" y="30" width="760" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="start" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="120" y="300" width="30" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="a1" value="Open video source\n(file/webcam/RTSP)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="200" y="270" width="190" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" value="Read next frame" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="450" y="270" width="170" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="d1" value="Frame valid?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="680" y="275" width="140" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="a3" value="Run person detection\n(YOLO)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="880" y="270" width="180" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="a4" value="Update tracker\n(ByteTrack IDs)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="270" width="190" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="a5" value="Evaluate zone membership\n(PolygonZone)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="430" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="a6" value="Count in-zone tracker IDs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="860" y="430" width="210" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="a7" value="QueueAnalyzer.update()\n(arrivals/departures/rates)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="590" y="430" width="230" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="a8" value="Render overlays + emit runtime payload" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="320" y="430" width="220" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="d2" value="Continue loop?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="120" y="435" width="140" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="end" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="120" y="610" width="30" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e1" edge="1" parent="1" source="start" target="a1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="a1" target="a2" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="a2" target="d1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" value="Yes" edge="1" parent="1" source="d1" target="a3" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="a3" target="a4" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="a4" target="a5" style="endArrow=block;html=1;rounded=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="a5" target="a6" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="a6" target="a7" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="a7" target="a8" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e10" edge="1" parent="1" source="a8" target="d2" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e11" value="Yes" edge="1" parent="1" source="d2" target="a2" style="endArrow=block;html=1;rounded=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e12" value="No" edge="1" parent="1" source="d2" target="end" style="endArrow=block;html=1;rounded=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e13" value="No" edge="1" parent="1" source="d1" target="end" style="endArrow=block;html=1;strokeColor=#b85450;"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

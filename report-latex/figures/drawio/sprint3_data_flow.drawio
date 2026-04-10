@@ -1,0 +1,50 @@
+<mxfile host="app.diagrams.net" modified="2026-04-10T12:22:00.000Z" agent="GitHub Copilot" version="26.2.7" editor="draw.io">
+  <diagram id="sprint3-data-flow" name="Sprint3 Data Flow">
+    <mxGraphModel dx="1300" dy="760" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Sprint 3 Data Flow - Feeds to API and WebSocket Broadcast" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" vertex="1" parent="1"><mxGeometry x="380" y="20" width="820" height="30" as="geometry" /></mxCell>
+
+        <mxCell id="lane1" value="Onboarding/Test Flow" style="swimlane;horizontal=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="80" y="80" width="1640" height="230" as="geometry" /></mxCell>
+        <mxCell id="l1a" value="Frontend request\n(RTSP test / ONVIF discovery)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="140" y="150" width="220" height="90" as="geometry" /></mxCell>
+        <mxCell id="l1b" value="FastAPI endpoints" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="430" y="150" width="200" height="90" as="geometry" /></mxCell>
+        <mxCell id="l1c" value="RTSP/ONVIF adapters" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="700" y="150" width="210" height="90" as="geometry" /></mxCell>
+        <mxCell id="l1d" value="Validation result\nstatus + metadata" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="980" y="150" width="220" height="90" as="geometry" /></mxCell>
+        <mxCell id="l1e" value="Frontend setup UI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="1270" y="150" width="220" height="90" as="geometry" /></mxCell>
+
+        <mxCell id="lane2" value="Feed Control Flow" style="swimlane;horizontal=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="80" y="360" width="1640" height="250" as="geometry" /></mxCell>
+        <mxCell id="l2a" value="Dashboard action\ncreate/start/stop/restart" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="140" y="445" width="220" height="90" as="geometry" /></mxCell>
+        <mxCell id="l2b" value="/api/feeds/*" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="430" y="445" width="180" height="90" as="geometry" /></mxCell>
+        <mxCell id="l2c" value="FeedRegistry\nstate update" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="680" y="445" width="200" height="90" as="geometry" /></mxCell>
+        <mxCell id="l2d" value="Worker lifecycle\nspawn/stop/restart" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="950" y="445" width="210" height="90" as="geometry" /></mxCell>
+        <mxCell id="l2e" value="feed_status event" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="1230" y="445" width="170" height="90" as="geometry" /></mxCell>
+        <mxCell id="l2f" value="Dashboard state sync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="1470" y="445" width="210" height="90" as="geometry" /></mxCell>
+
+        <mxCell id="lane3" value="Runtime Event Flow" style="swimlane;horizontal=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="80" y="650" width="1640" height="250" as="geometry" /></mxCell>
+        <mxCell id="l3a" value="Per-frame analysis" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="180" y="735" width="180" height="90" as="geometry" /></mxCell>
+        <mxCell id="l3b" value="metrics_update\nalert_fired" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="460" y="735" width="180" height="90" as="geometry" /></mxCell>
+        <mxCell id="l3c" value="WebSocket broadcast" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="740" y="735" width="190" height="90" as="geometry" /></mxCell>
+        <mxCell id="l3d" value="Frontend merge cache" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="1030" y="735" width="190" height="90" as="geometry" /></mxCell>
+        <mxCell id="l3e" value="KPI cards / feed grid\nactivity timeline" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="1320" y="735" width="260" height="90" as="geometry" /></mxCell>
+
+        <mxCell id="e1" edge="1" parent="1" source="l1a" target="l1b" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="l1b" target="l1c" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="l1c" target="l1d" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="l1d" target="l1e" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e5" edge="1" parent="1" source="l2a" target="l2b" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="l2b" target="l2c" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="l2c" target="l2d" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="l2d" target="l2e" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="l2e" target="l2f" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e10" edge="1" parent="1" source="l3a" target="l3b" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e11" edge="1" parent="1" source="l3b" target="l3c" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e12" edge="1" parent="1" source="l3c" target="l3d" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e13" edge="1" parent="1" source="l3d" target="l3e" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

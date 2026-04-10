@@ -1,0 +1,49 @@
+<mxfile host="app.diagrams.net" modified="2026-04-10T12:35:00.000Z" agent="GitHub Copilot" version="26.2.7" editor="draw.io">
+  <diagram id="sprint6-data-flow" name="Sprint6 Data Flow">
+    <mxGraphModel dx="1300" dy="760" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Sprint 6 Alert Payload Flow - Metrics to Notification and Archival" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" vertex="1" parent="1"><mxGeometry x="360" y="20" width="900" height="30" as="geometry" /></mxCell>
+
+        <mxCell id="s1" value="Periodic queue metrics\n+ immediate warning dispatch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="100" y="260" width="230" height="100" as="geometry" /></mxCell>
+        <mxCell id="s2" value="Build QueuePayload\n(timestamp, metrics, uncertainty, alerts)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="390" y="260" width="260" height="100" as="geometry" /></mxCell>
+        <mxCell id="s3" value="POST to n8n webhook\n(retry + secret header)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="710" y="260" width="240" height="100" as="geometry" /></mxCell>
+        <mxCell id="s4" value="Validate webhook secret" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="1020" y="260" width="220" height="100" as="geometry" /></mxCell>
+        <mxCell id="d1" value="Authorized?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="1300" y="270" width="130" height="80" as="geometry" /></mxCell>
+        <mxCell id="unauth" value="Reject 401" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="1490" y="140" width="170" height="80" as="geometry" /></mxCell>
+
+        <mxCell id="d2" value="Has alerts?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="1490" y="320" width="150" height="90" as="geometry" /></mxCell>
+        <mxCell id="ack" value="Acknowledge only\n(no outbound alert)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="1720" y="320" width="170" height="90" as="geometry" /></mxCell>
+
+        <mxCell id="split" value="Split alerts\n(per item)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="1490" y="500" width="170" height="90" as="geometry" /></mxCell>
+        <mxCell id="d3" value="Cooldown passed?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="1710" y="505" width="150" height="80" as="geometry" /></mxCell>
+        <mxCell id="suppress" value="Suppress duplicate\n(alert cooldown)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="1710" y="640" width="170" height="85" as="geometry" /></mxCell>
+        <mxCell id="format" value="Format Telegram message\nby severity" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="1470" y="640" width="200" height="85" as="geometry" /></mxCell>
+        <mxCell id="send" value="Send Telegram alert" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="1470" y="760" width="200" height="85" as="geometry" /></mxCell>
+
+        <mxCell id="archive" value="Archive alert payload\n/api/alerts/archive" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="1230" y="760" width="200" height="85" as="geometry" /></mxCell>
+        <mxCell id="end" value="Return 200 OK" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="1080" y="880" width="170" height="75" as="geometry" /></mxCell>
+
+        <mxCell id="e1" edge="1" parent="1" source="s1" target="s2" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="s2" target="s3" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="s3" target="s4" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="s4" target="d1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" value="No" edge="1" parent="1" source="d1" target="unauth" style="endArrow=block;html=1;strokeColor=#b85450;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" value="Yes" edge="1" parent="1" source="d1" target="d2" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" value="No" edge="1" parent="1" source="d2" target="ack" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e8" value="Yes" edge="1" parent="1" source="d2" target="split" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="split" target="d3" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e10" value="No" edge="1" parent="1" source="d3" target="suppress" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e11" value="Yes" edge="1" parent="1" source="d3" target="format" style="endArrow=block;html=1;strokeColor=#b85450;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e12" edge="1" parent="1" source="format" target="send" style="endArrow=block;html=1;strokeColor=#b85450;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e13" edge="1" parent="1" source="send" target="archive" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e14" edge="1" parent="1" source="archive" target="end" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e15" edge="1" parent="1" source="ack" target="end" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e16" edge="1" parent="1" source="suppress" target="end" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e17" edge="1" parent="1" source="unauth" target="end" style="endArrow=block;html=1;dashed=1;strokeColor=#999999;"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,36 @@
+<mxfile host="app.diagrams.net" modified="2026-04-10T12:13:00.000Z" agent="GitHub Copilot" version="26.2.7" editor="draw.io">
+  <diagram id="sprint2-data-flow" name="Sprint2 Data Flow">
+    <mxGraphModel dx="1200" dy="700" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Sprint 2 Data Flow - Events to Queue Metrics and Confidence Intervals" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" vertex="1" parent="1"><mxGeometry x="320" y="30" width="920" height="30" as="geometry" /></mxCell>
+
+        <mxCell id="in1" value="Frame-level\ntracker IDs in zone" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="90" y="230" width="180" height="90" as="geometry" /></mxCell>
+        <mxCell id="p1" value="Detect ID transitions\n(entry / exit)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="320" y="230" width="200" height="90" as="geometry" /></mxCell>
+        <mxCell id="d1" value="Arrival/departure\nevent windows" style="shape=mxgraph.basic.cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1"><mxGeometry x="570" y="220" width="190" height="110" as="geometry" /></mxCell>
+        <mxCell id="p2" value="Estimate rates\n(lambda, mu)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="820" y="230" width="180" height="90" as="geometry" /></mxCell>
+        <mxCell id="p3" value="Wait-time logic\n(stable / fallback)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="1050" y="230" width="190" height="90" as="geometry" /></mxCell>
+        <mxCell id="p4" value="Estimate uncertainty\n(CI for rates and wait)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="1290" y="230" width="220" height="90" as="geometry" /></mxCell>
+
+        <mxCell id="out1" value="QueueMetrics object\n- people_in_zone\n- arrival_rate / service_rate\n- wait_time_seconds\n- queue_stable\n- uncertainty fields" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1"><mxGeometry x="1540" y="200" width="220" height="150" as="geometry" /></mxCell>
+
+        <mxCell id="out2" value="Overlay / dashboard\nupdates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="1310" y="430" width="190" height="90" as="geometry" /></mxCell>
+        <mxCell id="out3" value="CSV logging" style="shape=mxgraph.basic.cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1"><mxGeometry x="1550" y="430" width="170" height="90" as="geometry" /></mxCell>
+        <mxCell id="out4" value="Webhook payload\nfor alerts/automation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="1090" y="430" width="180" height="90" as="geometry" /></mxCell>
+
+        <mxCell id="e1" edge="1" parent="1" source="in1" target="p1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="p1" target="d1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="d1" target="p2" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="p2" target="p3" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="p2" target="p4" style="endArrow=block;html=1;dashed=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="p3" target="p4" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="p4" target="out1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="out1" target="out2" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="out1" target="out3" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e10" edge="1" parent="1" source="out1" target="out4" style="endArrow=block;html=1;strokeColor=#b85450;"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

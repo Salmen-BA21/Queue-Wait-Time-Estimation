@@ -1,0 +1,72 @@
+<mxfile host="app.diagrams.net" modified="2026-04-10T12:00:00.000Z" agent="GitHub Copilot" version="26.2.7" editor="draw.io">
+  <diagram id="global-use-case" name="Global Use Case">
+    <mxGraphModel dx="1200" dy="700" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Queue Wait-Time Estimation System" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="460" y="30" width="420" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="boundary" value="" style="rounded=0;whiteSpace=wrap;html=1;strokeColor=#666666;fillColor=#f5f5f5;" vertex="1" parent="1">
+          <mxGeometry x="340" y="80" width="900" height="760" as="geometry" />
+        </mxCell>
+
+        <mxCell id="actor_admin" value="Administrator" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="170" width="60" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="actor_operator" value="Operator" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="420" width="60" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="actor_manager" value="Manager" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1320" y="320" width="60" height="120" as="geometry" />
+        </mxCell>
+
+        <mxCell id="uc01" value="UC-01\nRegister and configure\nvideo feed source" style="ellipse;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="420" y="140" width="230" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="uc02" value="UC-02\nDefine or update\nqueue zone geometry" style="ellipse;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="760" y="140" width="230" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="uc03" value="UC-03\nMonitor live queue metrics\nand feed status" style="ellipse;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="420" y="320" width="230" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="uc04" value="UC-04\nReceive and interpret\nwarning/critical alerts" style="ellipse;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="760" y="320" width="230" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="uc05" value="UC-05\nReview trends and\nperformance indicators" style="ellipse;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="580" y="520" width="230" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="uc06" value="UC-06\nValidate automation\nworkflow behavior" style="ellipse;whiteSpace=wrap;html=1;align=center;verticalAlign=middle;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="580" y="690" width="230" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e_admin_01" edge="1" parent="1" source="actor_admin" target="uc01" style="endArrow=none;html=1;strokeColor=#666666;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_admin_02" edge="1" parent="1" source="actor_admin" target="uc02" style="endArrow=none;html=1;strokeColor=#666666;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_admin_06" edge="1" parent="1" source="actor_admin" target="uc06" style="endArrow=none;html=1;strokeColor=#666666;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e_operator_03" edge="1" parent="1" source="actor_operator" target="uc03" style="endArrow=none;html=1;strokeColor=#666666;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_operator_04" edge="1" parent="1" source="actor_operator" target="uc04" style="endArrow=none;html=1;strokeColor=#666666;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e_manager_05" edge="1" parent="1" source="actor_manager" target="uc05" style="endArrow=none;html=1;strokeColor=#666666;">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="group_note" value="Interaction groups:\nConfiguration, Monitoring, Analytics, Alert Handling" style="shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1020" y="580" width="200" height="120" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

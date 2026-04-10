@@ -1,0 +1,61 @@
+<mxfile host="app.diagrams.net" modified="2026-04-10T12:05:00.000Z" agent="GitHub Copilot" version="26.2.7" editor="draw.io">
+  <diagram id="sprint1-use-case" name="Sprint1 Use Case">
+    <mxGraphModel dx="1200" dy="700" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Sprint 1 - Detection and Tracking in Queue Zones" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="420" y="30" width="560" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="boundary" value="Perception Runtime" style="rounded=0;whiteSpace=wrap;html=1;strokeColor=#666666;fillColor=#f5f5f5;fontStyle=1;align=left;verticalAlign=top;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="330" y="90" width="920" height="760" as="geometry" />
+        </mxCell>
+
+        <mxCell id="actor_operator" value="Operator" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;" vertex="1" parent="1">
+          <mxGeometry x="130" y="220" width="60" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="actor_system" value="Queue Runtime" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1320" y="450" width="60" height="120" as="geometry" />
+        </mxCell>
+
+        <mxCell id="uc_cfg_source" value="Configure source\n(file/webcam/RTSP)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="420" y="150" width="250" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_cfg_zone" value="Define queue zone\npolygon" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="760" y="150" width="250" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_launch" value="Launch continuous\nanalysis" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="590" y="290" width="250" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_detect" value="Detect persons\n(YOLO)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="410" y="450" width="220" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_track" value="Associate stable IDs\n(ByteTrack)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="680" y="450" width="220" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_filter" value="Filter detections\ninside queue zone" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="960" y="450" width="220" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_update" value="Update queue state\nfor analytics" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="680" y="620" width="240" height="85" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e_op_source" edge="1" parent="1" source="actor_operator" target="uc_cfg_source" style="endArrow=none;html=1;strokeColor=#666666;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_op_zone" edge="1" parent="1" source="actor_operator" target="uc_cfg_zone" style="endArrow=none;html=1;strokeColor=#666666;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_op_launch" edge="1" parent="1" source="actor_operator" target="uc_launch" style="endArrow=none;html=1;strokeColor=#666666;"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e_runtime_detect" edge="1" parent="1" source="actor_system" target="uc_detect" style="endArrow=none;html=1;strokeColor=#666666;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_runtime_track" edge="1" parent="1" source="actor_system" target="uc_track" style="endArrow=none;html=1;strokeColor=#666666;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_runtime_filter" edge="1" parent="1" source="actor_system" target="uc_filter" style="endArrow=none;html=1;strokeColor=#666666;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_runtime_update" edge="1" parent="1" source="actor_system" target="uc_update" style="endArrow=none;html=1;strokeColor=#666666;"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="inc_detect" value="&lt;&lt;include&gt;&gt;" edge="1" parent="1" source="uc_launch" target="uc_detect" style="dashed=1;html=1;endArrow=open;strokeColor=#999999;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="inc_track" value="&lt;&lt;include&gt;&gt;" edge="1" parent="1" source="uc_detect" target="uc_track" style="dashed=1;html=1;endArrow=open;strokeColor=#999999;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="inc_filter" value="&lt;&lt;include&gt;&gt;" edge="1" parent="1" source="uc_track" target="uc_filter" style="dashed=1;html=1;endArrow=open;strokeColor=#999999;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="inc_update" value="&lt;&lt;include&gt;&gt;" edge="1" parent="1" source="uc_filter" target="uc_update" style="dashed=1;html=1;endArrow=open;strokeColor=#999999;"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
