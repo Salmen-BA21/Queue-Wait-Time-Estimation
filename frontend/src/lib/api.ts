@@ -124,6 +124,14 @@ export interface QueueThresholdUpdateInput {
   queue_length_warning: number;
 }
 
+export interface FeedSourceUpdateInput {
+  source: string;
+  rtsp_username?: string | null;
+  rtsp_password?: string | null;
+  rtsp_transport?: RTSPTransport | null;
+  restart_if_running?: boolean;
+}
+
 export interface SystemHealth {
   status: "ok" | "degraded";
   api_version: string;
@@ -654,6 +662,16 @@ export function updateFeedThresholds(feedId: string, input: QueueThresholdUpdate
   return fetchApi<VideoFeed>(`/api/feeds/${feedId}/thresholds`, {
     method: "POST",
     body: JSON.stringify(input),
+  });
+}
+
+export function updateFeedSource(feedId: string, input: FeedSourceUpdateInput): Promise<VideoFeed> {
+  return fetchApi<VideoFeed>(`/api/feeds/${feedId}/source`, {
+    method: "POST",
+    body: JSON.stringify({
+      ...input,
+      restart_if_running: input.restart_if_running ?? true,
+    }),
   });
 }
 

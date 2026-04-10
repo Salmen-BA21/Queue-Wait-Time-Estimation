@@ -1466,6 +1466,58 @@ class FeedRegistry:
         await self._broadcaster.broadcast_feed_event(action="updated", feed=model)
         return model
 
+    async def update_source(
+        self,
+        feed_id: str,
+        *,
+        source: str,
+        restart_if_running: bool = True,
+        rtsp_username: str | None = None,
+        set_rtsp_username: bool = False,
+        rtsp_password: str | None = None,
+        set_rtsp_password: bool = False,
+        rtsp_transport: Literal["tcp", "udp"] | None = None,
+        set_rtsp_transport: bool = False,
+    ) -> VideoFeed | None:
+        """Update a feed source and optionally restart the worker when running."""
+        normalized_source = source.strip()
+        if not normalized_source:
+            raise FeedStateError("Feed source must not be blank.")
+
+        async with self._lock:
+            record = self._feeds.get(feed_id)
+            if record is None:
+                return None
+
+            record.source = normalized_source
+
+            if set_rtsp_username:
+                record.rtsp_username = rtsp_username
+            if set_rtsp_password:
+                record.rtsp_password = rtsp_password
+            if set_rtsp_transport:
+                record.rtsp_transport = rtsp_transport
+
+            if record.source.lower().startswith("rtsp://") and record.rtsp_password and not record.rtsp_username:
+                raise FeedStateError("RTSP username is required when RTSP password is provided.")
+
+            record.updated_at = utc_now()
+            model = record.to_model()
+            should_restart = (
+                restart_if_running
+                and record.worker is not None
+                and self._runner.poll(record.worker) is None
+            )
+
+        await self._persist_record(record)
+
+        if should_restart:
+            await self.restart_feed(feed_id)
+            return await self.get_feed(feed_id)
+
+        await self._broadcaster.broadcast_feed_event(action="updated", feed=model)
+        return model
+
     async def start_feed(
         self,
         feed_id: str,

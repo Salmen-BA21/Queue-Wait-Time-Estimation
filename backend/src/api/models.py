@@ -261,6 +261,29 @@ class QueueThresholdUpdateRequest(BaseModel):
     queue_length_warning: int = Field(ge=0)
 
 
+class FeedSourceUpdateRequest(BaseModel):
+    """Payload used to update a feed source after onboarding (for example IP changes)."""
+
+    source: str = Field(min_length=1, max_length=512)
+    rtsp_username: str | None = Field(default=None, max_length=120)
+    rtsp_password: str | None = Field(default=None, max_length=120)
+    rtsp_transport: RTSPTransport | None = None
+    restart_if_running: bool = True
+
+    @field_validator("source")
+    @classmethod
+    def validate_source_not_blank(cls, value: str) -> str:
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("Source must not be blank.")
+        return trimmed
+
+    @field_validator("rtsp_username", "rtsp_password")
+    @classmethod
+    def normalize_optional_rtsp_credentials(cls, value: str | None) -> str | None:
+        return _normalize_optional_string(value)
+
+
 class CreateFeedRequest(BaseModel):
     """Payload to register a new video feed."""
 

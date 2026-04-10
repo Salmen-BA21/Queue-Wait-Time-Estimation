@@ -517,6 +517,75 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertEqual(started["rtsp_password"], "topsecret")
         self.assertEqual(started["rtsp_transport"], "udp")
 
+    def test_update_feed_source_restarts_running_feed_and_preserves_credentials(self) -> None:
+        create_response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "DHCP Camera",
+                "source": "rtsp://192.168.1.19/live/main",
+                "rtsp_username": "operator",
+                "rtsp_password": "topsecret",
+                "rtsp_transport": "udp",
+            },
+        )
+        self.assertEqual(create_response.status_code, 201)
+        feed = create_response.json()["data"]
+
+        start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
+        self.assertEqual(start_response.status_code, 200)
+
+        update_response = self.client.post(
+            f"/api/feeds/{feed['feed_id']}/source",
+            json={
+                "source": "rtsp://192.168.1.13/live/main",
+            },
+        )
+        self.assertEqual(update_response.status_code, 200)
+        updated = update_response.json()["data"]
+        self.assertEqual(updated["source"], "rtsp://192.168.1.13/live/main")
+
+        self.assertEqual(self.runner.started.count(feed["feed_id"]), 2)
+        self.assertIn(feed["feed_id"], self.runner.stopped)
+        restarted = self.runner.started_config[feed["feed_id"]]
+        self.assertEqual(restarted["source"], "rtsp://192.168.1.13/live/main")
+        self.assertEqual(restarted["rtsp_username"], "operator")
+        self.assertEqual(restarted["rtsp_password"], "topsecret")
+        self.assertEqual(restarted["rtsp_transport"], "udp")
+
+    def test_update_feed_source_rejects_password_without_username(self) -> None:
+        create_response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "Credential Camera",
+                "source": "rtsp://192.168.1.30/live/main",
+            },
+        )
+        self.assertEqual(create_response.status_code, 201)
+        feed = create_response.json()["data"]
+
+        update_response = self.client.post(
+            f"/api/feeds/{feed['feed_id']}/source",
+            json={
+                "source": "rtsp://192.168.1.13/live/main",
+                "rtsp_password": "secret",
+            },
+        )
+        self.assertEqual(update_response.status_code, 409)
+        self.assertEqual(
+            update_response.json()["detail"],
+            "RTSP username is required when RTSP password is provided.",
+        )
+
+    def test_update_feed_source_returns_not_found_for_missing_feed(self) -> None:
+        response = self.client.post(
+            "/api/feeds/missing-feed/source",
+            json={
+                "source": "rtsp://192.168.1.13/live/main",
+            },
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["detail"], "Feed not found.")
+
     def test_batch_launch_serializes_zone_and_rtsp_credentials(self) -> None:
         zone = ZonePolygon.model_validate(
             {

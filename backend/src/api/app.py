@@ -29,6 +29,7 @@ from src.api.models import (
     Establishment,
     FeedWebRTCOfferRequest,
     FeedWebRTCOfferResponse,
+    FeedSourceUpdateRequest,
     FeedTransportCapabilities,
     FeedSnapshotResult,
     FeedSnapshotEvent,
@@ -1027,6 +1028,36 @@ async def update_feed_thresholds(feed_id: str, request: QueueThresholdUpdateRequ
     if feed is None:
         raise HTTPException(status_code=404, detail="Feed not found.")
     return ApiResponse(data=feed, message="Feed thresholds updated successfully.")
+
+
+@app.post("/api/feeds/{feed_id}/source", response_model=ApiResponse[VideoFeed])
+async def update_feed_source(feed_id: str, request: FeedSourceUpdateRequest) -> ApiResponse[VideoFeed]:
+    fields_set = request.model_fields_set
+
+    try:
+        feed = await get_registry().update_source(
+            feed_id,
+            source=request.source,
+            restart_if_running=request.restart_if_running,
+            rtsp_username=request.rtsp_username,
+            set_rtsp_username="rtsp_username" in fields_set,
+            rtsp_password=request.rtsp_password,
+            set_rtsp_password="rtsp_password" in fields_set,
+            rtsp_transport=request.rtsp_transport,
+            set_rtsp_transport="rtsp_transport" in fields_set,
+        )
+    except FeedStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except FeedStartError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if feed is None:
+        raise HTTPException(status_code=404, detail="Feed not found.")
+
+    message = "Feed source updated successfully."
+    if request.restart_if_running:
+        message = "Feed source updated successfully (worker restart applied when running)."
+    return ApiResponse(data=feed, message=message)
 
 
 @app.get("/api/system/health", response_model=ApiResponse[SystemHealth])
