@@ -10,7 +10,7 @@ The Sprint 3 backlog addressed four integration tracks:
     \item RTSP connectivity with authentication, transport control, reconnection, and snapshots.
     \item ONVIF discovery and stream resolution for IP camera onboarding.
     \item REST API endpoints for feed CRUD, metadata management, and diagnostics.
-    \item Real-time delivery through websocket events and MJPEG feed streaming.
+    \item Real-time delivery through websocket events and tiered video transport (WebRTC primary, MJPEG fallback, snapshots for zone workflows).
 \end{itemize}
 
 \section{Design}
@@ -59,10 +59,34 @@ The API layer is implemented in \texttt{backend/src/api/app.py}, with typed mode
 \begin{itemize}
     \item feed management (create/list/start/stop/restart/delete),
     \item source onboarding (RTSP test/snapshot, ONVIF discovery/streams/test),
-    \item metadata (establishments and caisses),
+    \item metadata (establishments and cashiers),
     \item integration and health (webhook status/test, system health),
-    \item live channels (websocket and MJPEG stream endpoint).
+    \item live transport channels (websocket, transport capability endpoint, WebRTC signaling endpoint, and MJPEG stream endpoint).
 \end{itemize}
+
+\subsection{Transport Capability and WebRTC Signaling}
+To reduce end-to-end viewing latency while preserving backward compatibility, Sprint 3 now exposes a capability-driven transport contract aligned with WebRTC signaling standards \cite{webrtc_w3c,ietf_rfc8830}.
+
+The endpoint \texttt{/api/feeds/\{feed\_id\}/transport} returns per-feed \texttt{FeedTransportCapabilities} with both \texttt{webrtc} and \texttt{mjpeg} readiness fields. The frontend consumes this contract to decide transport routing:
+\begin{itemize}
+    \item \texttt{enabled}: feature-level availability,
+    \item \texttt{ready}: runtime readiness for immediate use,
+    \item \texttt{source\_mode}: \texttt{direct}, \texttt{annotated}, or \texttt{none},
+    \item \texttt{reason}: machine-readable explanation when transport is unavailable.
+\end{itemize}
+
+When WebRTC is ready, the endpoint \texttt{/api/feeds/\{feed\_id\}/webrtc/offer} accepts a browser SDP offer and proxies it to MediaMTX WHEP, then returns the SDP answer \cite{mediamtx_docs}. The backend validates feed existence, running state, and RTSP-source eligibility before proxying.
+
+Operational status semantics are explicit:
+\begin{itemize}
+    \item \texttt{200}: offer accepted and SDP answer returned,
+    \item \texttt{404}: feed not found,
+    \item \texttt{409}: feed not running, unsupported source, or transport not ready,
+    \item \texttt{422}: invalid SDP payload,
+    \item \texttt{502}/\texttt{503}: upstream or service-availability failures.
+\end{itemize}
+
+In \texttt{direct} mode, backend runtime can ensure MediaMTX path configuration through the control API before offer proxying. Environment-driven configuration (WHEP URL, control URL, timeout, and feature flag) keeps deployment adaptable without changing API contracts.
 
 \subsection{Runtime Orchestration and Real-Time Events}
 Runtime control resides in \texttt{backend/src/api/runtime.py}. \texttt{FeedRegistry} manages feed state, persistence sync, worker process lifecycle, and event dispatch. The worker command launches \texttt{src.main} in headless mode and writes event JSONL. \texttt{WebSocketHub} broadcasts standardized events:
@@ -74,4 +98,4 @@ For video surfaces, \texttt{FeedFrameStreamManager} supports shared MJPEG buffer
 \texttt{backend/src/database.py} provides SQLite persistence for feed configuration, metadata, video sessions, and archived alerts. On API startup, persisted feeds are restored and stale running sessions are safely recovered to a stopped state.
 
 \section{Conclusion}
-Sprint 3 delivered the system connectivity layer and formal service contract required by the web application. With source onboarding, runtime orchestration, and typed API/websocket channels in place, the project was ready for full web UI integration and operational workflows.
+Sprint 3 delivered the system connectivity layer and formal service contract required by the web application. With source onboarding, runtime orchestration, typed API/websocket channels, and capability-driven WebRTC signaling in place, the project was ready for full web UI integration and operational workflows.

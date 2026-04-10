@@ -19,8 +19,8 @@ Sprint 7 backlog included:
 \subsection{Test Plan}
 Validation followed a layered strategy:
 \begin{itemize}
-	\item \textbf{Backend unit/integration tests:} uncertainty, API endpoints, runtime streaming behavior, webhook payload handling.
-	\item \textbf{Frontend integration tests:} dashboard setup flow, websocket event handling, and API error handling.
+	\item \textbf{Backend unit/integration tests:} uncertainty, API endpoints (including transport capability and WebRTC signaling), runtime streaming behavior, webhook payload handling.
+	\item \textbf{Frontend integration tests:} dashboard setup flow, websocket event handling, WebRTC lifecycle/fallback behavior, and API error handling.
 	\item \textbf{Scenario tests:} n8n send/acknowledge flows, unauthorized branch, and multi-feed alert scenarios.
 \end{itemize}
 
@@ -37,11 +37,11 @@ The optimization metrics were aligned with operational requirements:
 \subsection{Automated Test Coverage}
 Representative test assets include:
 \begin{itemize}
-	\item backend: \texttt{backend/tests/test\_api\_app.py}, \texttt{test\_runtime\_streams.py}, \texttt{test\_webhook.py},
+	\item backend: \texttt{backend/tests/test\_api\_app.py} (transport capability and WebRTC offer endpoint cases), \texttt{test\_runtime\_streams.py}, \texttt{test\_webhook.py},
 	\item backend/root: \texttt{test\_uncertainty.py},
-	\item frontend: \texttt{frontend/src/pages/Dashboard.integration.test.tsx}, \texttt{frontend/src/hooks/use-live-dashboard.test.tsx}, \texttt{frontend/src/lib/api.test.ts}.
+	\item frontend: \texttt{frontend/src/pages/Dashboard.integration.test.tsx}, \texttt{frontend/src/hooks/use-live-dashboard.test.tsx}, \texttt{frontend/src/lib/api.test.ts}, \texttt{frontend/src/hooks/use-feed-webrtc.test.tsx}, \texttt{frontend/src/components/dashboard/FeedGrid.test.tsx}.
 \end{itemize}
-These tests verify API envelopes, event contracts, stream handoff, uncertainty calculations, and setup-workflow behavior.
+These tests verify API envelopes, event contracts, WebRTC signaling and fallback paths, stream handoff, uncertainty calculations, and setup-workflow behavior.
 
 \subsection{Runtime Optimization Actions}
 Key optimizations implemented in \texttt{backend/src/main.py} and \texttt{backend/src/config.py} include:

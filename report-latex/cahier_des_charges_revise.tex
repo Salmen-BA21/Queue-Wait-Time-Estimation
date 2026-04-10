@@ -56,7 +56,7 @@ Technologies effectivement utilisées dans le projet (extrait de `requirements.t
   \item GUI : `tkinter` (interface locale) et `Pillow` (PIL) pour gestion d'images.
   \item Intégration & webhooks : `requests` pour envoi d'alertes HTTP.
   \item Outils dev / visualisation : `jupyter`, `matplotlib`.
-  \item Stockage : exports CSV (via `csv_logger`), option SQLite pour historisation.
+  \item Stockage : base SQLite comme source unique pour historisation.
 \end{itemize}
 
 \paragraph{Site web / API}
@@ -76,7 +76,7 @@ La solution se compose des modules suivants :
   \item \texttt{gui} / \texttt{dashboard} : affichage en temps réel et historisation.
   \item \texttt{api} / \texttt{backend} : API REST et services temps réel (WebSocket/SSE) exposant métriques, historiques et contrôles.
   \item \texttt{frontend} : application web (React/Vue) ou prototype Streamlit consommant l'API pour supervision distante.
-  \item \texttt{csv\\_logger} : export et stockage des métriques pour analyse offline.
+  \item \texttt{database} : stockage des métriques et métadonnées pour analyse offline.
 \end{itemize}
 
 \section{Méthodologie de conception adoptée}
@@ -98,7 +98,7 @@ L'architecture proposée comprend :
   \item Acquisition vidéo (RTSP/MP4) \rightarrow Prétraitement des frames.
   \item Module de détection \rightarrow Module de tracking \rightarrow Zone Manager (génération d'événements).
   \item Queue Analyzer et Uncertainty Engine qui calculent indicateurs et intervalles.
-  \item Notifier/Rules Engine qui déclenche alertes (webhook/email) et stocke métriques via CSV/DB.
+  \item Notifier/Rules Engine qui déclenche alertes (webhook/email) et stocke métriques via SQLite/DB.
   \item Dashboard (GUI) qui consomme API pour affichage temps réel et historiques.
 \end{itemize}
 

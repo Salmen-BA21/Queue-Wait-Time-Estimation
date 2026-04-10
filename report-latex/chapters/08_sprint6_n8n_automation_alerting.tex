@@ -48,7 +48,7 @@ Data flow starts with periodic metrics dispatch from the runtime loop, branches 
 The module includes payload validation before dispatch.
 
 \subsection{Reliable Webhook Delivery}
-\texttt{backend/src/webhook\_client.py} sends payloads to n8n with timeout, retry policy, optional shared-secret header, and success/failure statistics. Each payload is also written to local CSV through \texttt{CSVMetricsLogger} as a backup persistence path.
+\texttt{backend/src/webhook\_client.py} sends payloads to n8n with timeout, retry policy, optional shared-secret header, and success/failure statistics. Payload persistence is handled through the SQLite database path, keeping one source of truth for historical records.
 
 \subsection{Runtime Alert Dispatch Integration}
 In \texttt{backend/src/main.py}, webhook sending is offloaded to \texttt{AsyncWebhookDispatcher} to avoid blocking the main perception loop. The implementation supports periodic metric dispatch and immediate warning dispatch with deduplication windows to limit repeated alert spam.

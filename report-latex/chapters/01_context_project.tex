@@ -96,7 +96,8 @@ The proposed system combines perception, analytics, and integration in one modul
     \item polygon-based queue-zone filtering,
     \item estimation of $\lambda$, $\mu$, and expected wait time,
     \item Bayesian uncertainty quantification for key metrics,
-    \item real-time web supervision and automation through n8n webhooks and Telegram alerts.
+    \item real-time web supervision through tiered live transport (WebRTC primary, MJPEG fallback),
+    \item automation through n8n webhooks and Telegram alerts.
 \end{enumerate}
 
 This architecture aims to convert visual observations into operational actions while keeping each layer independently testable. Detection/tracking modules can evolve without rewriting queue formulas; web and automation channels can evolve without changing the core metric contract.

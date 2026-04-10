@@ -60,7 +60,7 @@ To support verification and sprint-level accountability, these requirements are 
         FR-05 & Compute uncertainty bounds and qualitative confidence levels. & High & Validate interval outputs and fallback behavior in \texttt{backend/src/uncertainty.py}. \\ \hline
         FR-06 & Expose feed control and live updates through API and websocket channels. & High & Validate endpoint and runtime behavior through API and integration tests. \\ \hline
         FR-07 & Dispatch alert payloads to external automation workflows. & Medium & Validate webhook dispatch and n8n branch behavior using script-based scenarios. \\ \hline
-        FR-08 & Persist operational metrics and metadata for analysis and auditing. & Medium & Validate CSV and SQLite paths through runtime execution and persistence checks. \\ \hline
+        FR-08 & Persist operational metrics and metadata for analysis and auditing. & Medium & Validate SQLite persistence paths through runtime execution and database checks. \\ \hline
     \end{tabularx}
 \end{table}
 
@@ -170,9 +170,10 @@ The data model combines runtime monitoring entities and persistence entities. It
 The main objects are:
 \begin{itemize}
     \item \textbf{VideoFeed}: source identity, connectivity, runtime status, and configuration.
+    \item \textbf{FeedTransportCapabilities}: per-feed readiness flags for WebRTC and MJPEG routing.
     \item \textbf{QueueMetrics}: timestamped indicators (people in zone, $\lambda$, $\mu$, $W$, stability).
     \item \textbf{Alert}: severity, threshold context, and notification payload.
-    \item \textbf{Establishment} and \textbf{Caisse}: business metadata used to organize feeds.
+    \item \textbf{Establishment} and \textbf{Cashier}: business metadata used to organize feeds.
 \end{itemize}
 
 \begin{table}[ht]
@@ -183,16 +184,17 @@ The main objects are:
         \hline
         Entity & Core semantics & Producer/consumer context \\ \hline
         VideoFeed & Declares source type, identity, status, and runtime control metadata. & Produced by onboarding/configuration flows; consumed by runtime and dashboard layers. \\ \hline
+        FeedTransportCapabilities & Declares transport readiness (WebRTC and MJPEG), source mode, and unavailability reason for each feed. & Produced by API runtime transport endpoint; consumed by dashboard playback routing and fallback logic. \\ \hline
         QueueMetrics & Captures analytical outputs used for monitoring and decision support. & Produced by analysis loop; consumed by websocket/API/dashboard and alert logic. \\ \hline
         Alert & Encodes threshold breach context and notification-ready payload content. & Produced by threshold evaluation; consumed by webhook automation and archival paths. \\ \hline
-        Establishment / Caisse & Binds feeds to business-level organization context. & Produced by metadata management APIs; consumed by setup and filtering interfaces. \\ \hline
+        Establishment / Cashier & Binds feeds to business-level organization context. & Produced by metadata management APIs; consumed by setup and filtering interfaces. \\ \hline
     \end{tabularx}
 \end{table}
 
 \subsection{Data Lifecycle and Persistence Strategy}
 Runtime metrics are generated continuously and distributed through live channels, while selected records are persisted for auditability and trend analysis. This dual-path strategy (stream plus persistence) improves resilience: temporary integration failures do not imply complete data loss.
 
-CSV logging supports rapid observability and portability, while SQLite supports structured metadata and alert archival. Together, these storage paths enable both operational continuity and post-run diagnosis.
+SQLite database persistence stores operational metrics, structured metadata, and alert archives in one source of truth. This supports both operational continuity and post-run diagnosis.
 
 \section{Project Environment}
 
@@ -209,7 +211,7 @@ The development workflow combines a Python backend environment, a TypeScript fro
         Backend runtime & Python ecosystem with vision and scientific libraries & Perception, queue analytics, uncertainty, and integration dispatch. \\ \hline
         Frontend runtime & Node/Bun-based TypeScript toolchain with Vite & Dashboard rendering, interaction workflows, and live-state synchronization. \\ \hline
         Automation runtime & Self-hosted n8n with webhook endpoints & Alert routing, cooldown logic, and external notifications. \\ \hline
-        Persistence/runtime support & CSV outputs and SQLite metadata store & Historical analysis and system state continuity. \\ \hline
+        Persistence/runtime support & SQLite database store (metrics, metadata, alerts) & Historical analysis and system state continuity. \\ \hline
     \end{tabularx}
 \end{table}
 
@@ -219,9 +221,10 @@ The selected technology stack is:
     \item \textbf{Vision pipeline}: YOLO26, ByteTrack, OpenCV \cite{ultralytics_docs,bytetrack2022,opencv_docs}.
     \item \textbf{Queue analytics}: NumPy, Pandas, SciPy, M/M/1 modeling \cite{gross_queueing}.
     \item \textbf{Backend API}: FastAPI and Pydantic v2.
+    \item \textbf{Live transport}: WebRTC signaling with MediaMTX WHEP gateway and MJPEG fallback \cite{webrtc_w3c,mediamtx_docs}.
     \item \textbf{Frontend}: React, TypeScript, Vite, Tailwind CSS.
     \item \textbf{Automation}: n8n workflows with Telegram notifications.
-    \item \textbf{Persistence}: CSV metrics logging and SQLite metadata.
+    \item \textbf{Persistence}: SQLite database for metrics, metadata, and alert archival.
 \end{itemize}
 
 Technology selection follows a modular criterion: each component must provide clear contract boundaries and practical interoperability with adjacent layers.
@@ -258,7 +261,7 @@ The backend exposes REST and websocket interfaces for feed lifecycle control and
 
 Runtime orchestration is centered around feed-level lifecycle control and event broadcasting. This design supports independent feed state transitions and clear event contracts consumed by the dashboard and automation pipeline.
 
-Persistence and integration are treated as first-class concerns: CSV metrics logging, SQLite metadata state, and webhook dispatch reliability are all part of the operational architecture rather than optional add-ons.
+Persistence and integration are treated as first-class concerns: SQLite-backed metrics and metadata state, plus webhook dispatch reliability, are all part of the operational architecture rather than optional add-ons.
 
 \subsection{Frontend Architecture}
 The frontend follows a component-based architecture with typed API contract mapping, feed-oriented dashboard composition, and websocket-driven synchronization. It separates data-access concerns (API client and hooks) from presentation concerns (pages and reusable components).

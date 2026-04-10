@@ -2,7 +2,7 @@
 \chaptertoc
 
 \section{Introduction}
-Sprint 5 connected the frontend foundation to real backend services and runtime events. The objective was to provide an operational live dashboard capable of feed control, stream visualization, metric updates, and alert awareness.
+Sprint 5 connected the frontend foundation to real backend services and runtime events. The objective was to provide an operational live dashboard capable of feed control, tiered stream visualization, metric updates, and alert awareness.
 
 \section{Sprint Backlog}
 Sprint 5 backlog covered integration-critical items:
@@ -10,6 +10,7 @@ Sprint 5 backlog covered integration-critical items:
     \item implement a typed API client aligned with backend response contracts,
     \item integrate feed lifecycle actions (create/start/stop/restart/delete),
     \item integrate websocket events for low-latency dashboard updates,
+    \item integrate capability-driven transport routing (WebRTC first, MJPEG fallback),
     \item implement resilient live monitoring behavior (reconnect and fallback),
     \item validate dashboard setup and onboarding workflows through integration tests.
 \end{itemize}
@@ -52,6 +53,21 @@ The frontend contract is implemented in \texttt{frontend/src/lib/api.ts}. It def
 \end{itemize}
 This design ensures graceful degradation under transient connection issues.
 
+\subsection{Transport Capability Routing and WebRTC Lifecycle}
+Live feed cards use capability-driven routing from \texttt{frontend/src/components/dashboard/FeedGrid.tsx}. For each running feed, the frontend queries \texttt{/api/feeds/\{feed\_id\}/transport}. If \texttt{webrtc.enabled=true}, \texttt{webrtc.ready=true}, and \texttt{source\_mode != none}, the dashboard selects WebRTC as the primary transport; otherwise it falls back to MJPEG.
+
+The WebRTC lifecycle is implemented in \texttt{frontend/src/hooks/use-feed-webrtc.ts} using \texttt{RTCPeerConnection} \cite{webrtc_w3c}:
+\begin{itemize}
+    \item create connection with a receive-only video transceiver,
+    \item gather ICE candidates (bounded wait before signaling),
+    \item send browser SDP offer to \texttt{/api/feeds/\{feed\_id\}/webrtc/offer},
+    \item apply backend SDP answer and switch feed card to live state.
+\end{itemize}
+
+Reconnection uses exponential backoff (1s, 2s, 5s, 10s). Retry is intentionally skipped for non-recoverable API statuses (404, 409, 422). Under those conditions, the transport layer degrades to MJPEG while preserving dashboard continuity.
+
+When backend-annotated mode is active on WebRTC, client-side detection overlays are suppressed to avoid duplicate box rendering on top of server-rendered frames.
+
 \subsection{Dashboard UI Integration}
 \texttt{frontend/src/pages/Dashboard.tsx} integrates live feed controls, setup flow dialogs, source onboarding (RTSP/ONVIF/local file), KPI visualizations, and chart components. The page composes domain hooks and reusable dashboard components into one operational interface.
 
@@ -60,9 +76,11 @@ Frontend integration behavior is validated with Vitest and Testing Library in:
 \begin{itemize}
     \item \texttt{frontend/src/pages/Dashboard.integration.test.tsx},
     \item \texttt{frontend/src/hooks/use-live-dashboard.test.tsx},
-    \item \texttt{frontend/src/lib/api.test.ts}.
+    \item \texttt{frontend/src/lib/api.test.ts},
+    \item \texttt{frontend/src/hooks/use-feed-webrtc.test.tsx},
+    \item \texttt{frontend/src/components/dashboard/FeedGrid.test.tsx}.
 \end{itemize}
-These tests cover setup flow execution, websocket-event handling, and API error contract behavior.
+These tests cover setup flow execution, websocket-event handling, WebRTC lifecycle/fallback logic, and API error contract behavior.
 
 \section{Conclusion}
-Sprint 5 delivered a fully connected monitoring frontend: typed REST integration, resilient websocket updates, and operational dashboard controls. This integration created the interface layer required for end-to-end alert automation in Sprint 6.
+Sprint 5 delivered a fully connected monitoring frontend: typed REST integration, resilient websocket updates, capability-driven WebRTC/MJPEG routing, and operational dashboard controls. This integration created the interface layer required for end-to-end alert automation in Sprint 6.
