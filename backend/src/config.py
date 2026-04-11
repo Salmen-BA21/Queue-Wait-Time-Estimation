@@ -89,6 +89,18 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
+def _env_int(name: str, default: int) -> int:
+    """Read an integer environment variable, falling back when parsing fails."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
 DEFAULT_REALTIME_FILE_PLAYBACK: bool = _env_flag("QUEUE_REALTIME_FILE_PLAYBACK", True)
 
 DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY: int = int(
@@ -141,6 +153,29 @@ WEBHOOK_RETRY_COUNT: int = 3
 WEBHOOK_SEND_INTERVAL_SEC: float = 5.0  # Send every N seconds (not every frame)
 # How long to suppress repeated alert webhook deliveries for the same alert type (seconds)
 ALERT_DEDUPE_WINDOW_SEC: int = 300  # 5 minutes
+
+
+# ─── Authentication / RBAC ──────────────────────────────────
+AUTH_ENFORCE_API: bool = _env_flag("QUEUEVISION_AUTH_ENFORCE_API", False)
+AUTH_SECRET_KEY: str = os.getenv("QUEUEVISION_AUTH_SECRET_KEY", "queuevision-dev-secret-change-me")
+AUTH_ACCESS_TOKEN_TTL_MINUTES: int = max(5, _env_int("QUEUEVISION_AUTH_ACCESS_TOKEN_TTL_MIN", 15))
+AUTH_REFRESH_TOKEN_TTL_HOURS: int = max(1, _env_int("QUEUEVISION_AUTH_REFRESH_TOKEN_TTL_HOURS", 168))
+AUTH_COOKIE_SECURE: bool = _env_flag("QUEUEVISION_AUTH_COOKIE_SECURE", False)
+AUTH_COOKIE_SAMESITE: str = (os.getenv("QUEUEVISION_AUTH_COOKIE_SAMESITE", "lax").strip().lower() or "lax")
+AUTH_MAX_FAILED_LOGINS: int = max(1, _env_int("QUEUEVISION_AUTH_MAX_FAILED_LOGINS", 5))
+AUTH_LOCKOUT_MINUTES: int = max(1, _env_int("QUEUEVISION_AUTH_LOCKOUT_MINUTES", 15))
+AUTH_MIN_PASSWORD_LENGTH: int = max(8, _env_int("QUEUEVISION_AUTH_MIN_PASSWORD_LENGTH", 10))
+AUTH_BOOTSTRAP_ADMIN_EMAIL: str = (
+    os.getenv("QUEUEVISION_BOOTSTRAP_ADMIN_EMAIL", "admin@queuevision.local").strip().lower()
+)
+AUTH_BOOTSTRAP_ADMIN_PASSWORD: str = os.getenv(
+    "QUEUEVISION_BOOTSTRAP_ADMIN_PASSWORD",
+    "ChangeMe123!",
+).strip()
+AUTH_BOOTSTRAP_ADMIN_NAME: str = os.getenv(
+    "QUEUEVISION_BOOTSTRAP_ADMIN_NAME",
+    "QueueVision Admin",
+).strip() or "QueueVision Admin"
 
 @dataclass
 class AppConfig:

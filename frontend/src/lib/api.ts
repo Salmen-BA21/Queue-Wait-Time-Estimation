@@ -11,6 +11,52 @@ export interface ApiResponse<T> {
   message?: string | null;
 }
 
+export type AuthRole = "admin" | "manager";
+
+export interface AuthUser {
+  id: number;
+  email: string;
+  display_name: string;
+  role: AuthRole;
+  is_active: boolean;
+  created_at: string;
+  last_login_at: string | null;
+}
+
+export interface LoginInput {
+  email: string;
+  password: string;
+}
+
+export interface RegisterInput {
+  email: string;
+  display_name: string;
+  password: string;
+}
+
+export interface LoginResult {
+  user: AuthUser;
+}
+
+export interface SessionStatus {
+  authenticated: boolean;
+  user: AuthUser | null;
+}
+
+export interface CreateManagerInput {
+  email: string;
+  display_name: string;
+  password: string;
+}
+
+export interface UpdateManagerStatusInput {
+  is_active: boolean;
+}
+
+export interface ResetManagerPasswordInput {
+  password: string;
+}
+
 export class ApiError extends Error {
   status: number;
   url: string;
@@ -59,8 +105,6 @@ export interface QueueMetrics {
   arrival_rate: number;
   service_rate: number;
   wait_time_seconds: number | null;
-  wait_time_ci: [number, number] | null;
-  uncertainty_level: string;
   queue_stable: boolean;
   detections?: number[][] | null;
   render_frame_jpeg_base64?: string | null;
@@ -417,6 +461,7 @@ async function fetchApi<T>(path: string, init?: RequestInit): Promise<T> {
 
   try {
     response = await fetch(url, {
+      credentials: "include",
       headers: isFormData
         ? init?.headers
         : {
@@ -463,6 +508,61 @@ async function fetchApi<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return payload.data;
+}
+
+export function login(input: LoginInput): Promise<LoginResult> {
+  return fetchApi<LoginResult>("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function register(input: RegisterInput): Promise<LoginResult> {
+  return fetchApi<LoginResult>("/api/auth/register", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function refreshSession(): Promise<LoginResult> {
+  return fetchApi<LoginResult>("/api/auth/refresh", {
+    method: "POST",
+  });
+}
+
+export function logout(): Promise<{ logged_out: boolean }> {
+  return fetchApi<{ logged_out: boolean }>("/api/auth/logout", {
+    method: "POST",
+  });
+}
+
+export function getCurrentSession(): Promise<SessionStatus> {
+  return fetchApi<SessionStatus>("/api/auth/me");
+}
+
+export function listManagers(): Promise<AuthUser[]> {
+  return fetchApi<AuthUser[]>("/api/admin/managers");
+}
+
+export function createManager(input: CreateManagerInput): Promise<AuthUser> {
+  return fetchApi<AuthUser>("/api/admin/managers", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateManagerStatus(userId: number, input: UpdateManagerStatusInput): Promise<AuthUser> {
+  return fetchApi<AuthUser>(`/api/admin/managers/${userId}/status`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function resetManagerPassword(userId: number, input: ResetManagerPasswordInput): Promise<{ password_reset: boolean }> {
+  return fetchApi<{ password_reset: boolean }>(`/api/admin/managers/${userId}/reset-password`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export function listFeeds(): Promise<VideoFeed[]> {

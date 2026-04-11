@@ -35,7 +35,7 @@
 | `--accent-cyan` | `#22D3EE` | Primary accent – buttons, links, active states, highlights |
 | `--accent-amber` | `#F59E0B` | Warning states, zone editor badge, caution alerts |
 | `--accent-red` | `#EF4444` | Critical alerts, heatmap badge, error states |
-| `--accent-purple` | `#A78BFA` | Uncertainty metrics, analytics badge |
+| `--accent-purple` | `#A78BFA` | Analytics badge and trend highlights |
 | `--accent-green` | `#10B981` | Success states, "online" indicators, positive trends |
 | `--text-primary` | `#F1F5F9` | Headings, primary text |
 | `--text-secondary` | `#94A3B8` | Body text, labels, descriptions |
@@ -99,7 +99,7 @@
 ├─────────────────────────────────────────────────────┤
 │ FEATURES – 3×2 grid of feature cards                │
 │   Real-Time Detection | Queue Analytics | Smart...  │
-│   Multi-Camera       | Uncertainty     | n8n...     │
+│   Multi-Camera       | Stability Logic | n8n...     │
 ├─────────────────────────────────────────────────────┤
 │ TECH STACK – 5 technology cards in a row            │
 │   YOLO26 | ByteTrack | OpenCV | Supervision | n8n  │
@@ -129,7 +129,7 @@
 
 **Node ID:** `OPPgB`  
 **Canvas Position:** x: 1540, y: 0  
-**Purpose:** Main admin dashboard – real-time monitoring of all camera feeds and alerts  
+**Purpose:** Main manager dashboard – real-time monitoring of all camera feeds and alerts  
 
 ### Layout Structure
 
@@ -275,11 +275,11 @@
 ├─────────────────────────────────────────────────────┤
 │ KPI ROW – 4 cards                                   │
 │  Avg Wait 4.2m ↓12% | Peak 18 ↑8% | Served 2847   │
-│  ↑23% | Uncertainty ±0.8 LOW                        │
+│  ↑23% | Alert Rate 2.4% (weekly)                    │
 ├───────────────────────────┬─────────────────────────┤
 │ WAIT TIME TREND CHART     │ QUEUE SIZE BAR CHART    │
-│ Line chart with CI band   │ 4 horizontal bars       │
-│ (purple uncertainty area)  │ by camera               │
+│ Line chart with trend band│ 4 horizontal bars       │
+│ (weekly smoothing area)   │ by camera               │
 ├───────────────────────────┼─────────────────────────┤
 │ PEAK HOURS HEATMAP        │ RECENT ALERTS LOG       │
 │ 3×7 grid (Mon–Sun,       │ 4 alert entries with    │
@@ -292,8 +292,8 @@
 | Component | Description |
 |-----------|-------------|
 | **Top Bar** | Logo, purple "ANALYTICS" badge, date range picker "Feb 20 – Feb 27, 2026", "Export CSV" button |
-| **KPI Cards (4)** | Avg Wait: 4.2 min (↓12% green), Peak Queue: 18 (↑8% red), Total Served: 2,847 (↑23% green), Avg Uncertainty: ±0.8 (LOW green badge) |
-| **Trend Chart** | Title "Wait Time Trend", line chart placeholder with purple CI (confidence interval) band area, x-axis = time, y-axis = minutes |
+| **KPI Cards (4)** | Avg Wait: 4.2 min (↓12% green), Peak Queue: 18 (↑8% red), Total Served: 2,847 (↑23% green), Alert Rate: 2.4% (LOW green badge) |
+| **Trend Chart** | Title "Wait Time Trend", line chart placeholder with smoothed trend band area, x-axis = time, y-axis = minutes |
 | **Bar Chart** | Title "Queue Size by Camera", 4 horizontal bars (Main Entrance, Side Door, Checkout, VIP) with cyan fill and values |
 | **Peak Hours Heatmap** | Title "Peak Hours", 3×7 grid. Rows: Morning/Afternoon/Evening. Cols: Mon–Sun. Cells colored in varying cyan opacity (0.2–0.9) representing density |
 | **Alerts Log** | Title "Recent Alerts", 4 entries: CRITICAL (red badge), WARNING (amber), INFO (cyan), RESOLVED (green). Each has timestamp + message |
@@ -335,7 +335,7 @@
 │            │ YOLO Model: [yolo26n ▼        ]       │
 │            │ Confidence: [0.45             ]       │
 │            │ ByteTrack maxAge: [30         ]       │
-│            │ Uncertainty: [======●]                  │
+│            │ Stability Alerts: [======●]            │
 │            │                                        │
 │            │ ─── Webhooks ───                       │
 │            │ n8n URL: [https://n8n.example...]     │
@@ -361,7 +361,7 @@
 ### Settings Sections (All)
 
 1. **Application** – App name, refresh rate (FPS), dark mode toggle
-2. **Model & Detection** – YOLO model selector (nano/small/medium/large/xlarge), confidence threshold, ByteTrack max age, track threshold, enable uncertainty toggle
+2. **Model & Detection** – YOLO model selector (nano/small/medium/large/xlarge), confidence threshold, ByteTrack max age, track threshold, enable stability-alert toggle
 3. **Alerts & Thresholds** – (on separate nav page) max wait time, max queue size, spike detection sensitivity
 4. **Webhooks** – n8n webhook URL, enable webhook toggle, CSV logging toggle, export directory path
 5. **Data & Export** – (on separate nav page) data retention period, auto-export settings
@@ -465,20 +465,20 @@ module.exports = {
 | Route | Page | Auth Required |
 |-------|------|---------------|
 | `/` | Landing Page | No |
-| `/dashboard` | Dashboard | Yes (Admin) |
-| `/setup` | Setup Wizard | Yes (Admin) |
-| `/setup/zones` | Zone Editor | Yes (Admin) |
-| `/analytics` | Historical Analytics | Yes (Admin) |
-| `/settings` | Settings / Config | Yes (Admin) |
-| `/heatmap` | Heatmap Overlay | Yes (Admin) |
+| `/dashboard` | Dashboard | Yes (Manager) |
+| `/setup` | Setup Wizard | Yes (Manager) |
+| `/setup/zones` | Zone Editor | Yes (Manager) |
+| `/analytics` | Historical Analytics | Yes (Manager) |
+| `/settings` | Settings / Config | Yes (Manager) |
+| `/heatmap` | Heatmap Overlay | Yes (Manager) |
 
 ### Component Hierarchy
 
 ```
 <App>
 ├── <LandingPage />          ← Public
-├── <AdminLayout>             ← Authenticated wrapper
-│   ├── <TopBar />            ← Shared across admin pages
+├── <ManagerLayout>           ← Authenticated operational wrapper
+│   ├── <TopBar />            ← Shared across manager pages
 │   ├── <Dashboard>
 │   │   ├── <CameraGrid />
 │   │   ├── <AlertSidebar />
@@ -550,8 +550,7 @@ interface QueueMetrics {
   avgWaitTime: number;         // minutes
   arrivalRate: number;         // λ (persons/min)
   serviceRate: number;         // μ (persons/min)
-  uncertainty: number;         // ± value
-  confidenceInterval: [number, number];
+  queueStable: boolean;
 }
 
 interface Alert {
@@ -570,7 +569,7 @@ interface AppSettings {
   yoloModel: 'yolo26n' | 'yolo26s' | 'yolo26m' | 'yolo26l' | 'yolo26x';
   confidenceThreshold: number;
   bytetrackMaxAge: number;
-  enableUncertainty: boolean;
+  enableStabilityAlerts: boolean;
   webhookUrl: string;
   enableWebhook: boolean;
   csvLogging: boolean;

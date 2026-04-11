@@ -24,7 +24,7 @@ The committed Sprint 1 backlog focused on the minimum viable perception chain:
     \label{fig:sprint1_use_case}
 \end{figure}
 
-The use case is centered on the operator configuring a source and zone, then launching continuous analysis. For each frame, the system detects persons, associates identities, evaluates zone membership, and updates the queue state. This sequence is the basis for all later analytics and automation layers.
+The use case is centered on the manager configuring a source and zone, then launching continuous analysis. For each frame, the system detects persons, associates identities, evaluates zone membership, and updates the queue state. This sequence is the basis for all later analytics and automation layers.
 
 \subsection{Use Case Scenarios}
 Three key scenarios are implemented in Sprint 1:
@@ -69,7 +69,7 @@ The pipeline integration is implemented in \texttt{backend/src/main.py}. The run
     \item Headless mode and dashboard event emission hooks for future API/runtime integration.
 \end{itemize}
 
-This implementation produced a stable perception baseline for later queue analytics and uncertainty modeling \cite{opencv_docs}.
+This implementation produced a stable perception baseline for later queue analytics and automation integration \cite{opencv_docs}.
 
 \section{Conclusion}
-Sprint 1 delivered the operational perception core: reliable person detection, ID tracking continuity, and queue-zone filtering. This foundation directly enabled Sprint 2, where statistical queue metrics and uncertainty quantification were added on top of these stable perception outputs.
+Sprint 1 delivered the operational perception core: reliable person detection, ID tracking continuity, and queue-zone filtering. This foundation directly enabled Sprint 2, where queue metrics and stability-aware logic were added on top of these stable perception outputs.

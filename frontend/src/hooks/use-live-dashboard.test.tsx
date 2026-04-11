@@ -33,8 +33,11 @@ vi.mock("@/lib/api", async () => {
 
 class MockDashboardSocket {
   onmessage: ((message: MessageEvent<string>) => void) | null = null;
-  onerror: (() => void) | null = null;
-  close = vi.fn();
+  onerror: ((event: Event) => void) | null = null;
+  onclose: ((event: CloseEvent) => void) | null = null;
+  close = vi.fn(() => {
+    this.onclose?.({} as CloseEvent);
+  });
 
   emit(event: DashboardSocketEvent): void {
     this.onmessage?.({ data: JSON.stringify(event) } as MessageEvent<string>);
@@ -122,8 +125,6 @@ describe("useLiveDashboard", () => {
             arrival_rate: 0.2,
             service_rate: 0.4,
             wait_time_seconds: 8,
-            wait_time_ci: [6, 10],
-            uncertainty_level: "Low",
             queue_stable: true,
           },
         },
@@ -157,8 +158,6 @@ describe("useLiveDashboard", () => {
               arrival_rate: 0.2,
               service_rate: 0.4,
               wait_time_seconds: 8,
-              wait_time_ci: [6, 10],
-              uncertainty_level: "Low",
               queue_stable: true,
             },
               last_warning: "Queue exceeded the warning threshold.",
@@ -184,9 +183,13 @@ describe("useLiveDashboard", () => {
     expect(result.current.activity.some((item) => item.message === "Checkout 1 was started.")).toBe(true);
 
     act(() => {
-      socket.onerror?.();
+      socket.onerror?.({} as Event);
     });
 
-    expect(result.current.activity[0].message).toContain("Live dashboard connection is unavailable");
+    expect(
+      result.current.activity.some((item) =>
+        item.message.includes("Live dashboard connection dropped"),
+      ),
+    ).toBe(true);
   });
 });

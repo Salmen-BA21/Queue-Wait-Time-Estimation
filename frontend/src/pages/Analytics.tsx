@@ -1,7 +1,7 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Button } from "@/components/ui/button";
-import { Clock, Users, TrendingUp, HelpCircle, Download } from "lucide-react";
+import { Clock, Users, TrendingUp, AlertTriangle, Download } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
@@ -75,7 +75,7 @@ export default function Analytics() {
           <KpiCard title="Avg Wait Time" value="6.1m" icon={Clock} trend={{ value: 5, positive: false }} />
           <KpiCard title="Peak Queue Size" value={28} icon={Users} trend={{ value: 15, positive: true }} />
           <KpiCard title="Total Served" value="1,285" icon={TrendingUp} trend={{ value: 8, positive: true }} />
-          <KpiCard title="Uncertainty" value="±1.3m" icon={HelpCircle} subtitle="95% confidence" />
+          <KpiCard title="Active Alerts" value="2.4%" icon={AlertTriangle} subtitle="Weekly average" />
         </div>
 
         {/* Charts */}

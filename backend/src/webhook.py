@@ -31,17 +31,8 @@ class QueuePayload:
     arrival_rate: float  # λ – per second
     service_rate: float  # μ – per second
     estimated_wait_sec: float
-    
-    # Uncertainty bounds (95% credible/confidence intervals)
-    arrival_rate_lower: float
-    arrival_rate_upper: float
-    service_rate_lower: float
-    service_rate_upper: float
-    wait_time_lower: float
-    wait_time_upper: float
-    
+
     # Classification
-    uncertainty_level: str  # "Low", "Medium", "High"
     queue_stable: bool
     
     # Alerts and thresholds
@@ -87,13 +78,6 @@ class QueuePayload:
             arrival_rate=metrics.arrival_rate,
             service_rate=metrics.service_rate,
             estimated_wait_sec=metrics.estimated_wait_sec,
-            arrival_rate_lower=metrics.arrival_rate_lower,
-            arrival_rate_upper=metrics.arrival_rate_upper,
-            service_rate_lower=metrics.service_rate_lower,
-            service_rate_upper=metrics.service_rate_upper,
-            wait_time_lower=metrics.wait_time_lower,
-            wait_time_upper=metrics.wait_time_upper,
-            uncertainty_level=metrics.uncertainty_level,
             queue_stable=metrics.queue_stable,
             alert_triggered=alert_triggered,
             alert_reason=alert_reason,
@@ -112,13 +96,6 @@ EXAMPLE_PAYLOAD = {
     "arrival_rate": 0.133,
     "service_rate": 0.050,
     "estimated_wait_sec": 5.2,
-    "arrival_rate_lower": 0.089,
-    "arrival_rate_upper": 0.177,
-    "service_rate_lower": 0.020,
-    "service_rate_upper": 0.080,
-    "wait_time_lower": 4.1,
-    "wait_time_upper": 6.3,
-    "uncertainty_level": "Low",
     "queue_stable": True,
     "alert_triggered": False,
     "alert_reason": "",
@@ -136,7 +113,7 @@ def validate_payload(payload: dict) -> bool:
     required_fields = {
         "timestamp", "frame_id", "source", "feed_id", "people_in_zone",
         "arrival_rate", "service_rate", "estimated_wait_sec",
-        "uncertainty_level", "queue_stable", "alert_triggered"
+        "queue_stable", "alert_triggered"
     }
     
     if not all(field in payload for field in required_fields):

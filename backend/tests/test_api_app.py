@@ -270,12 +270,6 @@ class TestQueueVisionApi(unittest.TestCase):
                     "wait_time_seconds": 137.4,
                     "queue_stable": False,
                 },
-                "uncertainty": {
-                    "lambda_ci": [0.10, 0.22],
-                    "mu_ci": [0.11, 0.23],
-                    "wait_time_ci": [110.0, 165.0],
-                    "level": "LOW",
-                },
                 "alerts": [
                     {
                         "type": "WAIT_TIME_CRITICAL",
@@ -1827,8 +1821,6 @@ class TestQueueVisionApi(unittest.TestCase):
             arrival_rate=0.2,
             service_rate=0.4,
             wait_time_seconds=5.0,
-            wait_time_ci=[3.5, 6.5],
-            uncertainty_level="Low",
             queue_stable=True,
         )
         alert = AlertModel(
@@ -1907,8 +1899,6 @@ class TestQueueVisionApi(unittest.TestCase):
                     "arrival_rate": 0.3,
                     "service_rate": 0.5,
                     "wait_time_seconds": 9.0,
-                    "wait_time_ci": [7.0, 11.0],
-                    "uncertainty_level": "Medium",
                     "queue_stable": True,
                 }
             },

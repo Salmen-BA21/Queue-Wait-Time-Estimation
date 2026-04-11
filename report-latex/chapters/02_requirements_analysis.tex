@@ -9,14 +9,13 @@ The chapter therefore goes beyond feature listing. It introduces requirement tra
 \section{Requirements Specification}
 
 \subsection{Identification of Actors}
-The system involves three primary actors:
+The system involves two primary actors:
 \begin{itemize}
-    \item \textbf{Administrator}: configures sources, thresholds, and integration parameters.
-    \item \textbf{Operator}: monitors live queues and reacts to alerts during operations.
-    \item \textbf{Manager}: analyzes historical trends and uses indicators for planning decisions.
+    \item \textbf{Administrator}: manages manager accounts (create, update, delete) and controls access governance.
+    \item \textbf{Manager}: configures sources and thresholds, monitors live queues, reacts to alerts, and reviews performance indicators.
 \end{itemize}
 
-Although these roles interact with the same platform, they consume different abstractions. Administrators require configuration and diagnostics depth, operators require low-latency situational awareness, and managers require interpretable KPI summaries for decision support.
+Although these roles interact with the same platform, they consume different abstractions. Administrators require account-governance visibility, while managers require operational depth from setup through live supervision and KPI interpretation.
 
 \begin{table}[ht]
     \centering
@@ -25,9 +24,8 @@ Although these roles interact with the same platform, they consume different abs
     \begin{tabularx}{\textwidth}{|l|X|X|}
         \hline
         Actor & Main responsibilities & Typical interactions \\ \hline
-        Administrator & Configure feeds, zones, threshold rules, and integration credentials. & Uses setup and settings flows, validates connectivity, and supervises runtime health signals. \\ \hline
-        Operator & Monitor queue status in real time and react to warnings/critical alerts. & Uses dashboard KPIs, live feed views, and alert panels for immediate response. \\ \hline
-        Manager & Review aggregate behavior and support planning decisions. & Consumes historical trends, uncertainty-aware metrics, and performance summaries. \\ \hline
+        Administrator & Create, update, and delete manager accounts; enforce access governance rules. & Uses account-management and audit-oriented flows to maintain authorized manager access. \\ \hline
+        Manager & Configure feeds, zones, and thresholds; monitor live queue status; react to warning/critical alerts; review trends and performance summaries. & Uses setup workflows, dashboard KPIs, live feed views, alert panels, and analytics views for operational decision-making. \\ \hline
     \end{tabularx}
 \end{table}
 
@@ -37,7 +35,7 @@ The system must provide the following core functionalities:
     \item real-time person detection and tracking,
     \item configurable queue zone definition,
     \item estimation of arrival rate ($\lambda$), service rate ($\mu$), and wait time ($W$),
-    \item uncertainty quantification for queue metrics,
+    \item queue stability classification with robust wait-time fallback behavior,
     \item real-time web dashboard updates and alerts,
     \item RTSP and ONVIF camera integration,
     \item automated webhook and Telegram notifications,
@@ -57,7 +55,7 @@ To support verification and sprint-level accountability, these requirements are 
         FR-02 & Maintain identity continuity through tracking for event-level queue analysis. & High & Validate tracker ID continuity from \texttt{backend/src/tracker.py} in runtime scenarios. \\ \hline
         FR-03 & Restrict counting to configurable polygon queue zones. & High & Validate zone inclusion logic from \texttt{backend/src/zone\_manager.py}. \\ \hline
         FR-04 & Compute $\lambda$, $\mu$, and expected wait time from event windows. & High & Validate queue formulas and stability handling in \texttt{backend/src/queue\_analyzer.py}. \\ \hline
-        FR-05 & Compute uncertainty bounds and qualitative confidence levels. & High & Validate interval outputs and fallback behavior in \texttt{backend/src/uncertainty.py}. \\ \hline
+        FR-05 & Classify stable/unstable queue states and apply safe fallback wait-time logic. & High & Validate stability branches and fallback behavior in \texttt{backend/src/queue\_analyzer.py}. \\ \hline
         FR-06 & Expose feed control and live updates through API and websocket channels. & High & Validate endpoint and runtime behavior through API and integration tests. \\ \hline
         FR-07 & Dispatch alert payloads to external automation workflows. & Medium & Validate webhook dispatch and n8n branch behavior using script-based scenarios. \\ \hline
         FR-08 & Persist operational metrics and metadata for analysis and auditing. & Medium & Validate SQLite persistence paths through runtime execution and database checks. \\ \hline
@@ -110,7 +108,7 @@ Early execution emphasized backend foundations to reduce downstream integration 
     \begin{tabularx}{\textwidth}{|l|X|X|}
         \hline
         Domain & Representative backlog scope & Dependency rationale \\ \hline
-        Backend & Detection/tracking, zone logic, queue formulas, uncertainty, feed runtime services. & Provides source-of-truth metrics consumed by all upper layers. \\ \hline
+        Backend & Detection/tracking, zone logic, queue formulas, and feed runtime services. & Provides source-of-truth metrics consumed by all upper layers. \\ \hline
         Web & Dashboard pages, typed API integration, websocket synchronization, feed controls. & Depends on stable backend contracts and event schemas. \\ \hline
         Automation & Webhook payload contract, routing, cooldown, external notifications, archival. & Depends on reliable alert semantics and validated thresholds. \\ \hline
     \end{tabularx}
@@ -133,12 +131,12 @@ At system level, use cases can be organized into four interaction groups: config
     \begin{tabularx}{\textwidth}{|l|X|l|}
         \hline
         Use case ID & Use case summary & Primary actor \\ \hline
-        UC-01 & Register and configure a video feed source. & Administrator \\ \hline
-        UC-02 & Define or update queue zone geometry. & Administrator \\ \hline
-        UC-03 & Monitor live queue metrics and feed status. & Operator \\ \hline
-        UC-04 & Receive and interpret warning or critical alerts. & Operator \\ \hline
-        UC-05 & Review trends and performance indicators. & Manager \\ \hline
-        UC-06 & Validate automation workflow behavior for alerts. & Administrator \\ \hline
+        UC-01 & Create, update, or remove manager accounts. & Administrator \\ \hline
+        UC-02 & Register and configure a video feed source. & Manager \\ \hline
+        UC-03 & Define or update queue zone geometry. & Manager \\ \hline
+        UC-04 & Monitor live queue metrics and feed status. & Manager \\ \hline
+        UC-05 & Receive and interpret warning or critical alerts. & Manager \\ \hline
+        UC-06 & Review trends and performance indicators. & Manager \\ \hline
     \end{tabularx}
 \end{table}
 
@@ -153,7 +151,7 @@ The project implementation is organized into eight sprints. Table~\ref{tab:sprin
         \hline
         Sprint & Main outcome & Representative validation lens \\ \hline
         Sprint 1 & Detection, tracking, and queue-zone perception foundation & Perception correctness and tracker continuity \\ \hline
-        Sprint 2 & Queue analytics and uncertainty quantification & Formula validity and interval consistency \\ \hline
+        Sprint 2 & Queue analytics and stability handling & Formula validity and stability-branch consistency \\ \hline
         Sprint 3 & Camera connectivity and backend API exposure & Runtime control and contract stability \\ \hline
         Sprint 4 & Web design system and frontend scaffolding & UX structure and component baseline \\ \hline
         Sprint 5 & Frontend integration and live monitoring & API/websocket synchronization quality \\ \hline
@@ -208,7 +206,7 @@ The development workflow combines a Python backend environment, a TypeScript fro
     \begin{tabularx}{\textwidth}{|l|X|X|}
         \hline
         Environment layer & Main tooling & Purpose \\ \hline
-        Backend runtime & Python ecosystem with vision and scientific libraries & Perception, queue analytics, uncertainty, and integration dispatch. \\ \hline
+        Backend runtime & Python ecosystem with vision and scientific libraries & Perception, queue analytics, and integration dispatch. \\ \hline
         Frontend runtime & Node/Bun-based TypeScript toolchain with Vite & Dashboard rendering, interaction workflows, and live-state synchronization. \\ \hline
         Automation runtime & Self-hosted n8n with webhook endpoints & Alert routing, cooldown logic, and external notifications. \\ \hline
         Persistence/runtime support & SQLite database store (metrics, metadata, alerts) & Historical analysis and system state continuity. \\ \hline
@@ -236,7 +234,7 @@ The system architecture is organized in four layers:
 \begin{enumerate}
     \item \textbf{Video acquisition}: local files, RTSP streams, and ONVIF discovery.
     \item \textbf{Perception}: detection, tracking, and queue-zone filtering.
-    \item \textbf{Analysis}: queue metrics estimation and uncertainty modeling.
+    \item \textbf{Analysis}: queue metrics estimation and stability handling.
     \item \textbf{Output and integration}: web dashboard, webhook dispatch, and alert automation.
 \end{enumerate}
 
@@ -251,7 +249,7 @@ This layering constrains coupling and simplifies testing. For example, queue for
         Layer & Responsibilities & Representative modules \\ \hline
         Video acquisition & Source opening, stream transport handling, reconnect behavior. & \texttt{video\_capture.py}, \texttt{rtsp\_camera.py}, \texttt{onvif\_client.py} \\ \hline
         Perception & Person detection, tracking continuity, zone-aware filtering. & \texttt{detector.py}, \texttt{tracker.py}, \texttt{zone\_manager.py} \\ \hline
-        Analysis & Event-window rates, wait-time logic, uncertainty bounds. & \texttt{queue\_analyzer.py}, \texttt{uncertainty.py}, \texttt{threshold\_detector.py} \\ \hline
+        Analysis & Event-window rates, wait-time logic, and stability-aware fallback handling. & \texttt{queue\_analyzer.py}, \texttt{threshold\_detector.py} \\ \hline
         Output/integration & API/websocket exposure, webhook dispatch, persistence, dashboard consumption. & \texttt{api/app.py}, \texttt{api/runtime.py}, \texttt{webhook\_client.py}, frontend hooks/pages \\ \hline
     \end{tabularx}
 \end{table}

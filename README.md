@@ -2,11 +2,11 @@
 
 Real-time queue monitoring system for checkout lanes and service counters.
 
-The project combines computer vision, queueing theory, uncertainty estimation, and alerting workflows:
+The project combines computer vision, queueing theory, stability-aware queue analytics, and alerting workflows:
 
 - Person detection + tracking from video feeds
 - Queue metrics estimation: arrival rate (lambda), service rate (mu), wait time (W)
-- Bayesian uncertainty intervals and stability checks
+- Queue stability checks with robust fallback logic
 - Desktop GUI workflow and web dashboard workflow
 - n8n webhook integration for alert automation
 
@@ -100,6 +100,18 @@ npm install
 npm run dev
 ```
 
+Authentication pages:
+
+- Sign in: `http://localhost:5173/login`
+- Sign up (self-service manager account): `http://localhost:5173/signup`
+
+Default bootstrap admin credentials (created on backend startup when missing):
+
+- Email: `admin@queuevision.local`
+- Password: `ChangeMe123!`
+
+Important: change bootstrap defaults in environment variables before production use.
+
 Optional WebRTC gateway for live preview (MediaMTX):
 
 ```bash
@@ -183,6 +195,10 @@ Set backend environment variables:
 - `MEDIAMTX_WHEP_BASE_URL` (default: `http://127.0.0.1:8889`)
 - `MEDIAMTX_CONTROL_API_BASE_URL` (default: `http://127.0.0.1:9997`)
 - `MEDIAMTX_WEBRTC_TIMEOUT_SEC` (default: `8.0`)
+- `QUEUEVISION_BOOTSTRAP_ADMIN_EMAIL` (default: `admin@queuevision.local`)
+- `QUEUEVISION_BOOTSTRAP_ADMIN_PASSWORD` (default: `ChangeMe123!`)
+- `QUEUEVISION_BOOTSTRAP_ADMIN_NAME` (default: `QueueVision Admin`)
+- `QUEUEVISION_AUTH_ENFORCE_API` (default: `false`; set `true` to enforce manager-role auth on operational API endpoints)
 
 If go2rtc is still running locally, stop it before starting MediaMTX to avoid port conflicts.
 
@@ -201,7 +217,6 @@ Queue-Wait-Time-Estimation/
 │   │   ├── onvif_client.py
 │   │   ├── rtsp_camera.py
 │   │   ├── queue_analyzer.py
-│   │   ├── uncertainty.py
 │   │   └── webhook_client.py
 │   ├── tests/
 │   └── scripts/

@@ -40,6 +40,28 @@ VITE_API_BASE_URL=http://localhost:8000
 
 If not set, the client defaults to `http://localhost:8000`.
 
+## Authentication (April 2026 update)
+
+Implemented auth flows:
+
+- `/login` for sign in
+- `/signup` for self-service manager account registration
+
+Session behavior:
+
+- Cookie-based auth with access + refresh cookies
+- Frontend requests include credentials by default in `frontend/src/lib/api.ts`
+- Role-protected routes:
+	- manager: `/dashboard`, `/analytics`
+	- manager/admin: `/settings`
+
+Bootstrap admin defaults (backend startup creates account if missing):
+
+- email: `admin@queuevision.local`
+- password: `ChangeMe123!`
+
+Important: override bootstrap defaults via environment variables before production deployment.
+
 ## Scripts
 
 ```bash
@@ -57,6 +79,9 @@ npm run test     # Vitest
 - API client: `frontend/src/lib/api.ts`
 
 The client includes support for:
+
+- Authentication and session endpoints (`register`, `login`, `refresh`, `logout`, `me`)
+- Admin manager-account operations (list/create/status/password reset)
 
 - Feed lifecycle (`create`, `start`, `stop`, `restart`, `delete`)
 - Feed zone and threshold updates

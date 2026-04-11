@@ -2,13 +2,13 @@
 \chaptertoc
 
 \section{Summary}
-This end-of-studies project delivered a complete queue wait-time estimation platform that connects computer vision, queue analytics, uncertainty quantification, web supervision, and automation workflows.
+This end-of-studies project delivered a complete queue wait-time estimation platform that connects computer vision, queue analytics, web supervision, and automation workflows.
 
 From a technical standpoint, the system now includes:
 \begin{itemize}
     \item a perception pipeline based on YOLO detection and ByteTrack identity continuity,
     \item queue-zone filtering and event-driven estimation of $\lambda$, $\mu$, and expected wait time,
-    \item uncertainty-aware outputs with interval bounds and stability semantics,
+    \item stability-aware outputs with explicit queue-state semantics,
     \item a typed FastAPI backend-for-frontend with feed lifecycle control and live websocket events,
     \item a React dashboard for monitoring, setup, and runtime interaction,
     \item n8n and Telegram integration for operational alert routing.
@@ -22,7 +22,7 @@ The initial objectives are considered achieved at project scope level:
     \item \textbf{Real-time detection and tracking:} implemented through dedicated detector and tracker modules.
     \item \textbf{Queue-zone counting:} implemented with polygon-zone management and in-zone identity filtering.
     \item \textbf{Queue metric estimation:} implemented for arrival rate, service rate, and wait time.
-    \item \textbf{Uncertainty quantification:} implemented with Bayesian and variance-based methods.
+    \item \textbf{Queue stability handling:} implemented through stable/unstable classification and fallback wait-time logic.
     \item \textbf{Web monitoring:} implemented through a multi-feed dashboard with live updates.
     \item \textbf{Automation integration:} implemented through webhook transport, n8n routing, and Telegram notifications.
 \end{enumerate}

@@ -9,20 +9,57 @@ import sqlite3
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 from urllib.parse import quote, urlparse, urlunparse
 from uuid import uuid4
 
 import requests
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Header,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 
 from src import __version__
+from src.auth import (
+    ACCESS_TOKEN_COOKIE_MAX_AGE,
+    ACCESS_TOKEN_COOKIE_NAME,
+    REFRESH_TOKEN_COOKIE_MAX_AGE,
+    REFRESH_TOKEN_COOKIE_NAME,
+    AuthenticatedUser,
+    create_access_token,
+    create_refresh_session_id,
+    decode_access_token,
+    ensure_bootstrap_admin_account,
+    generate_refresh_token,
+    hash_password,
+    hash_refresh_token,
+    is_account_locked,
+    lockout_threshold_reached,
+    next_lockout_until_iso,
+    parse_iso_datetime,
+    refresh_token_expiry_iso,
+    user_record_to_authenticated_user,
+    validate_password_policy,
+    verify_password,
+)
 from src.api.models import (
+    AuthUserModel,
     ApiResponse,
     BatchFeedLaunchRequest,
     BatchFeedLaunchResponse,
     Caisse,
+    CreateManagerRequest,
     CreateFeedRequest,
     CreateCaisseRequest,
     CreateEstablishmentRequest,
@@ -33,8 +70,14 @@ from src.api.models import (
     FeedTransportCapabilities,
     FeedSnapshotResult,
     FeedSnapshotEvent,
+    LoginRequest,
+    LoginResponse,
     QueueAlertArchiveRequest,
     QueueAlertArchiveResponse,
+    RegisterRequest,
+    ResetManagerPasswordRequest,
+    SessionStatusResponse,
+    UpdateManagerStatusRequest,
     WebhookIntegrationStatus,
     WebhookIntegrationTestResult,
     ONVIFCameraTestRequest,
@@ -58,15 +101,33 @@ from src.api.models import (
 from src.api.runtime import FeedRegistry, FeedStartError, FeedStateError, WebSocketHub
 from src.database import (
     archive_alert_payload,
+    create_auth_audit_event,
     create_caisse,
     create_establishment,
+    create_refresh_session,
+    create_user,
+    get_refresh_session_by_token_hash,
     get_caisse_by_id,
     get_caisses_by_establishment,
     get_establishment_by_id,
     get_establishments,
+    get_user_by_email,
+    get_user_by_id,
     init_db,
+    list_users_by_role,
+    record_failed_login_attempt,
+    record_successful_login,
+    revoke_refresh_session,
+    revoke_refresh_session_by_token_hash,
+    set_user_active,
+    touch_refresh_session,
+    update_user_password_hash,
 )
 from src.config import (
+    AUTH_COOKIE_SAMESITE,
+    AUTH_COOKIE_SECURE,
+    AUTH_ENFORCE_API,
+    AUTH_MIN_PASSWORD_LENGTH,
     MEDIAMTX_CONTROL_API_BASE_URL,
     MEDIAMTX_WEBRTC_PREVIEW_ENABLED,
     MEDIAMTX_WEBRTC_TIMEOUT_SEC,
@@ -343,6 +404,7 @@ def run_mediamtx_webrtc_offer(
 async def lifespan(app: FastAPI):
     """Initialize runtime services when the API starts."""
     init_db()
+    ensure_bootstrap_admin_account()
     broadcaster = WebSocketHub()
     registry = FeedRegistry(broadcaster=broadcaster)
     app.state.broadcaster = broadcaster
@@ -394,6 +456,138 @@ def get_broadcaster() -> WebSocketHub:
         _ = get_registry()
         broadcaster = app.state.broadcaster
     return broadcaster
+
+
+def build_auth_user_model(user: AuthenticatedUser) -> AuthUserModel:
+    """Convert dependency-level auth user to API response model."""
+    return AuthUserModel(
+        id=user.id,
+        email=user.email,
+        display_name=user.display_name,
+        role=user.role,
+        is_active=user.is_active,
+        created_at=user.created_at,
+        last_login_at=user.last_login_at,
+    )
+
+
+def set_auth_cookies(response: Response, *, access_token: str, refresh_token: str) -> None:
+    """Attach signed session cookies to response."""
+    samesite_value: Literal["lax", "strict", "none"]
+    if AUTH_COOKIE_SAMESITE == "strict":
+        samesite_value = "strict"
+    elif AUTH_COOKIE_SAMESITE == "none":
+        samesite_value = "none"
+    else:
+        samesite_value = "lax"
+    response.set_cookie(
+        key=ACCESS_TOKEN_COOKIE_NAME,
+        value=access_token,
+        max_age=ACCESS_TOKEN_COOKIE_MAX_AGE,
+        httponly=True,
+        secure=AUTH_COOKIE_SECURE,
+        samesite=samesite_value,
+        path="/",
+    )
+    response.set_cookie(
+        key=REFRESH_TOKEN_COOKIE_NAME,
+        value=refresh_token,
+        max_age=REFRESH_TOKEN_COOKIE_MAX_AGE,
+        httponly=True,
+        secure=AUTH_COOKIE_SECURE,
+        samesite=samesite_value,
+        path="/",
+    )
+
+
+def clear_auth_cookies(response: Response) -> None:
+    """Expire auth cookies on the client."""
+    response.delete_cookie(ACCESS_TOKEN_COOKIE_NAME, path="/")
+    response.delete_cookie(REFRESH_TOKEN_COOKIE_NAME, path="/")
+
+
+def get_request_client_metadata(request: Request) -> tuple[str | None, str | None]:
+    """Extract client metadata for refresh-session auditing."""
+    forwarded_for = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    client_ip = forwarded_for or (request.client.host if request.client else None)
+    user_agent = request.headers.get("user-agent")
+    return client_ip, user_agent
+
+
+def resolve_access_token(
+    request: Request,
+    authorization_header: str | None,
+) -> str | None:
+    """Read access token from Authorization header or cookie."""
+    if authorization_header:
+        scheme, _, token = authorization_header.partition(" ")
+        if scheme.lower() == "bearer" and token.strip():
+            return token.strip()
+
+    cookie_token = request.cookies.get(ACCESS_TOKEN_COOKIE_NAME)
+    if cookie_token and cookie_token.strip():
+        return cookie_token.strip()
+    return None
+
+
+async def get_optional_current_user(
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> AuthenticatedUser | None:
+    """Resolve authenticated user if an access token is present and valid."""
+    raw_token = resolve_access_token(request, authorization)
+    if not raw_token:
+        return None
+
+    decoded = decode_access_token(raw_token)
+    if decoded is None:
+        return None
+
+    user_record = await asyncio.to_thread(get_user_by_id, decoded.user_id)
+    if user_record is None:
+        return None
+
+    user = user_record_to_authenticated_user(user_record)
+    if not user.is_active:
+        return None
+    return user
+
+
+async def require_authenticated_user(
+    current_user: AuthenticatedUser | None = Depends(get_optional_current_user),
+) -> AuthenticatedUser:
+    """Enforce authentication for strict auth endpoints."""
+    if current_user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
+    return current_user
+
+
+async def require_admin(
+    current_user: AuthenticatedUser = Depends(require_authenticated_user),
+) -> AuthenticatedUser:
+    """Enforce Administrator role for account governance endpoints."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator role required.")
+    return current_user
+
+
+async def require_manager_for_api(
+    current_user: AuthenticatedUser | None = Depends(get_optional_current_user),
+) -> AuthenticatedUser | None:
+    """Conditionally enforce manager role for operational endpoints.
+
+    During rollout, enforcement can stay disabled via QUEUEVISION_AUTH_ENFORCE_API.
+    """
+    if not AUTH_ENFORCE_API:
+        return current_user
+
+    if current_user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
+
+    if current_user.role != "manager":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Manager role required.")
+
+    return current_user
 
 
 def build_establishment_model(record: dict) -> Establishment:
@@ -472,9 +666,351 @@ def build_onvif_camera_test_result(
     )
 
 
+@app.post("/api/auth/register", response_model=ApiResponse[LoginResponse], status_code=201)
+async def register(
+    request: RegisterRequest,
+    response: Response,
+    http_request: Request,
+) -> ApiResponse[LoginResponse]:
+    password_issue = validate_password_policy(request.password)
+    if password_issue:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=password_issue)
+
+    try:
+        user_id = await asyncio.to_thread(
+            create_user,
+            email=request.email,
+            display_name=request.display_name,
+            password_hash=hash_password(request.password),
+            role="manager",
+        )
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email is already in use.") from exc
+
+    user_record = await asyncio.to_thread(get_user_by_id, user_id)
+    if user_record is None:
+        raise HTTPException(status_code=500, detail="Created account could not be loaded.")
+
+    await asyncio.to_thread(record_successful_login, user_id)
+    user_record = await asyncio.to_thread(get_user_by_id, user_id)
+    if user_record is None:
+        raise HTTPException(status_code=500, detail="Created account could not be loaded.")
+
+    user = user_record_to_authenticated_user(user_record)
+    access_token = create_access_token(
+        user_id=user.id,
+        email=user.email,
+        role=user.role,
+    )
+    refresh_token = generate_refresh_token()
+    client_ip, user_agent = get_request_client_metadata(http_request)
+    await asyncio.to_thread(
+        create_refresh_session,
+        session_id=create_refresh_session_id(),
+        user_id=user.id,
+        token_hash=hash_refresh_token(refresh_token),
+        expires_at=refresh_token_expiry_iso(),
+        ip_address=client_ip,
+        user_agent=user_agent,
+    )
+
+    set_auth_cookies(response, access_token=access_token, refresh_token=refresh_token)
+    await asyncio.to_thread(
+        create_auth_audit_event,
+        user_id=user.id,
+        event_type="register",
+        event_status="success",
+        details={"email": user.email},
+    )
+
+    return ApiResponse(
+        data=LoginResponse(user=build_auth_user_model(user)),
+        message="Account created successfully.",
+    )
+
+
+@app.post("/api/auth/login", response_model=ApiResponse[LoginResponse])
+async def login(
+    request: LoginRequest,
+    response: Response,
+    http_request: Request,
+) -> ApiResponse[LoginResponse]:
+    user_record = await asyncio.to_thread(get_user_by_email, request.email)
+    if user_record is None:
+        await asyncio.to_thread(
+            create_auth_audit_event,
+            user_id=None,
+            event_type="login",
+            event_status="failed",
+            details={"email": request.email, "reason": "unknown_email"},
+        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
+
+    user = user_record_to_authenticated_user(user_record)
+
+    if not user.is_active:
+        await asyncio.to_thread(
+            create_auth_audit_event,
+            user_id=user.id,
+            event_type="login",
+            event_status="failed",
+            details={"email": user.email, "reason": "inactive_account"},
+        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is inactive.")
+
+    if is_account_locked(user_record):
+        raise HTTPException(
+            status_code=status.HTTP_423_LOCKED,
+            detail="Account is temporarily locked. Please retry later.",
+        )
+
+    if not verify_password(request.password, str(user_record["password_hash"])):
+        current_failures = int(user_record.get("failed_login_attempts") or 0)
+        next_failures = current_failures + 1
+        lock_until = next_lockout_until_iso() if lockout_threshold_reached(next_failures) else None
+        applied_failures = await asyncio.to_thread(
+            record_failed_login_attempt,
+            user.id,
+            locked_until=lock_until,
+        )
+        await asyncio.to_thread(
+            create_auth_audit_event,
+            user_id=user.id,
+            event_type="login",
+            event_status="failed",
+            details={
+                "email": user.email,
+                "reason": "invalid_password",
+                "failed_attempts": applied_failures,
+            },
+        )
+        if lock_until is not None:
+            raise HTTPException(
+                status_code=status.HTTP_423_LOCKED,
+                detail="Account is temporarily locked due to repeated failed attempts.",
+            )
+
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
+
+    await asyncio.to_thread(record_successful_login, user.id)
+
+    refreshed_record = await asyncio.to_thread(get_user_by_id, user.id)
+    if refreshed_record is None:
+        raise HTTPException(status_code=500, detail="Failed to load authenticated account.")
+
+    refreshed_user = user_record_to_authenticated_user(refreshed_record)
+    access_token = create_access_token(
+        user_id=refreshed_user.id,
+        email=refreshed_user.email,
+        role=refreshed_user.role,
+    )
+    refresh_token = generate_refresh_token()
+    client_ip, user_agent = get_request_client_metadata(http_request)
+    await asyncio.to_thread(
+        create_refresh_session,
+        session_id=create_refresh_session_id(),
+        user_id=refreshed_user.id,
+        token_hash=hash_refresh_token(refresh_token),
+        expires_at=refresh_token_expiry_iso(),
+        ip_address=client_ip,
+        user_agent=user_agent,
+    )
+
+    set_auth_cookies(response, access_token=access_token, refresh_token=refresh_token)
+    await asyncio.to_thread(
+        create_auth_audit_event,
+        user_id=refreshed_user.id,
+        event_type="login",
+        event_status="success",
+        details={"email": refreshed_user.email},
+    )
+
+    return ApiResponse(
+        data=LoginResponse(user=build_auth_user_model(refreshed_user)),
+        message="Login successful.",
+    )
+
+
+@app.post("/api/auth/refresh", response_model=ApiResponse[LoginResponse])
+async def refresh_auth_session(response: Response, request: Request) -> ApiResponse[LoginResponse]:
+    raw_refresh_token = request.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
+    if not raw_refresh_token:
+        clear_auth_cookies(response)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session refresh token missing.")
+
+    token_hash = hash_refresh_token(raw_refresh_token)
+    session_record = await asyncio.to_thread(get_refresh_session_by_token_hash, token_hash)
+    if session_record is None or session_record.get("revoked_at"):
+        clear_auth_cookies(response)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session is invalid.")
+
+    expires_at = parse_iso_datetime(session_record.get("expires_at"))
+    if expires_at is None or datetime.now(timezone.utc) >= expires_at:
+        await asyncio.to_thread(revoke_refresh_session, str(session_record["id"]))
+        clear_auth_cookies(response)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session has expired.")
+
+    user_record = await asyncio.to_thread(get_user_by_id, int(session_record["user_id"]))
+    if user_record is None:
+        await asyncio.to_thread(revoke_refresh_session, str(session_record["id"]))
+        clear_auth_cookies(response)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session user is unavailable.")
+
+    user = user_record_to_authenticated_user(user_record)
+    if not user.is_active:
+        await asyncio.to_thread(revoke_refresh_session, str(session_record["id"]))
+        clear_auth_cookies(response)
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is inactive.")
+
+    await asyncio.to_thread(revoke_refresh_session, str(session_record["id"]))
+    client_ip, user_agent = get_request_client_metadata(request)
+    new_refresh_token = generate_refresh_token()
+    new_session_id = create_refresh_session_id()
+    await asyncio.to_thread(
+        create_refresh_session,
+        session_id=new_session_id,
+        user_id=user.id,
+        token_hash=hash_refresh_token(new_refresh_token),
+        expires_at=refresh_token_expiry_iso(),
+        ip_address=client_ip,
+        user_agent=user_agent,
+    )
+    await asyncio.to_thread(touch_refresh_session, new_session_id)
+
+    access_token = create_access_token(user_id=user.id, email=user.email, role=user.role)
+    set_auth_cookies(response, access_token=access_token, refresh_token=new_refresh_token)
+
+    return ApiResponse(data=LoginResponse(user=build_auth_user_model(user)), message="Session refreshed.")
+
+
+@app.post("/api/auth/logout", response_model=ApiResponse[dict[str, bool]])
+async def logout(response: Response, request: Request) -> ApiResponse[dict[str, bool]]:
+    raw_refresh_token = request.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
+    if raw_refresh_token:
+        await asyncio.to_thread(revoke_refresh_session_by_token_hash, hash_refresh_token(raw_refresh_token))
+
+    clear_auth_cookies(response)
+    return ApiResponse(data={"logged_out": True}, message="Logged out successfully.")
+
+
+@app.get("/api/auth/me", response_model=ApiResponse[SessionStatusResponse])
+async def get_current_session(
+    current_user: AuthenticatedUser = Depends(require_authenticated_user),
+) -> ApiResponse[SessionStatusResponse]:
+    return ApiResponse(
+        data=SessionStatusResponse(authenticated=True, user=build_auth_user_model(current_user)),
+        message="Session loaded successfully.",
+    )
+
+
+@app.get("/api/admin/managers", response_model=ApiResponse[list[AuthUserModel]])
+async def list_manager_accounts(
+    _admin: AuthenticatedUser = Depends(require_admin),
+) -> ApiResponse[list[AuthUserModel]]:
+    manager_records = await asyncio.to_thread(list_users_by_role, "manager")
+    manager_models = [
+        build_auth_user_model(user_record_to_authenticated_user(record))
+        for record in manager_records
+    ]
+    return ApiResponse(data=manager_models)
+
+
+@app.post("/api/admin/managers", response_model=ApiResponse[AuthUserModel], status_code=201)
+async def create_manager_account(
+    request: CreateManagerRequest,
+    _admin: AuthenticatedUser = Depends(require_admin),
+) -> ApiResponse[AuthUserModel]:
+    password_issue = validate_password_policy(request.password)
+    if password_issue:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=password_issue)
+
+    try:
+        manager_id = await asyncio.to_thread(
+            create_user,
+            email=request.email,
+            display_name=request.display_name,
+            password_hash=hash_password(request.password),
+            role="manager",
+        )
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email is already in use.") from exc
+
+    manager_record = await asyncio.to_thread(get_user_by_id, manager_id)
+    if manager_record is None:
+        raise HTTPException(status_code=500, detail="Created manager account could not be loaded.")
+
+    manager_user = user_record_to_authenticated_user(manager_record)
+    await asyncio.to_thread(
+        create_auth_audit_event,
+        user_id=manager_user.id,
+        event_type="manager_create",
+        event_status="success",
+        details={"email": manager_user.email},
+    )
+    return ApiResponse(data=build_auth_user_model(manager_user), message="Manager account created.")
+
+
+@app.post("/api/admin/managers/{user_id}/status", response_model=ApiResponse[AuthUserModel])
+async def update_manager_account_status(
+    user_id: int,
+    request: UpdateManagerStatusRequest,
+    _admin: AuthenticatedUser = Depends(require_admin),
+) -> ApiResponse[AuthUserModel]:
+    manager_record = await asyncio.to_thread(get_user_by_id, user_id)
+    if manager_record is None or manager_record.get("role") != "manager":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manager account not found.")
+
+    updated = await asyncio.to_thread(set_user_active, user_id, request.is_active)
+    if not updated:
+        raise HTTPException(status_code=500, detail="Failed to update manager status.")
+
+    manager_record = await asyncio.to_thread(get_user_by_id, user_id)
+    if manager_record is None:
+        raise HTTPException(status_code=500, detail="Updated manager account could not be loaded.")
+
+    manager_user = user_record_to_authenticated_user(manager_record)
+    await asyncio.to_thread(
+        create_auth_audit_event,
+        user_id=manager_user.id,
+        event_type="manager_status_update",
+        event_status="success",
+        details={"is_active": request.is_active},
+    )
+    return ApiResponse(data=build_auth_user_model(manager_user), message="Manager status updated.")
+
+
+@app.post("/api/admin/managers/{user_id}/reset-password", response_model=ApiResponse[dict[str, bool]])
+async def reset_manager_account_password(
+    user_id: int,
+    request: ResetManagerPasswordRequest,
+    _admin: AuthenticatedUser = Depends(require_admin),
+) -> ApiResponse[dict[str, bool]]:
+    manager_record = await asyncio.to_thread(get_user_by_id, user_id)
+    if manager_record is None or manager_record.get("role") != "manager":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manager account not found.")
+
+    password_issue = validate_password_policy(request.password)
+    if password_issue:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=password_issue)
+
+    updated = await asyncio.to_thread(update_user_password_hash, user_id, hash_password(request.password))
+    if not updated:
+        raise HTTPException(status_code=500, detail="Failed to reset manager password.")
+
+    await asyncio.to_thread(
+        create_auth_audit_event,
+        user_id=user_id,
+        event_type="manager_password_reset",
+        event_status="success",
+        details={"min_password_length": AUTH_MIN_PASSWORD_LENGTH},
+    )
+    return ApiResponse(data={"password_reset": True}, message="Manager password reset.")
+
+
 @app.post("/api/sources/rtsp/test", response_model=ApiResponse[RTSPConnectionTestResult])
 async def test_rtsp_source(
     request: RTSPConnectionTestRequest,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[RTSPConnectionTestResult]:
     try:
         ok, info = await asyncio.to_thread(
@@ -508,6 +1044,7 @@ async def test_rtsp_source(
 @app.post("/api/sources/rtsp/snapshot", response_model=ApiResponse[RTSPSnapshotResult])
 async def capture_rtsp_snapshot(
     request: RTSPSnapshotRequest,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[RTSPSnapshotResult]:
     try:
         ok, info = await asyncio.to_thread(
@@ -545,6 +1082,7 @@ async def capture_rtsp_snapshot(
 @app.post("/api/sources/onvif/discover", response_model=ApiResponse[list[ONVIFDevice]])
 async def discover_onvif_devices(
     request: ONVIFDiscoveryRequest,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[list[ONVIFDevice]]:
     try:
         devices = await asyncio.to_thread(
@@ -564,6 +1102,7 @@ async def discover_onvif_devices(
 @app.post("/api/sources/onvif/streams", response_model=ApiResponse[list[ONVIFStream]])
 async def resolve_onvif_streams(
     request: ONVIFStreamResolutionRequest,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[list[ONVIFStream]]:
     try:
         urls = await asyncio.to_thread(
@@ -585,6 +1124,7 @@ async def resolve_onvif_streams(
 @app.post("/api/sources/onvif/test", response_model=ApiResponse[ONVIFCameraTestResult])
 async def test_onvif_camera(
     request: ONVIFCameraTestRequest,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[ONVIFCameraTestResult]:
     try:
         urls = await asyncio.to_thread(
@@ -655,7 +1195,9 @@ async def archive_queue_alerts(request: QueueAlertArchiveRequest) -> ApiResponse
 
 
 @app.get("/api/establishments", response_model=ApiResponse[list[Establishment]])
-async def list_establishments() -> ApiResponse[list[Establishment]]:
+async def list_establishments(
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[list[Establishment]]:
     records = await asyncio.to_thread(get_establishments)
     return ApiResponse(data=[build_establishment_model(record) for record in records])
 
@@ -663,6 +1205,7 @@ async def list_establishments() -> ApiResponse[list[Establishment]]:
 @app.post("/api/establishments", response_model=ApiResponse[Establishment], status_code=201)
 async def create_establishment_endpoint(
     request: CreateEstablishmentRequest,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[Establishment]:
     try:
         establishment_id = await asyncio.to_thread(create_establishment, request.name)
@@ -680,7 +1223,10 @@ async def create_establishment_endpoint(
 
 
 @app.get("/api/establishments/{establishment_id}/caisses", response_model=ApiResponse[list[Caisse]])
-async def list_caisses(establishment_id: int) -> ApiResponse[list[Caisse]]:
+async def list_caisses(
+    establishment_id: int,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[list[Caisse]]:
     establishment = await asyncio.to_thread(get_establishment_by_id, establishment_id)
     if establishment is None:
         raise HTTPException(status_code=404, detail="Establishment not found.")
@@ -693,6 +1239,7 @@ async def list_caisses(establishment_id: int) -> ApiResponse[list[Caisse]]:
 async def create_caisse_endpoint(
     establishment_id: int,
     request: CreateCaisseRequest,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[Caisse]:
     establishment = await asyncio.to_thread(get_establishment_by_id, establishment_id)
     if establishment is None:
@@ -722,7 +1269,10 @@ async def create_caisse_endpoint(
 
 @app.post("/api/upload", response_model=ApiResponse[UploadVideoResponse], status_code=201)
 @app.post("/api/uploads/video", response_model=ApiResponse[UploadVideoResponse], status_code=201)
-async def upload_video_file(file: UploadFile = File(...)) -> ApiResponse[UploadVideoResponse]:
+async def upload_video_file(
+    file: UploadFile = File(...),
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[UploadVideoResponse]:
     """Upload a video file and return a backend-readable source path."""
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file was provided.")
@@ -761,7 +1311,10 @@ async def upload_video_file(file: UploadFile = File(...)) -> ApiResponse[UploadV
 
 
 @app.get("/api/uploads/files/{file_name}")
-async def serve_uploaded_video(file_name: str) -> FileResponse:
+async def serve_uploaded_video(
+    file_name: str,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> FileResponse:
     candidate = (UPLOAD_DIR / Path(file_name).name).resolve()
 
     try:
@@ -777,13 +1330,18 @@ async def serve_uploaded_video(file_name: str) -> FileResponse:
 
 
 @app.get("/api/feeds", response_model=ApiResponse[list[VideoFeed]])
-async def list_feeds() -> ApiResponse[list[VideoFeed]]:
+async def list_feeds(
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[list[VideoFeed]]:
     feeds = await get_registry().list_feeds()
     return ApiResponse(data=feeds)
 
 
 @app.post("/api/feeds", response_model=ApiResponse[VideoFeed], status_code=201)
-async def create_feed(request: CreateFeedRequest) -> ApiResponse[VideoFeed]:
+async def create_feed(
+    request: CreateFeedRequest,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[VideoFeed]:
     feed = await get_registry().create_feed(
         name=request.name,
         source=request.source,
@@ -798,7 +1356,10 @@ async def create_feed(request: CreateFeedRequest) -> ApiResponse[VideoFeed]:
 
 
 @app.post("/api/feeds/batch-launch", response_model=ApiResponse[BatchFeedLaunchResponse])
-async def batch_launch_feeds(request: BatchFeedLaunchRequest) -> ApiResponse[BatchFeedLaunchResponse]:
+async def batch_launch_feeds(
+    request: BatchFeedLaunchRequest,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[BatchFeedLaunchResponse]:
     result = await get_registry().launch_feed_batch(
         feeds=request.feeds,
         launch_mode=request.launch_mode,
@@ -809,7 +1370,10 @@ async def batch_launch_feeds(request: BatchFeedLaunchRequest) -> ApiResponse[Bat
 
 
 @app.get("/api/feeds/{feed_id}/status", response_model=ApiResponse[VideoFeed])
-async def get_feed_status(feed_id: str) -> ApiResponse[VideoFeed]:
+async def get_feed_status(
+    feed_id: str,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[VideoFeed]:
     feed = await get_registry().get_feed(feed_id)
     if feed is None:
         raise HTTPException(status_code=404, detail="Feed not found.")
@@ -817,7 +1381,10 @@ async def get_feed_status(feed_id: str) -> ApiResponse[VideoFeed]:
 
 
 @app.get("/api/feeds/{feed_id}/transport", response_model=ApiResponse[FeedTransportCapabilities])
-async def get_feed_transport(feed_id: str) -> ApiResponse[FeedTransportCapabilities]:
+async def get_feed_transport(
+    feed_id: str,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[FeedTransportCapabilities]:
     capabilities = await get_registry().get_feed_transport_capabilities(feed_id)
     if capabilities is None:
         raise HTTPException(status_code=404, detail="Feed not found.")
@@ -828,6 +1395,7 @@ async def get_feed_transport(feed_id: str) -> ApiResponse[FeedTransportCapabilit
 async def create_feed_webrtc_offer(
     feed_id: str,
     request: FeedWebRTCOfferRequest,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[FeedWebRTCOfferResponse]:
     if not MEDIAMTX_WEBRTC_PREVIEW_ENABLED:
         raise HTTPException(status_code=503, detail="WebRTC preview is disabled on this backend.")
@@ -897,7 +1465,10 @@ async def create_feed_webrtc_offer(
 
 
 @app.get("/api/feeds/{feed_id}/snapshot", response_model=ApiResponse[FeedSnapshotResult])
-async def get_feed_snapshot(feed_id: str) -> ApiResponse[FeedSnapshotResult]:
+async def get_feed_snapshot(
+    feed_id: str,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[FeedSnapshotResult]:
     snapshot = await get_registry().capture_feed_snapshot(feed_id)
     if snapshot is None:
         raise HTTPException(status_code=404, detail="Feed not found.")
@@ -909,7 +1480,10 @@ async def get_feed_snapshot(feed_id: str) -> ApiResponse[FeedSnapshotResult]:
 
 
 @app.get("/api/feeds/{feed_id}/stream")
-async def stream_feed(feed_id: str) -> StreamingResponse:
+async def stream_feed(
+    feed_id: str,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> StreamingResponse:
     registry = get_registry()
     stream_status = await registry.subscribe_feed_stream(feed_id)
     if stream_status == "not_found":
@@ -961,7 +1535,10 @@ async def stream_feed(feed_id: str) -> StreamingResponse:
 
 
 @app.post("/api/feeds/{feed_id}/start", response_model=ApiResponse[VideoFeed])
-async def start_feed(feed_id: str) -> ApiResponse[VideoFeed]:
+async def start_feed(
+    feed_id: str,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[VideoFeed]:
     try:
         feed = await get_registry().start_feed(feed_id)
     except FeedStateError as exc:
@@ -976,7 +1553,10 @@ async def start_feed(feed_id: str) -> ApiResponse[VideoFeed]:
 
 
 @app.post("/api/feeds/{feed_id}/stop", response_model=ApiResponse[VideoFeed])
-async def stop_feed(feed_id: str) -> ApiResponse[VideoFeed]:
+async def stop_feed(
+    feed_id: str,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[VideoFeed]:
     try:
         feed = await get_registry().stop_feed(feed_id)
     except FeedStateError as exc:
@@ -989,7 +1569,10 @@ async def stop_feed(feed_id: str) -> ApiResponse[VideoFeed]:
 
 
 @app.post("/api/feeds/{feed_id}/restart", response_model=ApiResponse[VideoFeed])
-async def restart_feed(feed_id: str) -> ApiResponse[VideoFeed]:
+async def restart_feed(
+    feed_id: str,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[VideoFeed]:
     try:
         feed = await get_registry().restart_feed(feed_id)
     except FeedStateError as exc:
@@ -1004,7 +1587,10 @@ async def restart_feed(feed_id: str) -> ApiResponse[VideoFeed]:
 
 
 @app.delete("/api/feeds/{feed_id}", response_model=ApiResponse[dict[str, str]])
-async def delete_feed(feed_id: str) -> ApiResponse[dict[str, str]]:
+async def delete_feed(
+    feed_id: str,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[dict[str, str]]:
     removed = await get_registry().delete_feed(feed_id)
     if not removed:
         raise HTTPException(status_code=404, detail="Feed not found.")
@@ -1012,7 +1598,11 @@ async def delete_feed(feed_id: str) -> ApiResponse[dict[str, str]]:
 
 
 @app.post("/api/feeds/{feed_id}/zone", response_model=ApiResponse[VideoFeed])
-async def update_feed_zone(feed_id: str, request: ZoneUpdateRequest) -> ApiResponse[VideoFeed]:
+async def update_feed_zone(
+    feed_id: str,
+    request: ZoneUpdateRequest,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[VideoFeed]:
     feed = await get_registry().update_zone(feed_id, request.zone)
     if feed is None:
         raise HTTPException(status_code=404, detail="Feed not found.")
@@ -1020,7 +1610,11 @@ async def update_feed_zone(feed_id: str, request: ZoneUpdateRequest) -> ApiRespo
 
 
 @app.post("/api/feeds/{feed_id}/thresholds", response_model=ApiResponse[VideoFeed])
-async def update_feed_thresholds(feed_id: str, request: QueueThresholdUpdateRequest) -> ApiResponse[VideoFeed]:
+async def update_feed_thresholds(
+    feed_id: str,
+    request: QueueThresholdUpdateRequest,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[VideoFeed]:
     feed = await get_registry().update_thresholds(
         feed_id,
         queue_length_warning=request.queue_length_warning,
@@ -1031,7 +1625,11 @@ async def update_feed_thresholds(feed_id: str, request: QueueThresholdUpdateRequ
 
 
 @app.post("/api/feeds/{feed_id}/source", response_model=ApiResponse[VideoFeed])
-async def update_feed_source(feed_id: str, request: FeedSourceUpdateRequest) -> ApiResponse[VideoFeed]:
+async def update_feed_source(
+    feed_id: str,
+    request: FeedSourceUpdateRequest,
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[VideoFeed]:
     fields_set = request.model_fields_set
 
     try:
@@ -1061,7 +1659,9 @@ async def update_feed_source(feed_id: str, request: FeedSourceUpdateRequest) -> 
 
 
 @app.get("/api/system/health", response_model=ApiResponse[SystemHealth])
-async def get_system_health() -> ApiResponse[SystemHealth]:
+async def get_system_health(
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[SystemHealth]:
     feeds = await get_registry().list_feeds()
     active_feeds = sum(1 for feed in feeds if feed.status == "running")
     health = SystemHealth(
@@ -1076,7 +1676,9 @@ async def get_system_health() -> ApiResponse[SystemHealth]:
 
 
 @app.get("/api/system/webhook", response_model=ApiResponse[WebhookIntegrationStatus])
-async def get_webhook_integration_status() -> ApiResponse[WebhookIntegrationStatus]:
+async def get_webhook_integration_status(
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[WebhookIntegrationStatus]:
     return ApiResponse(
         data=WebhookIntegrationStatus(
             webhook_url=N8N_WEBHOOK_URL or None,
@@ -1088,7 +1690,9 @@ async def get_webhook_integration_status() -> ApiResponse[WebhookIntegrationStat
 
 
 @app.post("/api/system/webhook/test", response_model=ApiResponse[WebhookIntegrationTestResult])
-async def test_webhook_integration() -> ApiResponse[WebhookIntegrationTestResult]:
+async def test_webhook_integration(
+    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[WebhookIntegrationTestResult]:
     if not N8N_WEBHOOK_URL:
         raise HTTPException(status_code=503, detail="N8N webhook URL is not configured.")
 
@@ -1100,13 +1704,6 @@ async def test_webhook_integration() -> ApiResponse[WebhookIntegrationTestResult
         service_rate=0.10,
         estimated_wait_sec=5.0,
         queue_stable=True,
-        arrival_rate_lower=0.02,
-        arrival_rate_upper=0.09,
-        service_rate_lower=0.06,
-        service_rate_upper=0.15,
-        wait_time_lower=3.0,
-        wait_time_upper=8.5,
-        uncertainty_level="Low",
     )
 
     try:

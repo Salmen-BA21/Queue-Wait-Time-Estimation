@@ -46,7 +46,7 @@ class TestLocalScoring(unittest.TestCase):
         specific = (
             "In Sprint 6, the backend sent queue payloads to n8n with a 10-second cooldown "
             "and critical escalation through Telegram. The QueueAnalyzer module produced "
-            "lambda and mu estimates, while uncertainty.py computed confidence intervals "
+            "lambda and mu estimates, while ThresholdDetector handled queue instability alerts "
             "for wait time under noisy RTSP feeds at 24 FPS."
         )
 

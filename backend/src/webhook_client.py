@@ -226,13 +226,6 @@ if __name__ == "__main__":
         arrival_rate=0.15,
         service_rate=0.08,
         estimated_wait_sec=4.5,
-        arrival_rate_lower=0.10,
-        arrival_rate_upper=0.20,
-        service_rate_lower=0.05,
-        service_rate_upper=0.11,
-        wait_time_lower=3.5,
-        wait_time_upper=5.5,
-        uncertainty_level="Low",
         queue_stable=True,
     )
     

@@ -47,7 +47,7 @@ A complete UI/UX design for the **QueueVision** web application was created usin
 | Cyan | `#22D3EE` | Primary accent, buttons, links |
 | Amber | `#F59E0B` | Warnings, zone editor |
 | Red | `#EF4444` | Critical alerts, errors |
-| Purple | `#A78BFA` | Uncertainty, analytics |
+| Purple | `#A78BFA` | Analytics highlights |
 | Green | `#10B981` | Success, online status |
 | Text | `#F1F5F9` | Primary text |
 | Secondary | `#94A3B8` | Body text, labels |
@@ -98,7 +98,7 @@ Node IDs for screenshots:
 ### Step 4: Connect to Backend
 The existing Python backend (`backend/src/`) provides:
 - YOLO26 detection + ByteTrack tracking
-- M/M/1 queue analysis with Bayesian uncertainty
+- M/M/1 queue analysis with stability-aware runtime handling
 - Webhook client for n8n integration
 - CSV logging
 
@@ -112,7 +112,7 @@ The web frontend should:
 
 ## ⚠️ Important Notes
 
-1. The design is **admin-focused** — all pages except landing require authentication
+1. The design is **manager-focused** — all pages except landing require authenticated operational access
 2. The Zone Editor is both a **wizard step** AND an **inline edit tool** (accessible from dashboard)
 3. The heatmap uses **AI-generated images** in the design — implement with real computed heatmaps using canvas overlays
 4. Charts in the design are **placeholders** — implement with real data from the queue metrics CSV files
@@ -129,7 +129,6 @@ The web frontend should:
 | `QueueVision Design.pen` | Pencil design file (use MCP tools to view) |
 | `backend/src/config.py` | Backend configuration (maps to Settings page) |
 | `backend/src/queue_analyzer.py` | Queue metrics (maps to Dashboard KPIs) |
-| `backend/src/uncertainty.py` | Uncertainty calculations (maps to Analytics confidence intervals) |
 | `backend/src/threshold_detector.py` | Alert logic (maps to Dashboard alert sidebar) |
 | `backend/src/webhook_client.py` | n8n integration (maps to Settings webhook section) |
 | `data/*.csv` | Historical metrics (maps to Analytics charts) |

@@ -10,11 +10,11 @@
 **Topics covered:**
 - 🎯 Problem statement (real-world queue issues)
 - 🔄 Complete system pipeline (detection → tracking → analysis → alerts)
-- 📐 Mathematics (M/M/1 queuing theory, Bayesian uncertainty)
+- 📐 Mathematics (M/M/1 queuing theory and queue stability logic)
 - 🏗️ System architecture diagram
 - 💾 Real-world data flow example
 - 🔌 Why each component exists
-- 🎯 Use cases (for customers, staff, managers)
+- 🎯 Use cases (for customers, administrators, managers)
 - ⚠️ Limitations and honest assessment
 
 **Reading time:** 15-20 minutes
@@ -73,7 +73,7 @@
 
 ### 6️⃣ **[../sprints/](../sprints/)** – Sprint-Specific Details
 Deep dives into specific sprints:
-- `SPRINT4_SUMMARY.md` – Uncertainty quantification implementation
+- `SPRINT4_SUMMARY.md` – Historical sprint summary (legacy uncertainty work)
 - `SPRINT5_SETUP.md` – n8n webhook integration setup
 
 ---
@@ -99,7 +99,7 @@ Daily logs organized by date and sprint activity. Useful for understanding desig
 2. **design/DESIGN_SPEC.md** – Full technical design spec (colors, layouts, components)
 3. **frontend/src/pages/** – All 7 page implementations
 4. **frontend/src/components/** – UI components library (55+ shadcn/ui components)
-5. **Backend reference**: `backend/src/config.py`, `backend/src/queue_analyzer.py`, `backend/src/uncertainty.py`
+5. **Backend reference**: `backend/src/config.py`, `backend/src/queue_analyzer.py`, `backend/src/threshold_detector.py`
 
 ### **I'm implementing Sprint 5 (Telegram/n8n)**
 1. **AGENT_CONTEXT.md** – Status
@@ -145,7 +145,7 @@ docs/tracking/             (project status)
 └── STATUS_REPORT.md       (recent fixes & architecture)
 
 docs/sprints/              (sprint-specific deep dives)
-├── SPRINT4_SUMMARY.md     (uncertainty quantification)
+├── SPRINT4_SUMMARY.md     (legacy uncertainty sprint record)
 ├── SPRINT5_SETUP.md       (n8n integration)
 └── SPRINT_MAPPING.md      (legacy mapping)
 

@@ -80,8 +80,6 @@ function createMetrics(): NonNullable<VideoFeed["latest_metrics"]> {
     arrival_rate: 0.1,
     service_rate: 0.2,
     wait_time_seconds: 6.5,
-    wait_time_ci: [4.0, 9.0],
-    uncertainty_level: "LOW",
     queue_stable: true,
     detections: [[10, 20, 80, 120]],
     render_frame_jpeg_base64: null,

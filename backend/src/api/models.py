@@ -18,6 +18,7 @@ LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 BatchLaunchMode = Literal["save_only", "create_and_start"]
 BatchLaunchItemStatus = Literal["created", "started", "failed"]
 AlertSeverity = Literal["warning"]
+AuthRole = Literal["admin", "manager"]
 
 T = TypeVar("T")
 
@@ -28,6 +29,106 @@ class ApiResponse(BaseModel, Generic[T]):
     success: bool = True
     data: T
     message: str | None = None
+
+
+class AuthUserModel(BaseModel):
+    """Authenticated user profile returned to the frontend."""
+
+    id: int = Field(ge=1)
+    email: str = Field(min_length=3, max_length=255)
+    display_name: str = Field(min_length=1, max_length=120)
+    role: AuthRole
+    is_active: bool
+    created_at: str
+    last_login_at: str | None = None
+
+
+class LoginRequest(BaseModel):
+    """Credential payload for session login."""
+
+    email: str = Field(min_length=3, max_length=255)
+    password: str = Field(min_length=1, max_length=255)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if "@" not in normalized:
+            raise ValueError("Email must be valid.")
+        return normalized
+
+
+class RegisterRequest(BaseModel):
+    """Self-service registration payload for manager accounts."""
+
+    email: str = Field(min_length=3, max_length=255)
+    display_name: str = Field(min_length=1, max_length=120)
+    password: str = Field(min_length=1, max_length=255)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if "@" not in normalized:
+            raise ValueError("Email must be valid.")
+        return normalized
+
+    @field_validator("display_name")
+    @classmethod
+    def normalize_display_name(cls, value: str) -> str:
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("Display name must not be blank.")
+        return trimmed
+
+
+class LoginResponse(BaseModel):
+    """Login response payload for cookie-based sessions."""
+
+    user: AuthUserModel
+
+
+class SessionStatusResponse(BaseModel):
+    """Response payload for current-session introspection."""
+
+    authenticated: bool
+    user: AuthUserModel | None = None
+
+
+class CreateManagerRequest(BaseModel):
+    """Payload used by administrators to create manager accounts."""
+
+    email: str = Field(min_length=3, max_length=255)
+    display_name: str = Field(min_length=1, max_length=120)
+    password: str = Field(min_length=1, max_length=255)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if "@" not in normalized:
+            raise ValueError("Email must be valid.")
+        return normalized
+
+    @field_validator("display_name")
+    @classmethod
+    def normalize_display_name(cls, value: str) -> str:
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("Display name must not be blank.")
+        return trimmed
+
+
+class UpdateManagerStatusRequest(BaseModel):
+    """Payload used to activate or deactivate manager accounts."""
+
+    is_active: bool
+
+
+class ResetManagerPasswordRequest(BaseModel):
+    """Payload used to rotate manager account credentials."""
+
+    password: str = Field(min_length=1, max_length=255)
 
 
 class QueueAlertItem(BaseModel):
@@ -50,15 +151,6 @@ class QueueAlertMetrics(BaseModel):
     queue_stable: bool
 
 
-class QueueAlertUncertainty(BaseModel):
-    """Uncertainty summary attached to an archived alert payload."""
-
-    lambda_ci: list[float] | None = None
-    mu_ci: list[float] | None = None
-    wait_time_ci: list[float] | None = None
-    level: str | None = None
-
-
 class QueueAlertArchiveRequest(BaseModel):
     """Payload archived from the n8n workflow for later analysis."""
 
@@ -66,7 +158,6 @@ class QueueAlertArchiveRequest(BaseModel):
     camera_id: str = Field(min_length=1, max_length=120)
     zone_id: str = Field(min_length=1, max_length=120)
     metrics: QueueAlertMetrics
-    uncertainty: QueueAlertUncertainty | None = None
     alerts: list[QueueAlertItem] = Field(default_factory=list)
     raw_detection_count: int | None = Field(default=None, ge=0)
     fps: float | None = Field(default=None, ge=0.0)
@@ -180,8 +271,6 @@ class QueueMetricsModel(BaseModel):
     arrival_rate: float = Field(ge=0.0)
     service_rate: float = Field(ge=0.0)
     wait_time_seconds: float | None = Field(default=None, ge=0.0)
-    wait_time_ci: list[float] | None = None
-    uncertainty_level: str
     queue_stable: bool
     detections: list[list[float]] | None = None
     render_frame_jpeg_base64: str | None = None

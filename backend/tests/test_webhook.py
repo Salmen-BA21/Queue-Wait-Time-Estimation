@@ -11,13 +11,6 @@ def test_queue_payload_includes_feed_id_and_validates():
         arrival_rate=0.12,
         service_rate=0.15,
         estimated_wait_sec=12.3,
-        arrival_rate_lower=0.1,
-        arrival_rate_upper=0.14,
-        service_rate_lower=0.13,
-        service_rate_upper=0.17,
-        wait_time_lower=10.0,
-        wait_time_upper=14.0,
-        uncertainty_level="Low",
         queue_stable=True,
     )
 

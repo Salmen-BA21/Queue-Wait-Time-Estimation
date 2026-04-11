@@ -1,14 +1,14 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useAuth } from "@/auth/useAuth";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -20,7 +20,19 @@ type LoginForm = z.infer<typeof loginSchema>;
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login, user, isLoading: isSessionLoading } = useAuth();
+
+  useEffect(() => {
+    if (isSessionLoading || !user) {
+      return;
+    }
+
+    const destination = user.role === "manager" ? "/dashboard" : "/settings";
+    navigate(destination, { replace: true });
+  }, [isSessionLoading, navigate, user]);
 
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -32,18 +44,16 @@ export default function Login() {
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
+    setErrorMessage(null);
     try {
-      // TODO: Implement actual authentication
-      console.log("Login attempt:", data);
-
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // For now, just redirect to dashboard
-      navigate("/dashboard");
+      const loggedInUser = await login({ email: data.email, password: data.password });
+      const requestedPath = (location.state as { from?: string } | null)?.from;
+      const defaultPath = loggedInUser.role === "manager" ? "/dashboard" : "/settings";
+      navigate(requestedPath || defaultPath, { replace: true });
     } catch (error) {
       console.error("Login failed:", error);
-      // TODO: Show error message
+      const fallbackMessage = "Unable to sign in. Please check your credentials and try again.";
+      setErrorMessage(error instanceof Error ? error.message : fallbackMessage);
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +85,7 @@ export default function Login() {
                     <FormControl>
                       <Input
                         type="email"
-                        placeholder="operator@queuevision.com"
+                        placeholder="manager@queuevision.com"
                         {...field}
                       />
                     </FormControl>
@@ -118,11 +128,19 @@ export default function Login() {
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Signing in..." : "Sign in"}
               </Button>
+              {errorMessage && (
+                <p className="text-sm text-destructive" role="alert">
+                  {errorMessage}
+                </p>
+              )}
             </form>
           </Form>
-          <div className="mt-4 text-center text-sm text-muted-foreground">
-            <p>Demo credentials: operator@queuevision.com / password</p>
-          </div>
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            Need an account?{" "}
+            <Link to="/signup" className="text-primary hover:underline">
+              Sign up
+            </Link>
+          </p>
         </CardContent>
       </Card>
     </div>

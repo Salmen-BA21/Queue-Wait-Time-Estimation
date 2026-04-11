@@ -54,7 +54,6 @@ for ($i=1; $i -le $Rounds; $i++) {
             source = "rtsp://stream/$feed"
             feed_id = $feed
             metrics = @{ people_in_zone = $people; arrival_rate = $arrival; service_rate = $service; wait_time_seconds = $wait; queue_stable = $stable }
-            uncertainty = @{ lambda_ci = @([math]::Round($arrival - 0.03,3), [math]::Round($arrival + 0.03,3)); mu_ci = @([math]::Round($service - 0.03,3), [math]::Round($service + 0.03,3)); wait_time_ci = @([math]::Round($wait - 10,1), [math]::Round($wait + 10,1)); level = "MEDIUM" }
             alerts = $alerts
             raw_detection_count = $people
             fps = 24.5

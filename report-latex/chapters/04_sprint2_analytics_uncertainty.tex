@@ -2,16 +2,15 @@
 \chaptertoc
 
 \section{Introduction}
-Sprint 2 transformed perception outputs into operational queue indicators. The focus moved from ``who is detected'' to ``how the queue behaves'' through arrival/service-rate estimation, waiting-time computation, and explicit uncertainty quantification.
+Sprint 2 transformed perception outputs into operational queue indicators. The focus moved from ``who is detected'' to ``how the queue behaves'' through arrival/service-rate estimation, wait-time computation, and stability-aware decision logic.
 
 \section{Sprint Backlog}
 Sprint 2 backlog priorities were:
 \begin{itemize}
     \item Implement event-based queue rate estimation from tracked IDs in zone.
     \item Compute wait-time estimates with explicit stable/unstable queue handling.
-    \item Add Bayesian credible intervals for rate metrics.
-    \item Add wait-time uncertainty bounds and uncertainty-level classification.
-    \item Extend runtime payloads and overlays with confidence information.
+    \item Add denominator-safety guards and fallback wait-time logic.
+    \item Expose a consistent runtime metric contract for dashboard and webhook consumption.
 \end{itemize}
 
 \section{Design}
@@ -20,25 +19,25 @@ Sprint 2 backlog priorities were:
 \begin{figure}[ht]
     \centering
     \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 2 component diagram}}
-    \caption{Sprint 2 components for queue analysis and uncertainty computation.}
+    \caption{Sprint 2 components for queue analysis and stability handling.}
     \label{fig:sprint2_component}
 \end{figure}
 
-At component level, \texttt{QueueAnalyzer} receives in-zone tracker IDs and produces \texttt{QueueMetrics}, while \texttt{uncertainty.py} computes uncertainty estimates and confidence intervals consumed by both logs and dashboard payloads.
+At component level, \texttt{QueueAnalyzer} receives in-zone tracker IDs and produces \texttt{QueueMetrics} consumed by logs, webhook payloads, and dashboard updates.
 
 \subsection{Data Flow Diagram}
 \begin{figure}[ht]
     \centering
     \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 2 data flow diagram}}
-    \caption{Data flow from tracked events to queue metrics and confidence intervals.}
+    \caption{Data flow from tracked events to queue metrics and stability state.}
     \label{fig:sprint2_data_flow}
 \end{figure}
 
-Data flow is event-centric: per-frame ID transitions produce arrival/departure events, event windows produce rates $(\lambda,\mu)$, rates and occupancy produce wait-time estimates, and uncertainty modules provide interval bounds and level labels.
+Data flow is event-centric: per-frame ID transitions produce arrival/departure events, event windows produce rates $(\lambda,\mu)$, and rates with occupancy produce wait-time estimates plus stable/unstable state labels.
 
 \subsection{Sequence Diagrams}
 The implemented sequence is:
-\texttt{QueueAnalyzer.update()} computes counts and rates, then calls \texttt{estimate\_rate\_uncertainty()} and \texttt{estimate\_wait\_time\_uncertainty\_from\_variance()}, then classifies uncertainty with \texttt{classify\_uncertainty\_level()}.
+\texttt{QueueAnalyzer.update()} computes counts and rates, evaluates queue stability, and applies either the stable wait-time formula or fallback wait-time branch before publishing \texttt{QueueMetrics}.
 
 \section{Implementation}
 \subsection{Queue Event Windows and Rate Estimation}
@@ -60,22 +59,14 @@ The wait-time logic follows two branches:
 \end{itemize}
 When no service events are observed, the implementation currently returns a zero fallback.
 
-\subsection{Bayesian and Variance-Based Uncertainty}
-In \texttt{backend/src/uncertainty.py}, rate uncertainty uses a Gamma posterior with conjugate Poisson assumptions \cite{bishop_prml}:
-\[
-\lambda \mid k,T \sim \Gamma(k+1, T),\qquad
-\mu \mid n,T \sim \Gamma(n+1, T)
-\]
-Credible intervals are computed via Gamma quantiles. Wait-time uncertainty is estimated from recent variance when history is sufficient; otherwise a controlled fallback margin is used.
-
-\subsection{Uncertainty Classification and Runtime Contract}
-Uncertainty is mapped to \texttt{Low}/\texttt{Medium}/\texttt{High} based on relative interval width. The final \texttt{QueueMetrics} object includes:
+\subsection{Runtime Contract for Monitoring and Automation}
+The final \texttt{QueueMetrics} object includes:
 \begin{itemize}
     \item point estimates ($\lambda$, $\mu$, $W$),
-    \item interval bounds for rates and wait time,
-    \item stability flag and uncertainty-level label.
+    \item people-in-zone occupancy,
+    \item stability flag for safe downstream interpretation.
 \end{itemize}
 These fields are propagated to logs, overlays, webhook payloads, and dashboard events.
 
 \section{Conclusion}
-Sprint 2 delivered the analytical intelligence of the project: event-to-rate modeling, stable/unstable wait-time semantics, and uncertainty-aware outputs. This provided the mathematical and statistical core required for API exposure and external automation in the next sprint.
+Sprint 2 delivered the analytical intelligence of the project: event-to-rate modeling, stable/unstable wait-time semantics, and a consistent runtime metric contract. This provided the operational core required for API exposure and external automation in the next sprint.

@@ -644,7 +644,6 @@ def run(cfg: AppConfig) -> None:
                         estimated_wait_sec=metrics.estimated_wait_sec,
                         arrival_rate=metrics.arrival_rate,
                         service_rate=metrics.service_rate,
-                        uncertainty_level=metrics.uncertainty_level,
                         queue_stable=metrics.queue_stable,
                         frame_id=frame_count,
                         timestamp=event_timestamp,
@@ -871,16 +870,12 @@ def _compute_playback_target_fps(
 
 
 def _metrics_dict(m: QueueMetrics) -> dict[str, str]:
-    """Convert ``QueueMetrics`` to a display-friendly dict with uncertainty.
-    
-    Formats metrics with credible intervals for compact display.
-    """
+    """Convert ``QueueMetrics`` to a display-friendly overlay dictionary."""
     return {
         "People": str(m.people_in_zone),
-        "λ (arr)": f"{m.arrival_rate:.3f}±{(m.arrival_rate_upper - m.arrival_rate_lower)/2:.3f}",
-        "μ (svc)": f"{m.service_rate:.3f}±{(m.service_rate_upper - m.service_rate_lower)/2:.3f}",
+        "λ (arr)": f"{m.arrival_rate:.3f}",
+        "μ (svc)": f"{m.service_rate:.3f}",
         "Wait": f"{m.estimated_wait_sec:.1f}s",
-        "Unc.": m.uncertainty_level,
         "Stable": "✓" if m.queue_stable else "✗",
     }
 
@@ -898,19 +893,12 @@ def _log_metrics(
 ) -> None:
     """Write queue metrics and rolling loop performance diagnostics."""
     logger.info(
-        "[frame %d] zone=%d | λ=%.4f [%.4f,%.4f] | μ=%.4f [%.4f,%.4f] | W=%.1fs [%.1f,%.1f] | unc=%s | stable=%s | loop_fps=%.2f | proc_fps=%.2f | stride=%d | detect=%.1fms | track=%.1fms | analyze=%.1fms",
+        "[frame %d] zone=%d | λ=%.4f | μ=%.4f | W=%.1fs | stable=%s | loop_fps=%.2f | proc_fps=%.2f | stride=%d | detect=%.1fms | track=%.1fms | analyze=%.1fms",
         frame_count,
         m.people_in_zone,
         m.arrival_rate,
-        m.arrival_rate_lower,
-        m.arrival_rate_upper,
         m.service_rate,
-        m.service_rate_lower,
-        m.service_rate_upper,
         m.estimated_wait_sec,
-        m.wait_time_lower,
-        m.wait_time_upper,
-        m.uncertainty_level,
         m.queue_stable,
         loop_fps,
         processed_fps,
@@ -928,7 +916,6 @@ def _dashboard_metrics_payload(
 ) -> dict[str, object]:
     """Convert runtime metrics into the frontend websocket contract."""
     wait_time_seconds: float | None = m.estimated_wait_sec if m.queue_stable else None
-    wait_time_ci: list[float] | None = [m.wait_time_lower, m.wait_time_upper] if m.queue_stable else None
 
     # Convert supervision detections (xyxy) to nested list for JSON
     # Each detection is [x1, y1, x2, y2, confidence, class_id, tracker_id]
@@ -950,8 +937,6 @@ def _dashboard_metrics_payload(
         "arrival_rate": m.arrival_rate,
         "service_rate": m.service_rate,
         "wait_time_seconds": wait_time_seconds,
-        "wait_time_ci": wait_time_ci,
-        "uncertainty_level": m.uncertainty_level,
         "queue_stable": m.queue_stable,
         "detections": det_list,
     }

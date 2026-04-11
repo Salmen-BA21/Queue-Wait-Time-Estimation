@@ -1,9 +1,35 @@
 # Project Progress Report - Queue Wait-Time Estimation System
 
-**Current Date:** April 7, 2026
-**Last Updated:** April 7, 2026  
+**Current Date:** April 11, 2026
+**Last Updated:** April 11, 2026  
 
 This report assesses the completion status of each sprint based on the project structure, documentation, and daily logs.
+
+## Current-State Addendum (April 11, 2026)
+
+Authentication and account-management delivery completed for the current sprint slice:
+
+- Backend auth endpoints implemented and active:
+  - `POST /api/auth/register`
+  - `POST /api/auth/login`
+  - `POST /api/auth/refresh`
+  - `POST /api/auth/logout`
+  - `GET /api/auth/me`
+- Role model implemented (`admin`, `manager`) with staged API enforcement toggle via `QUEUEVISION_AUTH_ENFORCE_API`.
+- Frontend auth layer integrated:
+  - Auth provider/context with session bootstrap and refresh handling
+  - Protected routes by role
+  - Login page wired to backend session flow
+  - Signup page (`/signup`) for self-service manager account creation
+- Admin account governance integrated in settings UI:
+  - list/create manager
+  - activate/deactivate manager
+  - reset manager password
+- Validation status:
+  - Frontend tests: 25 passed
+  - Backend API tests: 86 passed
+- Runtime compatibility fix applied:
+  - `bcrypt` pinned to `<5` in requirements to keep passlib-backed auth startup stable.
 
 ## Current-State Addendum (April 2026)
 
@@ -140,7 +166,7 @@ Historical sprint sections below are preserved as delivered at the end of March 
 - ✅ 7 Pages implemented in React (Mar 4):
   - ✅ Landing Page – Hero section, features overview, navigation
   - ✅ Dashboard – 2×2 camera grid layout, KPI cards, alert sidebar
-  - ✅ Login Page – Form validation and authentication flow
+  - ✅ Login + Signup pages – Form validation and backend session flow
   - ✅ Settings Page – Configuration forms for thresholds, webhooks, camera management
   - ✅ Zone Editor – Canvas with polygon drawing tools
   - ✅ Analytics Page – Historical data visualization, trend charts
@@ -153,10 +179,16 @@ Historical sprint sections below are preserved as delivered at the end of March 
 - ✅ TypeScript full type safety throughout
 - ✅ API client implementation complete (`frontend/src/lib/api.ts`)
 - ✅ Backend BFF REST API endpoints implemented (`backend/src/api/`) — feeds, uploads, RTSP/ONVIF tests, snapshots, and `/ws/metrics`
+- ✅ Auth/RBAC delivery (Apr 11):
+  - ✅ Cookie-session auth endpoints (`register`, `login`, `refresh`, `logout`, `me`)
+  - ✅ Admin manager-account governance endpoints and settings UI integration
+  - ✅ Protected route enforcement by role (`admin`, `manager`)
+  - ✅ Frontend auth provider/session bootstrap with credentialed requests
+- ✅ Validation complete for auth slice: 25 frontend tests passed, 86 backend API tests passed
 - ⏳ Real-time metrics integration polish (remaining runtime UX/state refinements)
 
 ### Sprint 8 – Final Testing & Evaluation
-**Current Focus:** Frontend integration (implement API client and wire dashboard to existing backend BFF) and Telegram bot completion  
+**Current Focus:** Dashboard runtime polish and Telegram bot completion  
 - ✅ Basic testing scripts created  
 - ✅ STATUS_REPORT.md documenting fixes and architecture  
 - ✅ Some scenario testing done  
@@ -185,7 +217,7 @@ Historical sprint sections below are preserved as delivered at the end of March 
 - **Completed Sprints:** 0, 1, 2, 3, 4, 10, 11 (7 sprints)
 - **Total Sprints:** 11 (0-10)
 - **Completion Rate:** ~68%
-- **Current Focus:** Frontend-Backend API integration and Telegram bot completion  
+- **Current Focus:** Dashboard runtime polish and Telegram bot completion  
 
 ## 🎯 Next Immediate Tasks
 
@@ -210,7 +242,7 @@ Historical sprint sections below are preserved as delivered at the end of March 
 
 ---
 
-**Recent Activity (Feb 21 - Mar 31):**
+**Recent Activity (Feb 21 - Apr 11):**
 - Feb 21: Queue metrics data generated (queue_metrics_2026-02-21.csv)
 - Feb 23: Documentation reorganization and cleanup completed
 - Feb 27: Complete web UI/UX design created (7 pages in Pencil MCP)
@@ -222,6 +254,8 @@ Historical sprint sections below are preserved as delivered at the end of March 
 - Mar 5: RTSP camera support added with authentication and connection testing
 - Mar 5: GUI enhanced with RTSP camera management interface
 - Mar 31: Runtime throughput/smoothness tuning implemented (detector imgsz, stride, async webhook dispatch)
+- Apr 11: Signup/signin + RBAC flow integrated across backend and frontend
+- Apr 11: Backend startup compatibility fix applied (`bcrypt<5`) for passlib-backed auth stability
 - Mar 31: CUDA device enforcement and logging added for reliable GPU usage validation
 - Mar 31: File playback pacing fixed to match native source FPS in realtime mode
 

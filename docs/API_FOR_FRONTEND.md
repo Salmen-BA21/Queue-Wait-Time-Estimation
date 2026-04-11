@@ -4,7 +4,7 @@ Canonical contract for the web dashboard frontend.
 
 - Backend REST base: `/api`
 - WebSocket endpoint: `/ws/metrics`
-- Last validated against code: April 7, 2026
+- Last validated against code: April 11, 2026
 - Source of truth: `backend/src/api/app.py`, `backend/src/api/models.py`, `frontend/src/lib/api.ts`
 
 For transport architecture and MediaMTX setup details, see `WEBRTC_PREVIEW_SETUP.md`.
@@ -22,6 +22,46 @@ Most REST endpoints return:
 ```
 
 The live MJPEG endpoint `/api/feeds/{feed_id}/stream` returns `multipart/x-mixed-replace` bytes and does not use the envelope.
+
+## Authentication and RBAC
+
+Session model:
+
+- Cookie-based auth (`queuevision_access_token`, `queuevision_refresh_token`)
+- Frontend requests must send credentials (already configured in `frontend/src/lib/api.ts`)
+- Roles: `admin`, `manager`
+
+Frontend routes:
+
+- `/login`: sign in
+- `/signup`: self-service registration (creates manager account)
+- `/dashboard`: manager-only protected route
+- `/analytics`: manager-only protected route
+- `/settings`: manager/admin protected route
+
+### Auth Endpoints
+
+| Method | Path | Request Body | Response `data` |
+|---|---|---|---|
+| POST | `/api/auth/register` | `RegisterRequest` | `LoginResponse` |
+| POST | `/api/auth/login` | `LoginRequest` | `LoginResponse` |
+| POST | `/api/auth/refresh` | None (refresh cookie) | `LoginResponse` |
+| POST | `/api/auth/logout` | None | `{ "logged_out": true }` |
+| GET | `/api/auth/me` | None | `SessionStatusResponse` |
+
+### Admin Account-Management Endpoints
+
+| Method | Path | Request Body | Response `data` |
+|---|---|---|---|
+| GET | `/api/admin/managers` | None | `AuthUserModel[]` |
+| POST | `/api/admin/managers` | `CreateManagerRequest` | `AuthUserModel` |
+| POST | `/api/admin/managers/{user_id}/status` | `UpdateManagerStatusRequest` | `AuthUserModel` |
+| POST | `/api/admin/managers/{user_id}/reset-password` | `ResetManagerPasswordRequest` | `{ "password_reset": true }` |
+
+Operational API enforcement note:
+
+- Manager-role enforcement is controlled by `QUEUEVISION_AUTH_ENFORCE_API`.
+- Default is `false` for staged rollout compatibility.
 
 ## Playback Transport Strategy
 
@@ -221,8 +261,6 @@ Common `reason` values include:
   "arrival_rate": 0.14,
   "service_rate": 0.18,
   "wait_time_seconds": 22.7,
-  "wait_time_ci": [14.3, 33.8],
-  "uncertainty_level": "Low",
   "queue_stable": true,
   "detections": [[12, 44, 130, 312, 0.94, 0, 53]],
   "render_frame_jpeg_base64": null,
@@ -312,7 +350,7 @@ There are two related but different payloads in this repository:
 1. Backend runtime webhook payload (`backend/src/webhook.py`) used by `WebhookClient`:
    - Flat fields such as `alert_triggered`, `alert_reason`, `alert_severity`
 2. Alert archive payload (`POST /api/alerts/archive`) used for structured alert storage:
-   - Includes nested `metrics`, optional `uncertainty`, and `alerts[]`
+  - Includes nested `metrics` and `alerts[]`
 
 When integrating n8n, use the runtime webhook payload as the incoming contract unless your workflow explicitly transforms and archives to `/api/alerts/archive`.
 

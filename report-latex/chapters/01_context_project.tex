@@ -22,7 +22,7 @@ The collaboration provided a concrete engineering context in which data collecti
         Dimension & Scope in this project \\ \hline
         Business context & Queue management in service scenarios where waiting time and staffing decisions are operationally sensitive. \\ \hline
         Engineering constraints & Multi-source video ingestion, variable visual conditions, low-latency monitoring, and integration with automation channels. \\ \hline
-        Expected outputs & Actionable queue indicators, uncertainty-aware wait-time estimation, and alert-ready payloads for external workflows. \\ \hline
+        Expected outputs & Actionable queue indicators, wait-time estimation, and alert-ready payloads for external workflows. \\ \hline
         Validation mode & Iterative sprint reviews using implementation evidence from backend modules, API contracts, frontend behavior, and automation tests. \\ \hline
     \end{tabularx}
 \end{table}
@@ -41,16 +41,16 @@ DataDoIt delivers sustainability solutions across six mission-critical sectors w
 \section{Presentation of the Project}
 
 \subsection{Project Context}
-Manual queue supervision is often subjective, difficult to scale, and highly dependent on operator availability. In many environments, monitoring remains reactive: teams observe congestion after it appears rather than anticipating it early with measurable indicators.
+Manual queue supervision is often subjective, difficult to scale, and highly dependent on continuous manual attention. In many environments, monitoring remains reactive: teams observe congestion after it appears rather than anticipating it early with measurable indicators.
 
-This project addresses that gap by transforming camera streams into decision-oriented telemetry. The target output is not only occupancy counts, but a coherent set of operational metrics: people in zone, arrival rate, service rate, expected wait time, uncertainty level, and alert states consumable by monitoring and automation layers.
+This project addresses that gap by transforming camera streams into decision-oriented telemetry. The target output is not only occupancy counts, but a coherent set of operational metrics: people in zone, arrival rate, service rate, expected wait time, queue stability state, and alert states consumable by monitoring and automation layers.
 
 \subsection{Problem Statement}
 Existing operational practices and basic counting tools present recurring limitations:
 \begin{itemize}
     \item they provide limited anticipation of congestion,
     \item they rarely estimate waiting time explicitly,
-    \item they do not quantify uncertainty, which is critical in noisy visual environments,
+    \item they provide weak visibility into queue stability during sudden demand spikes,
     \item they are often disconnected from automated response workflows.
 \end{itemize}
 
@@ -63,9 +63,9 @@ As a consequence, interventions (staff reallocation, lane opening, escalation) c
     \begin{tabularx}{\textwidth}{|X|X|X|}
         \hline
         Observed pain point & Operational impact & Required system capability \\ \hline
-        Manual visual estimation is inconsistent across shifts. & Queue state interpretation varies between operators, reducing decision reliability. & Standardized per-feed metrics with explicit formulas and stable update cadence. \\ \hline
+        Manual visual estimation is inconsistent across shifts. & Queue state interpretation varies between staff members, reducing decision reliability. & Standardized per-feed metrics with explicit formulas and stable update cadence. \\ \hline
         Occupancy-only monitoring is descriptive but not predictive. & Teams react late because no forward-looking wait-time signal is available. & Continuous estimation of $\lambda$, $\mu$, and expected wait time $W$. \\ \hline
-        No confidence indicator accompanies reported metrics. & High-noise periods can produce overconfident decisions. & Uncertainty quantification with interval bounds and qualitative confidence level. \\ \hline
+        Stability state is not explicit during bursty periods. & Teams may overreact or underreact when service and arrivals fluctuate quickly. & Stable/unstable queue-state classification with fallback wait-time logic. \\ \hline
         Alerting tools are not integrated with runtime analytics. & Escalation depends on manual relay, increasing response latency. & Automated webhook dispatch and workflow-based notification routing. \\ \hline
     \end{tabularx}
 \end{table}
@@ -73,7 +73,7 @@ As a consequence, interventions (staff reallocation, lane opening, escalation) c
 \subsection{Study of Existing Approaches}
 Recent computer-vision frameworks provide strong building blocks for person perception, notably YOLO-based detection and tracking algorithms such as ByteTrack \cite{ultralytics_docs,bytetrack2022}. Queueing theory, in parallel, offers formal models for service-system behavior, including interpretable relationships between arrival rate, service rate, and expected waiting time \cite{gross_queueing}.
 
-However, many practical deployments remain partial. Some focus on counting without identity continuity, others on visualization without uncertainty semantics, and others on analytics without operational delivery channels. In addition, integration boundaries between perception pipelines, web supervision, and alert automation are frequently treated as separate projects instead of one coherent architecture.
+However, many practical deployments remain partial. Some focus on counting without identity continuity, others on visualization without explicit stability semantics, and others on analytics without operational delivery channels. In addition, integration boundaries between perception pipelines, web supervision, and alert automation are frequently treated as separate projects instead of one coherent architecture.
 
 \begin{table}[ht]
     \centering
@@ -82,10 +82,10 @@ However, many practical deployments remain partial. Some focus on counting witho
     \begin{tabularx}{\textwidth}{|l|X|X|}
         \hline
         Approach family & Strengths & Typical limitation \\ \hline
-        Manual or occupancy-only monitoring & Simple to deploy and easy to interpret at first glance. & Weak predictive capability and high operator subjectivity. \\ \hline
+        Manual or occupancy-only monitoring & Simple to deploy and easy to interpret at first glance. & Weak predictive capability and high human subjectivity. \\ \hline
         Vision detection without persistent tracking & Fast frame-level counting. & Identity discontinuity can distort arrival and departure logic. \\ \hline
         Analytical queue models without vision coupling & Strong mathematical interpretability. & Requires reliable event extraction pipeline from real scenes. \\ \hline
-        Proposed integrated pipeline & Couples perception, queue analytics, uncertainty, web monitoring, and automation. & Requires careful multi-layer integration and validation. \\ \hline
+        Proposed integrated pipeline & Couples perception, queue analytics, web monitoring, and automation. & Requires careful multi-layer integration and validation. \\ \hline
     \end{tabularx}
 \end{table}
 
@@ -95,7 +95,7 @@ The proposed system combines perception, analytics, and integration in one modul
     \item person detection and multi-object tracking from camera feeds,
     \item polygon-based queue-zone filtering,
     \item estimation of $\lambda$, $\mu$, and expected wait time,
-    \item Bayesian uncertainty quantification for key metrics,
+    \item stable/unstable queue-state interpretation for safe operational decisions,
     \item real-time web supervision through tiered live transport (WebRTC primary, MJPEG fallback),
     \item automation through n8n webhooks and Telegram alerts.
 \end{enumerate}
@@ -109,7 +109,7 @@ The project objectives are to:
     \item count people in configurable queue zones,
     \item estimate arrival and service rates,
     \item compute expected wait time,
-    \item quantify uncertainty for operational reliability,
+    \item classify queue stability for operational reliability,
     \item expose metrics through web interfaces and automation workflows.
 \end{enumerate}
 
@@ -125,7 +125,7 @@ To keep implementation traceable, objectives are mapped to delivery modules and 
         OBJ-01 & Real-time detection and tracking & Module A & Stable in-frame detections with persistent tracker IDs. \\ \hline
         OBJ-02 & Queue-zone counting & Module A & Per-frame in-zone people count and zone-aware overlays. \\ \hline
         OBJ-03 & Queue metric estimation ($\lambda,\mu,W$) & Module A & Continuous metric payloads from queue analysis pipeline. \\ \hline
-        OBJ-04 & Uncertainty quantification & Module A & Confidence intervals and uncertainty level labels. \\ \hline
+        OBJ-04 & Queue stability handling & Module A & Stable/unstable state classification and robust fallback wait-time behavior. \\ \hline
         OBJ-05 & Web monitoring & Module B & Live dashboard with feed controls, KPIs, and stream views. \\ \hline
         OBJ-06 & Automation integration & Module C & Webhook-based alert routing through n8n and Telegram. \\ \hline
     \end{tabularx}
@@ -139,8 +139,8 @@ All implementation details and validation narratives are presented through the b
 \subsection{Target Audience}
 The system targets three stakeholder groups with complementary goals:
 \begin{itemize}
-    \item \textbf{Operators}: need low-latency visibility of queue status and actionable alert signals.
-    \item \textbf{Managers}: need interpretable indicators for staffing and service-quality planning.
+    \item \textbf{Administrators}: manage manager accounts and access governance.
+    \item \textbf{Managers}: configure operational settings, monitor live queue status, react to alerts, and use indicators for staffing and service-quality planning.
     \item \textbf{End users}: benefit indirectly from reduced waiting times and smoother service flow.
 \end{itemize}
 
@@ -160,7 +160,7 @@ Development followed sprint-based Scrum planning with iterative validation. For 
 This module established the vision and analytics backbone:
 \begin{itemize}
     \item Sprint 1: detection, tracking, and zone filtering foundation,
-    \item Sprint 2: queue metrics and uncertainty modeling,
+    \item Sprint 2: queue metrics and stability handling,
     \item Sprint 3: camera connectivity and backend API exposure.
 \end{itemize}
 

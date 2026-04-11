@@ -26,7 +26,7 @@ const features = [
   {
     icon: Clock,
     title: "Wait Time Estimation",
-    description: "ML-based wait time predictions with confidence intervals for better customer experience.",
+    description: "ML-based wait time predictions with queue-stability context for better customer experience.",
   },
   {
     icon: Eye,

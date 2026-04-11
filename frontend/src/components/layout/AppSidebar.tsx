@@ -1,4 +1,6 @@
-import { LayoutDashboard, Settings, Eye } from "lucide-react";
+import { LayoutDashboard, Settings, Eye, BarChart3 } from "lucide-react";
+import { useContext } from "react";
+import { AuthContext } from "@/auth/AuthProvider";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -14,15 +16,23 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const navItems = [
+const managerNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "Analytics", url: "/analytics", icon: BarChart3 },
+  { title: "Settings", url: "/settings", icon: Settings },
+];
+
+const adminNavItems = [
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
+  const auth = useContext(AuthContext);
+  const user = auth?.user ?? null;
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const navItems = user?.role === "admin" ? adminNavItems : managerNavItems;
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">

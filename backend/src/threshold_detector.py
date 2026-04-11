@@ -60,7 +60,6 @@ class QueueThresholdDetector:
         estimated_wait_sec: float,
         arrival_rate: float,
         service_rate: float,
-        uncertainty_level: str,
         queue_stable: bool,
         frame_id: int,
         timestamp: float,
@@ -78,8 +77,6 @@ class QueueThresholdDetector:
             Arrival rate (people/second).
         service_rate : float
             Service rate (people/second).
-        uncertainty_level : str
-            Uncertainty classification ("Low", "Medium", "High").
         queue_stable : bool
             Whether queue is in stable state.
         frame_id : int

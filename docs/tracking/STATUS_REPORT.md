@@ -1,8 +1,40 @@
 # Queue Wait-Time Estimation System - Status Report
 
-**Last Updated:** April 7, 2026
+**Last Updated:** April 11, 2026
 
 > Note: This file is a cumulative status log. Some older sections preserve historical context from before the `backend/` + `frontend/` restructure and may reference legacy paths. For the current runtime contract, use `../../README.md`, `../API_FOR_FRONTEND.md`, and `../WEBRTC_PREVIEW_SETUP.md`.
+
+## ✅ FIXED: Signup/Signin + RBAC Integration (April 11, 2026)
+
+### Overview
+Implemented and validated end-to-end authentication and role-based access control for the web application.
+
+### What Changed
+- **Backend auth/session endpoints**
+  - Added `POST /api/auth/register` for self-service account creation.
+  - Added/validated cookie-session lifecycle endpoints:
+    - `POST /api/auth/login`
+    - `POST /api/auth/refresh`
+    - `POST /api/auth/logout`
+    - `GET /api/auth/me`
+- **Role governance**
+  - Added admin manager-account endpoints:
+    - list/create manager
+    - activate/deactivate manager
+    - reset manager password
+  - Added staged operational route protection via `QUEUEVISION_AUTH_ENFORCE_API`.
+- **Frontend auth integration**
+  - Added auth provider and protected-route enforcement by role.
+  - Added signup page (`/signup`) and login-to-signup navigation.
+  - Settings page now includes admin-only manager-account management UI.
+
+### Validation
+- Frontend test suite passed (`25 passed`).
+- Backend API test suite passed (`86 passed`).
+- Direct login verification against live backend returned HTTP 200 for bootstrap admin credentials.
+
+### Runtime Compatibility Note
+- Pinned `bcrypt<5` in `requirements.txt` to avoid passlib startup incompatibility on auth bootstrap paths.
 
 ## ✅ FIXED: WebRTC-First Live Transport Layer
 

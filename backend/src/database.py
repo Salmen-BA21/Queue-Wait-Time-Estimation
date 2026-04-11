@@ -110,7 +110,6 @@ def _create_current_schema(cursor: sqlite3.Cursor) -> None:
             service_rate REAL,
             wait_time_seconds REAL,
             queue_stable INTEGER,
-            uncertainty_level TEXT,
             raw_detection_count INTEGER,
             fps REAL,
             alerts_count INTEGER,
@@ -118,6 +117,56 @@ def _create_current_schema(cursor: sqlite3.Cursor) -> None:
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL UNIQUE,
+            display_name TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL CHECK(role IN ('admin', 'manager')),
+            is_active INTEGER NOT NULL DEFAULT 1,
+            failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+            locked_until TEXT,
+            last_login_at TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS auth_refresh_sessions (
+            id TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            token_hash TEXT NOT NULL UNIQUE,
+            expires_at TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_used_at TEXT,
+            revoked_at TEXT,
+            ip_address TEXT,
+            user_agent TEXT,
+            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS auth_audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            event_type TEXT NOT NULL,
+            event_status TEXT NOT NULL,
+            details_json TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
+        )
+    """)
+
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_auth_refresh_sessions_user_id ON auth_refresh_sessions(user_id)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_users_role_is_active ON users(role, is_active)"
+    )
 
 
 def _migrate_feed_configs_schema(cursor: sqlite3.Cursor) -> None:
@@ -606,7 +655,6 @@ def archive_alert_payload(payload: Dict[str, Any]) -> int:
     cursor = conn.cursor()
     try:
         metrics = payload.get("metrics") or {}
-        uncertainty = payload.get("uncertainty") or {}
         alerts = payload.get("alerts") or []
         serialized_payload = json.dumps(payload, default=str)
         rows_inserted = 0
@@ -628,12 +676,11 @@ def archive_alert_payload(payload: Dict[str, Any]) -> int:
                     service_rate,
                     wait_time_seconds,
                     queue_stable,
-                    uncertainty_level,
                     raw_detection_count,
                     fps,
                     alerts_count,
                     payload_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     payload.get("timestamp"),
@@ -649,7 +696,6 @@ def archive_alert_payload(payload: Dict[str, Any]) -> int:
                     metrics.get("service_rate"),
                     metrics.get("wait_time_seconds"),
                     int(bool(metrics.get("queue_stable", True))),
-                    uncertainty.get("level"),
                     payload.get("raw_detection_count"),
                     payload.get("fps"),
                     0,
@@ -676,12 +722,11 @@ def archive_alert_payload(payload: Dict[str, Any]) -> int:
                     service_rate,
                     wait_time_seconds,
                     queue_stable,
-                    uncertainty_level,
                     raw_detection_count,
                     fps,
                     alerts_count,
                     payload_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     payload.get("timestamp"),
@@ -697,7 +742,6 @@ def archive_alert_payload(payload: Dict[str, Any]) -> int:
                     metrics.get("service_rate"),
                     metrics.get("wait_time_seconds"),
                     int(bool(metrics.get("queue_stable", True))),
-                    uncertainty.get("level"),
                     payload.get("raw_detection_count"),
                     payload.get("fps"),
                     len(alerts),
@@ -708,6 +752,344 @@ def archive_alert_payload(payload: Dict[str, Any]) -> int:
 
         conn.commit()
         return rows_inserted
+    finally:
+        conn.close()
+
+
+# ============================================================================
+# AUTH / USER OPERATIONS
+# ============================================================================
+
+def create_user(*, email: str, display_name: str, password_hash: str, role: str) -> int:
+    """Create a new user account and return its ID."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        now_iso = datetime.now().isoformat()
+        cursor.execute(
+            """
+            INSERT INTO users (email, display_name, password_hash, role, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (email.strip().lower(), display_name.strip(), password_hash, role, now_iso),
+        )
+        conn.commit()
+        user_id = cursor.lastrowid
+        return cast(int, user_id)
+    finally:
+        conn.close()
+
+
+def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+    """Fetch one user by email."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT
+                id,
+                email,
+                display_name,
+                password_hash,
+                role,
+                is_active,
+                failed_login_attempts,
+                locked_until,
+                last_login_at,
+                created_at,
+                updated_at
+            FROM users
+            WHERE email = ?
+            """,
+            (email.strip().lower(),),
+        )
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def get_user_by_id(user_id: int) -> Optional[Dict[str, Any]]:
+    """Fetch one user by identifier."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT
+                id,
+                email,
+                display_name,
+                password_hash,
+                role,
+                is_active,
+                failed_login_attempts,
+                locked_until,
+                last_login_at,
+                created_at,
+                updated_at
+            FROM users
+            WHERE id = ?
+            """,
+            (user_id,),
+        )
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def list_users_by_role(role: str) -> List[Dict[str, Any]]:
+    """List users belonging to a role."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT
+                id,
+                email,
+                display_name,
+                role,
+                is_active,
+                failed_login_attempts,
+                locked_until,
+                last_login_at,
+                created_at,
+                updated_at
+            FROM users
+            WHERE role = ?
+            ORDER BY created_at DESC
+            """,
+            (role,),
+        )
+        return [dict(row) for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def set_user_active(user_id: int, is_active: bool) -> bool:
+    """Activate or deactivate one user account."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            UPDATE users
+            SET
+                is_active = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (int(is_active), datetime.now().isoformat(), user_id),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+
+def update_user_password_hash(user_id: int, password_hash: str) -> bool:
+    """Update password hash and clear lockout counters for a user."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            UPDATE users
+            SET
+                password_hash = ?,
+                failed_login_attempts = 0,
+                locked_until = NULL,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (password_hash, datetime.now().isoformat(), user_id),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+
+def record_successful_login(user_id: int) -> None:
+    """Reset login-failure counters and record last-login timestamp."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        now_iso = datetime.now().isoformat()
+        cursor.execute(
+            """
+            UPDATE users
+            SET
+                failed_login_attempts = 0,
+                locked_until = NULL,
+                last_login_at = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (now_iso, now_iso, user_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def record_failed_login_attempt(user_id: int, *, locked_until: Optional[str] = None) -> int:
+    """Increment failed-login count and optionally set lockout timestamp."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            UPDATE users
+            SET
+                failed_login_attempts = failed_login_attempts + 1,
+                locked_until = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (locked_until, datetime.now().isoformat(), user_id),
+        )
+        conn.commit()
+        cursor.execute("SELECT failed_login_attempts FROM users WHERE id = ?", (user_id,))
+        row = cursor.fetchone()
+        return int(row["failed_login_attempts"]) if row else 0
+    finally:
+        conn.close()
+
+
+def create_refresh_session(
+    *,
+    session_id: str,
+    user_id: int,
+    token_hash: str,
+    expires_at: str,
+    ip_address: Optional[str],
+    user_agent: Optional[str],
+) -> None:
+    """Persist a refresh-token session entry."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            INSERT INTO auth_refresh_sessions (
+                id,
+                user_id,
+                token_hash,
+                expires_at,
+                ip_address,
+                user_agent
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (session_id, user_id, token_hash, expires_at, ip_address, user_agent),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_refresh_session_by_token_hash(token_hash: str) -> Optional[Dict[str, Any]]:
+    """Load refresh-token session by hashed token value."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT
+                id,
+                user_id,
+                token_hash,
+                expires_at,
+                created_at,
+                last_used_at,
+                revoked_at,
+                ip_address,
+                user_agent
+            FROM auth_refresh_sessions
+            WHERE token_hash = ?
+            """,
+            (token_hash,),
+        )
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def revoke_refresh_session(session_id: str) -> None:
+    """Mark one refresh session as revoked."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            UPDATE auth_refresh_sessions
+            SET revoked_at = ?, last_used_at = ?
+            WHERE id = ?
+            """,
+            (datetime.now().isoformat(), datetime.now().isoformat(), session_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def revoke_refresh_session_by_token_hash(token_hash: str) -> None:
+    """Revoke one refresh session selected by token hash."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        now_iso = datetime.now().isoformat()
+        cursor.execute(
+            """
+            UPDATE auth_refresh_sessions
+            SET revoked_at = ?, last_used_at = ?
+            WHERE token_hash = ?
+            """,
+            (now_iso, now_iso, token_hash),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def touch_refresh_session(session_id: str) -> None:
+    """Update the last-used timestamp for one refresh session."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE auth_refresh_sessions SET last_used_at = ? WHERE id = ?",
+            (datetime.now().isoformat(), session_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def create_auth_audit_event(
+    *,
+    user_id: Optional[int],
+    event_type: str,
+    event_status: str,
+    details: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Persist an authentication and authorization audit event."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        details_json = json.dumps(details, default=str) if details is not None else None
+        cursor.execute(
+            """
+            INSERT INTO auth_audit_log (user_id, event_type, event_status, details_json)
+            VALUES (?, ?, ?, ?)
+            """,
+            (user_id, event_type, event_status, details_json),
+        )
+        conn.commit()
     finally:
         conn.close()
 

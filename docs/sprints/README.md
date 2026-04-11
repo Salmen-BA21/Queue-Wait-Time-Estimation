@@ -8,7 +8,7 @@ This folder contains sprint-oriented documentation for planning and execution tr
 - **Sprint 1:** Environment setup, first tests, and core detection pipeline
 - **Sprint 2:** GUI workflow, zone selection, and multi-video support
 - **Sprint 3:** Queue-rate modeling and wait-time estimation
-- **Sprint 4:** Bayesian uncertainty quantification
+- **Sprint 4:** Legacy uncertainty exploration (historical)
 - **Sprint 5:** n8n webhook integration, payloads, and threshold detection
 - **Sprint 6:** Telegram alerts, persistence checks, and inline actions (planned)
 - **Sprint 7:** Dashboard hardening and system supervision improvements (mostly done)

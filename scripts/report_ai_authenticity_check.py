@@ -78,7 +78,7 @@ PROJECT_SPECIFIC_TERMS = {
     "rtsp",
     "onvif",
     "queue",
-    "uncertainty",
+    "stability",
     "lambda",
     "mu",
     "sprint",
