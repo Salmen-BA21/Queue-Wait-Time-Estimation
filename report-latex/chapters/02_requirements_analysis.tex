@@ -194,6 +194,15 @@ Runtime metrics are generated continuously and distributed through live channels
 
 SQLite database persistence stores operational metrics, structured metadata, and alert archives in one source of truth. This supports both operational continuity and post-run diagnosis.
 
+\begin{figure}[ht]
+    \centering
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for unified database schema diagram (single ERD)}}
+    \caption{Unified SQLite schema used for feed metadata, queue sessions, and alert archival.}
+    \label{fig:database_schema}
+\end{figure}
+
+Figure~\ref{fig:database_schema} is intentionally kept as a single consolidated database view to avoid duplication across sprint chapters.
+
 \section{Project Environment}
 
 \subsection{Hardware and Software Environment}

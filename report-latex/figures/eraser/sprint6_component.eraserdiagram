@@ -1,0 +1,31 @@
+cloud-architecture-diagram
+
+direction right
+
+Backend {
+  QueueRuntime [label: "Queue runtime", icon: python]
+  AlertRules [label: "Alert rules", icon: bell]
+  WebhookSender [label: "Webhook sender", icon: mail]
+}
+
+N8nFlow {
+  ReceiveWebhook [label: "Receive webhook", icon: cloud]
+  CheckSecret [label: "Check webhook secret", icon: lock]
+  CheckAlerts [label: "Check alerts", icon: bell]
+  RouteSeverity [label: "Route by severity", icon: gear]
+  FormatMessage [label: "Format message", icon: code]
+}
+
+Telegram [label: "Telegram", icon: bell]
+ArchiveApi [label: "Alert archive API", icon: database]
+
+QueueRuntime > AlertRules
+AlertRules > WebhookSender
+WebhookSender > ReceiveWebhook
+
+ReceiveWebhook > CheckSecret
+CheckSecret > CheckAlerts: valid
+CheckAlerts > RouteSeverity: alerts found
+RouteSeverity > FormatMessage
+FormatMessage > Telegram
+FormatMessage --> ArchiveApi: save alert

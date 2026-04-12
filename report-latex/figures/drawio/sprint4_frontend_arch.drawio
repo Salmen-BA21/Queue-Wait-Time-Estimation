@@ -1,37 +1,39 @@
-<mxfile host="app.diagrams.net" modified="2026-04-10T12:25:00.000Z" agent="GitHub Copilot" version="26.2.7" editor="draw.io">
+﻿<mxfile host="app.diagrams.net" modified="2026-04-12T19:20:10.000Z" agent="GitHub Copilot" version="26.2.7" editor="draw.io">
   <diagram id="sprint4-frontend-arch" name="Sprint4 Frontend Architecture">
-    <mxGraphModel dx="1300" dy="760" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1100" math="0" shadow="0">
+    <mxGraphModel dx="1280" dy="720" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2000" pageHeight="1000" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
 
-        <mxCell id="title" value="Sprint 4 Frontend Architecture - Routing, Components, and State Boundaries" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" vertex="1" parent="1"><mxGeometry x="320" y="30" width="980" height="30" as="geometry" /></mxCell>
+        <mxCell id="title" value="Sprint 4 Frontend Architecture" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" vertex="1" parent="1"><mxGeometry x="60" y="30" width="360" height="30" as="geometry" /></mxCell>
 
-        <mxCell id="design" value="Design Spec\nTerminal Minimal\n(DESIGN_SPEC.md)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="100" y="150" width="220" height="120" as="geometry" /></mxCell>
+        <mxCell id="p1" value="Dashboard page" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="80" y="120" width="150" height="60" as="geometry" /></mxCell>
+        <mxCell id="p2" value="Zone editor page" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="80" y="210" width="150" height="60" as="geometry" /></mxCell>
+        <mxCell id="p3" value="Analytics page" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="80" y="300" width="150" height="60" as="geometry" /></mxCell>
+        <mxCell id="p4" value="Settings page" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="80" y="390" width="150" height="60" as="geometry" /></mxCell>
 
-        <mxCell id="app" value="App Shell\nReact + TypeScript + Router" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="420" y="120" width="320" height="120" as="geometry" /></mxCell>
+        <mxCell id="s1" value="Reusable UI components" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="360" y="120" width="200" height="60" as="geometry" /></mxCell>
+        <mxCell id="s2" value="Data hooks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="360" y="240" width="200" height="60" as="geometry" /></mxCell>
+        <mxCell id="s3" value="API client" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="650" y="210" width="150" height="60" as="geometry" /></mxCell>
+        <mxCell id="s4" value="Query cache" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="650" y="300" width="150" height="60" as="geometry" /></mxCell>
 
-        <mxCell id="routes" value="Route Layer\nLanding / Dashboard / Setup / Zone Editor / Analytics / Settings" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="820" y="120" width="380" height="120" as="geometry" /></mxCell>
+        <mxCell id="b1" value="Backend API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="920" y="210" width="150" height="60" as="geometry" /></mxCell>
+        <mxCell id="b2" value="WebSocket stream" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="920" y="300" width="150" height="60" as="geometry" /></mxCell>
 
-        <mxCell id="pages" value="Page Orchestration\nfrontend/src/pages" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="420" y="320" width="280" height="120" as="geometry" /></mxCell>
-        <mxCell id="components" value="Reusable UI Components\nfrontend/src/components" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="760" y="320" width="280" height="120" as="geometry" /></mxCell>
-        <mxCell id="hooks" value="Hooks / State Logic\nfrontend/src/hooks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="1100" y="320" width="260" height="120" as="geometry" /></mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="p1" target="s1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="p2" target="s1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="p3" target="s1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="p4" target="s1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
 
-        <mxCell id="lib" value="API Adapters + Helpers\nfrontend/src/lib" style="shape=component;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="700" y="520" width="280" height="120" as="geometry" /></mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="p1" target="s2" style="endArrow=block;html=1;dashed=1;strokeColor=#6c8ebf;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="p2" target="s2" style="endArrow=block;html=1;dashed=1;strokeColor=#6c8ebf;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="p3" target="s2" style="endArrow=block;html=1;dashed=1;strokeColor=#6c8ebf;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="p4" target="s2" style="endArrow=block;html=1;dashed=1;strokeColor=#6c8ebf;"><mxGeometry relative="1" as="geometry" /></mxCell>
 
-        <mxCell id="state_boundary" value="State boundary:\nUI state / Query cache / Live event state" style="shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="1120" y="540" width="260" height="120" as="geometry" /></mxCell>
-
-        <mxCell id="backend" value="Backend API + WS (Sprint 5 integration target)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1"><mxGeometry x="600" y="740" width="420" height="100" as="geometry" /></mxCell>
-
-        <mxCell id="e1" edge="1" parent="1" source="design" target="app" style="endArrow=block;html=1;dashed=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e2" edge="1" parent="1" source="app" target="routes" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e3" edge="1" parent="1" source="routes" target="pages" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e4" edge="1" parent="1" source="routes" target="components" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e5" edge="1" parent="1" source="pages" target="components" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e6" edge="1" parent="1" source="pages" target="hooks" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e7" edge="1" parent="1" source="hooks" target="lib" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e8" edge="1" parent="1" source="lib" target="backend" style="endArrow=block;html=1;strokeColor=#666666;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e9" edge="1" parent="1" source="components" target="state_boundary" style="endArrow=open;html=1;dashed=1;strokeColor=#999999;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e9" value="cache read/write" edge="1" parent="1" source="s2" target="s4" style="endArrow=both;html=1;edgeStyle=orthogonalEdgeStyle;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e10" edge="1" parent="1" source="s2" target="s3" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e11" edge="1" parent="1" source="s3" target="b1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e12" value="live updates" edge="1" parent="1" source="b2" target="s2" style="endArrow=block;html=1;dashed=1;strokeColor=#b85450;"><mxGeometry relative="1" as="geometry" /></mxCell>
       </root>
     </mxGraphModel>
   </diagram>

@@ -1,0 +1,34 @@
+flow-chart
+
+direction down
+
+Incoming [label: "Incoming webhook payload", shape: oval, icon: mail]
+ValidSecret [label: "Secret is valid?", shape: diamond, icon: lock]
+Reject [label: "Return unauthorized", shape: rectangle, icon: key]
+Validate [label: "Validate payload", shape: rectangle, icon: code]
+HasAlerts [label: "Any alerts?", shape: diamond, icon: bell]
+AckNoAlerts [label: "Acknowledge no alerts", shape: rectangle, icon: terminal]
+Cooldown [label: "Cooldown passed?", shape: diamond, icon: gear]
+AckSuppressed [label: "Acknowledge suppressed alert", shape: rectangle, icon: terminal]
+PickType [label: "Pick warning or critical", shape: rectangle, icon: bell]
+SendTelegram [label: "Send Telegram message", shape: rectangle, icon: bell]
+Archive [label: "Archive alert", shape: rectangle, icon: database]
+Done [shape: oval, icon: terminal]
+
+Incoming > ValidSecret
+ValidSecret > Reject: no
+Reject > Done
+
+ValidSecret > Validate: yes
+Validate > HasAlerts
+HasAlerts > AckNoAlerts: no
+AckNoAlerts > Done
+
+HasAlerts > Cooldown: yes
+Cooldown > AckSuppressed: no
+AckSuppressed > Done
+
+Cooldown > PickType: yes
+PickType > SendTelegram
+SendTelegram > Archive
+Archive > Done

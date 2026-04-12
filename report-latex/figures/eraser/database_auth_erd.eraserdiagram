@@ -1,0 +1,44 @@
+entity-relationship-diagram
+
+colorMode bold
+styleMode plain
+typeface clean
+notation crows-feet
+
+users [icon: user] {
+  id int pk
+  email string not null unique
+  display_name string not null
+  password_hash string not null
+  role string not null
+  is_active boolean not null
+  failed_login_attempts int not null
+  locked_until timestamp
+  last_login_at timestamp
+  created_at timestamp not null
+  updated_at timestamp not null
+}
+
+auth_refresh_sessions [icon: lock] {
+  id string pk
+  user_id int fk not null
+  token_hash string not null unique
+  expires_at timestamp not null
+  created_at timestamp not null
+  last_used_at timestamp
+  revoked_at timestamp
+  ip_address string
+  user_agent text
+}
+
+auth_audit_log [icon: database] {
+  id int pk
+  user_id int fk
+  event_type string not null
+  event_status string not null
+  details_json json
+  created_at timestamp not null
+}
+
+users.id < auth_refresh_sessions.user_id
+users.id < auth_audit_log.user_id

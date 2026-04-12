@@ -1,0 +1,26 @@
+sequence-diagram
+
+autoNumber on
+
+Analyzer [label: "Queue analyzer", icon: database]
+Rates [label: "Rate calculator", icon: code]
+Stability [label: "Stability check", icon: lock]
+WaitTime [label: "Wait time logic", icon: terminal]
+Metrics [label: "Metrics payload", icon: database]
+Dashboard [label: "Dashboard", icon: react]
+Webhook [label: "Webhook sender", icon: mail]
+
+Analyzer > Rates: compute arrival and service rates
+Rates > Stability: evaluate queue condition
+
+alt [label: queue is stable] {
+  Stability > WaitTime: use stable wait formula
+}
+else [label: queue is not stable] {
+  Stability > WaitTime: use fallback wait formula
+}
+
+WaitTime > Metrics: set wait time and stability flag
+Rates > Metrics: set arrival and service rates
+Metrics > Dashboard: publish metrics
+Metrics > Webhook: publish payload

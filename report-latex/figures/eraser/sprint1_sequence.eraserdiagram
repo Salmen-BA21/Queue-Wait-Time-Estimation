@@ -1,0 +1,19 @@
+sequence-diagram
+
+autoNumber on
+
+MainLoop [label: "Main loop", icon: gear]
+VideoSource [label: "Video source", icon: monitor]
+Detector [label: "Person detector", icon: server]
+Tracker [label: "Object tracker", icon: gear]
+ZoneCheck [label: "Zone check", icon: code]
+QueueLogic [label: "Queue analysis", icon: database]
+
+loop [label: each frame] {
+  MainLoop > VideoSource: read frame
+  VideoSource > Detector: send frame
+  Detector > Tracker: send detections
+  Tracker > ZoneCheck: send tracked people
+  ZoneCheck > QueueLogic: keep people in queue zone
+  QueueLogic > MainLoop: return updated metrics
+}

@@ -1,0 +1,32 @@
+<mxfile host="app.diagrams.net" modified="2026-04-12T18:33:00.000Z" agent="GitHub Copilot" version="26.2.7" editor="draw.io">
+  <diagram id="sprint5-sequence" name="Sprint5 Sequence">
+    <mxGraphModel dx="1280" dy="720" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2000" pageHeight="980" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Sprint 5 Sequence - UI Refresh and Alert Rendering" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" vertex="1" parent="1"><mxGeometry x="60" y="30" width="720" height="30" as="geometry" /></mxCell>
+
+        <mxCell id="p1" value="Dashboard UI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="70" y="150" width="140" height="60" as="geometry" /></mxCell>
+        <mxCell id="p2" value="Backend API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="250" y="150" width="140" height="60" as="geometry" /></mxCell>
+        <mxCell id="p3" value="Feed manager" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="430" y="150" width="140" height="60" as="geometry" /></mxCell>
+        <mxCell id="p4" value="WebSocket hub" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="610" y="150" width="140" height="60" as="geometry" /></mxCell>
+        <mxCell id="p5" value="Dashboard state" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="790" y="150" width="150" height="60" as="geometry" /></mxCell>
+        <mxCell id="p6" value="KPI cards" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="980" y="150" width="130" height="60" as="geometry" /></mxCell>
+        <mxCell id="p7" value="Activity panel" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="1140" y="150" width="140" height="60" as="geometry" /></mxCell>
+        <mxCell id="p8" value="Attention panel" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="1310" y="150" width="150" height="60" as="geometry" /></mxCell>
+
+        <mxCell id="e1" value="request dashboard data" edge="1" parent="1" source="p1" target="p2" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" value="query feed states" edge="1" parent="1" source="p2" target="p3" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" value="subscribe to updates" edge="1" parent="1" source="p1" target="p4" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" value="broadcast metrics and alerts" edge="1" parent="1" source="p4" target="p5" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" value="render metrics" edge="1" parent="1" source="p5" target="p6" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" value="append events" edge="1" parent="1" source="p5" target="p7" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" value="highlight critical alerts" edge="1" parent="1" source="p5" target="p8" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="note" value="Polling fallback: UI asks Backend API for latest values if WebSocket is disconnected." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1"><mxGeometry x="70" y="300" width="710" height="70" as="geometry" /></mxCell>
+        <mxCell id="e8" value="fallback poll" edge="1" parent="1" source="p1" target="p2" style="endArrow=block;html=1;dashed=1;strokeColor=#666666;edgeStyle=orthogonalEdgeStyle;"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="140" y="340"/><mxPoint x="320" y="340"/></Array></mxGeometry></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

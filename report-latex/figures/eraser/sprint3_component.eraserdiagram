@@ -1,0 +1,36 @@
+cloud-architecture-diagram
+
+direction right
+
+Sources {
+  LocalVideo [label: "Local file or webcam", icon: monitor]
+  RtspCamera [label: "RTSP camera", icon: server]
+  OnvifCamera [label: "ONVIF camera", icon: server]
+}
+
+Backend {
+  Api [label: "Backend API", icon: python]
+  FeedManager [label: "Feed manager", icon: database]
+  Worker [label: "Worker runtime", icon: terminal]
+  WebSocketHub [label: "WebSocket hub", icon: globe]
+  MjpegStream [label: "MJPEG stream", icon: monitor]
+  WebRtcOffer [label: "WebRTC offer endpoint", icon: cloud]
+}
+
+MediaServer [label: "Media server", icon: cloud]
+Dashboard [label: "Dashboard", icon: react]
+
+LocalVideo > Worker
+RtspCamera > Api
+OnvifCamera > Api
+
+Dashboard > Api: setup and control
+Api > FeedManager
+FeedManager > Worker
+Worker > WebSocketHub
+WebSocketHub > Dashboard: live events
+
+Dashboard > WebRtcOffer: start WebRTC
+WebRtcOffer <> MediaServer: SDP exchange
+Worker > MjpegStream
+MjpegStream > Dashboard: fallback video

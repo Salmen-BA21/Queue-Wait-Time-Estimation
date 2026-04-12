@@ -1,0 +1,30 @@
+flow-chart
+
+direction down
+
+StartSetup [label: "User starts feed setup", shape: oval, icon: user]
+CallApi [label: "Send setup request", shape: rectangle, icon: python]
+SaveFeed [label: "Save feed settings", shape: rectangle, icon: database]
+StartWorker [label: "Start worker", shape: rectangle, icon: terminal]
+EmitEvents [label: "Emit live events", shape: rectangle, icon: globe]
+RefreshDashboard [label: "Refresh dashboard", shape: oval, icon: react]
+
+CheckTransport [label: "Check transport readiness", shape: rectangle, icon: cloud]
+WebRtcReady [label: "WebRTC ready?", shape: diamond, icon: gear]
+OfferAnswer [label: "Exchange offer and answer", shape: rectangle, icon: cloud]
+UseWebRtc [label: "Show WebRTC video", shape: rectangle, icon: monitor]
+UseMjpeg [label: "Use MJPEG fallback", shape: rectangle, icon: monitor]
+
+StartSetup > CallApi
+CallApi > SaveFeed
+SaveFeed > StartWorker
+StartWorker > EmitEvents
+EmitEvents > RefreshDashboard
+
+StartSetup > CheckTransport
+CheckTransport > WebRtcReady
+WebRtcReady > OfferAnswer: yes
+OfferAnswer > UseWebRtc
+UseWebRtc > RefreshDashboard
+WebRtcReady > UseMjpeg: no
+UseMjpeg > RefreshDashboard

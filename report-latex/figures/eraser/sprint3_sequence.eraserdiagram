@@ -1,0 +1,22 @@
+sequence-diagram
+
+autoNumber on
+
+Dashboard [label: "Dashboard", icon: react]
+Api [label: "Backend API", icon: python]
+Manager [label: "Feed manager", icon: database]
+Worker [label: "Worker runtime", icon: terminal]
+Socket [label: "WebSocket hub", icon: globe]
+MediaServer [label: "Media server", icon: cloud]
+
+Dashboard > Api: request feed action
+Api > Manager: apply feed change
+Manager > Worker: start or stop worker
+Worker > Socket: emit status and metrics
+Socket > Dashboard: push live update
+
+opt [label: if WebRTC is available] {
+  Dashboard > Api: request WebRTC session
+  Api > MediaServer: exchange session info
+  MediaServer > Dashboard: return video session
+}

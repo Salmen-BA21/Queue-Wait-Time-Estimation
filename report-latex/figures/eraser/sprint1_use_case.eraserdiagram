@@ -1,0 +1,34 @@
+cloud-architecture-diagram
+
+direction right
+
+Manager [icon: user]
+
+Sprint1Actions {
+  ChooseSource [label: "Choose video source", icon: monitor]
+  DrawZone [label: "Draw queue zone", icon: code]
+  StartAnalysis [label: "Start queue analysis", icon: gear]
+  ViewLive [label: "View live video", icon: monitor]
+  ReviewQueue [label: "Review queue status", icon: database]
+}
+
+RuntimeFlow {
+  CaptureVideo [label: "Capture video", icon: monitor]
+  DetectPeople [label: "Detect people", icon: server]
+  TrackPeople [label: "Track people", icon: gear]
+  CheckZone [label: "Check zone membership", icon: code]
+  UpdateQueue [label: "Update queue state", icon: database]
+}
+
+Manager > ChooseSource, DrawZone, StartAnalysis, ViewLive, ReviewQueue
+
+ChooseSource > CaptureVideo
+DrawZone > CheckZone
+StartAnalysis > DetectPeople
+ViewLive > UpdateQueue
+ReviewQueue > UpdateQueue
+
+CaptureVideo > DetectPeople: frames
+DetectPeople > TrackPeople
+TrackPeople > CheckZone
+CheckZone > UpdateQueue

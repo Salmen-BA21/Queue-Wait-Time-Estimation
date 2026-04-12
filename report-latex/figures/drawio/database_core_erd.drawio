@@ -1,0 +1,27 @@
+<mxfile host="app.diagrams.net" modified="2026-04-12T18:34:00.000Z" agent="GitHub Copilot" version="26.2.7" editor="draw.io">
+  <diagram id="database-core-erd" name="Database Core ERD">
+    <mxGraphModel dx="1280" dy="720" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Core Database ERD - Queue Operations" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" vertex="1" parent="1"><mxGeometry x="50" y="20" width="540" height="30" as="geometry" /></mxCell>
+
+        <mxCell id="t1" value="establishments&#xa;PK id&#xa;name&#xa;address&#xa;created_at" style="shape=swimlane;html=1;whiteSpace=wrap;horizontal=0;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="60" y="90" width="250" height="180" as="geometry" /></mxCell>
+
+        <mxCell id="t2" value="caisses&#xa;PK id&#xa;FK establishment_id&#xa;name&#xa;camera_id&#xa;is_active" style="shape=swimlane;html=1;whiteSpace=wrap;horizontal=0;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="380" y="90" width="250" height="200" as="geometry" /></mxCell>
+
+        <mxCell id="t3" value="queue_sessions&#xa;PK id&#xa;FK caisse_id&#xa;started_at&#xa;ended_at&#xa;status" style="shape=swimlane;html=1;whiteSpace=wrap;horizontal=0;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="700" y="90" width="260" height="200" as="geometry" /></mxCell>
+
+        <mxCell id="t4" value="feed_configs&#xa;PK id&#xa;FK caisse_id&#xa;source_url&#xa;zone_polygon_json&#xa;is_enabled" style="shape=swimlane;html=1;whiteSpace=wrap;horizontal=0;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="380" y="360" width="250" height="220" as="geometry" /></mxCell>
+
+        <mxCell id="t5" value="queue_alerts&#xa;PK id&#xa;FK queue_session_id&#xa;severity&#xa;alert_type&#xa;value&#xa;threshold&#xa;created_at" style="shape=swimlane;html=1;whiteSpace=wrap;horizontal=0;startSize=30;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="700" y="360" width="260" height="240" as="geometry" /></mxCell>
+
+        <mxCell id="r1" value="1 to many" edge="1" parent="1" source="t1" target="t2" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;strokeWidth=2;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="r2" value="1 to many" edge="1" parent="1" source="t2" target="t3" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;strokeWidth=2;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="r3" value="1 to many" edge="1" parent="1" source="t2" target="t4" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;strokeWidth=2;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="r4" value="1 to many" edge="1" parent="1" source="t3" target="t5" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;strokeWidth=2;"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

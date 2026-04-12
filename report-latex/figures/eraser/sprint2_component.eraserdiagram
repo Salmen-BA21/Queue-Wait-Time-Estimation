@@ -1,0 +1,24 @@
+cloud-architecture-diagram
+
+direction right
+
+QueueEvents [label: "Queue events", icon: database]
+QueueAnalyzer [label: "Queue analyzer", icon: gear]
+RateCalculator [label: "Rate calculator", icon: code]
+StabilityCheck [label: "Stability check", icon: lock]
+WaitTime [label: "Wait time calculator", icon: terminal]
+Metrics [label: "Metrics payload", icon: database]
+Dashboard [icon: react]
+Webhook [icon: mail]
+CsvLog [label: "CSV log", icon: database]
+
+QueueEvents > QueueAnalyzer
+QueueAnalyzer > RateCalculator
+RateCalculator > StabilityCheck
+StabilityCheck > WaitTime
+RateCalculator > Metrics
+WaitTime > Metrics
+
+Metrics > Dashboard
+Metrics > Webhook
+Metrics > CsvLog

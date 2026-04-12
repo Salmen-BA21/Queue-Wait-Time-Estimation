@@ -1,0 +1,31 @@
+flow-chart
+
+direction down
+
+Start [shape: oval, icon: monitor]
+ChooseSource [label: "Choose source", shape: rectangle, icon: monitor]
+SourceOk [label: "Source works?", shape: diamond, icon: gear]
+DrawZone [label: "Draw queue zone", shape: rectangle, icon: code]
+RunAnalysis [label: "Run analysis", shape: rectangle, icon: gear]
+DetectTrack [label: "Detect and track people", shape: rectangle, icon: server]
+KeepInZone [label: "Keep only people in zone", shape: rectangle, icon: code]
+UpdateMetrics [label: "Update queue metrics", shape: rectangle, icon: database]
+ShowResult [label: "Show live result", shape: rectangle, icon: monitor]
+MoreFrames [label: "More frames?", shape: diamond, icon: gear]
+FixSource [label: "Fix source and retry", shape: rectangle, icon: key]
+Stop [shape: oval, icon: terminal]
+
+Start > ChooseSource
+ChooseSource > SourceOk
+SourceOk > DrawZone: yes
+SourceOk > FixSource: no
+FixSource > Stop
+
+DrawZone > RunAnalysis
+RunAnalysis > DetectTrack
+DetectTrack > KeepInZone
+KeepInZone > UpdateMetrics
+UpdateMetrics > ShowResult
+ShowResult > MoreFrames
+MoreFrames > DetectTrack: yes
+MoreFrames > Stop: no

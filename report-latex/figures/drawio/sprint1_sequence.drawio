@@ -1,0 +1,32 @@
+<mxfile host="app.diagrams.net" modified="2026-04-12T18:30:00.000Z" agent="GitHub Copilot" version="26.2.7" editor="draw.io">
+  <diagram id="sprint1-sequence" name="Sprint1 Sequence">
+    <mxGraphModel dx="1280" dy="720" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Sprint 1 Sequence - Per Frame Processing" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" vertex="1" parent="1">
+          <mxGeometry x="70" y="30" width="560" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="loop" value="Loop: for each frame" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="70" y="80" width="1240" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p1" value="Main loop" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="90" y="180" width="150" height="60" as="geometry" /></mxCell>
+        <mxCell id="p2" value="Video source" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="290" y="180" width="150" height="60" as="geometry" /></mxCell>
+        <mxCell id="p3" value="Person detector" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="490" y="180" width="150" height="60" as="geometry" /></mxCell>
+        <mxCell id="p4" value="Object tracker" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="690" y="180" width="150" height="60" as="geometry" /></mxCell>
+        <mxCell id="p5" value="Zone check" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="890" y="180" width="150" height="60" as="geometry" /></mxCell>
+        <mxCell id="p6" value="Queue analysis" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="1090" y="180" width="150" height="60" as="geometry" /></mxCell>
+
+        <mxCell id="e1" value="read frame" edge="1" parent="1" source="p1" target="p2" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" value="send frame" edge="1" parent="1" source="p2" target="p3" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" value="send detections" edge="1" parent="1" source="p3" target="p4" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" value="send tracked people" edge="1" parent="1" source="p4" target="p5" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" value="keep people in queue zone" edge="1" parent="1" source="p5" target="p6" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" value="return updated metrics" edge="1" parent="1" source="p6" target="p1" style="endArrow=block;html=1;dashed=1;edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#9673a6;"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

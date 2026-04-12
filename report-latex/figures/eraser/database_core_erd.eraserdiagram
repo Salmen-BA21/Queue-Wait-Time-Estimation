@@ -1,0 +1,78 @@
+entity-relationship-diagram
+
+colorMode bold
+styleMode plain
+typeface clean
+notation crows-feet
+
+establishments [icon: database] {
+  id int pk
+  name string not null unique
+  created_at timestamp
+}
+
+caisses [icon: database] {
+  id int pk
+  name string not null
+  establishment_id int fk not null
+  zone_points_json json
+  created_at timestamp
+}
+
+video_sessions [icon: database] {
+  id int pk
+  video_source string not null
+  establishment_id int fk
+  caisse_id int fk
+  start_time timestamp
+  end_time timestamp
+  created_at timestamp
+}
+
+feed_configs [icon: database] {
+  feed_id string pk
+  name string not null
+  source string not null
+  model_size string not null
+  status string not null
+  log_level string not null
+  webhook_enabled boolean not null
+  queue_length_warning int not null
+  rtsp_username string
+  rtsp_password string
+  rtsp_transport string
+  establishment_id int fk
+  caisse_id int fk
+  zone_points_json json
+  last_error text
+  created_at timestamp not null
+  updated_at timestamp not null
+}
+
+alert_history [icon: database] {
+  id int pk
+  timestamp timestamp
+  camera_id string
+  zone_id string
+  alert_type string
+  severity string
+  message text
+  value float
+  threshold float
+  people_in_zone int
+  arrival_rate float
+  service_rate float
+  wait_time_seconds float
+  queue_stable boolean
+  raw_detection_count int
+  fps float
+  alerts_count int
+  payload_json json not null
+  created_at timestamp not null
+}
+
+establishments.id < caisses.establishment_id
+establishments.id < video_sessions.establishment_id
+caisses.id < video_sessions.caisse_id
+establishments.id < feed_configs.establishment_id
+caisses.id < feed_configs.caisse_id

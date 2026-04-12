@@ -1,0 +1,27 @@
+flow-chart
+
+direction down
+
+UserAction [label: "User action on dashboard", shape: oval, icon: user]
+ApiRequest [label: "Send API request", shape: rectangle, icon: python]
+UpdateRuntime [label: "Update feed state", shape: rectangle, icon: database]
+PushStatus [label: "Push status event", shape: rectangle, icon: globe]
+UpdateState [label: "Update dashboard state", shape: rectangle, icon: gear]
+RefreshUi [label: "Refresh cards and feed grid", shape: oval, icon: react]
+
+MetricsEvent [label: "Metrics event arrives", shape: rectangle, icon: database]
+AlertEvent [label: "Alert event arrives", shape: rectangle, icon: bell]
+UpdateKpi [label: "Update KPI values", shape: rectangle, icon: monitor]
+UpdatePanels [label: "Update activity and attention", shape: rectangle, icon: bell]
+
+UserAction > ApiRequest
+ApiRequest > UpdateRuntime
+UpdateRuntime > PushStatus
+PushStatus > UpdateState
+UpdateState > RefreshUi
+
+MetricsEvent > UpdateKpi
+UpdateKpi > RefreshUi
+
+AlertEvent > UpdatePanels
+UpdatePanels > RefreshUi

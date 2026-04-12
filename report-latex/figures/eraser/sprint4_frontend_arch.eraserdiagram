@@ -1,0 +1,35 @@
+cloud-architecture-diagram
+
+direction right
+
+Pages {
+  DashboardPage [label: "Dashboard page", icon: react]
+  ZoneEditorPage [label: "Zone editor page", icon: react]
+  AnalyticsPage [label: "Analytics page", icon: react]
+  SettingsPage [label: "Settings page", icon: react]
+}
+
+SharedLayer {
+  UiComponents [label: "Reusable UI components", icon: monitor]
+  DataHooks [label: "Data hooks", icon: gear]
+  ApiClient [label: "API client", icon: typescript]
+  QueryCache [label: "Query cache", icon: database]
+}
+
+BackendApi [label: "Backend API", icon: python]
+LiveSocket [label: "WebSocket stream", icon: globe]
+
+DashboardPage > UiComponents
+ZoneEditorPage > UiComponents
+AnalyticsPage > UiComponents
+SettingsPage > UiComponents
+
+DashboardPage > DataHooks
+ZoneEditorPage > DataHooks
+AnalyticsPage > DataHooks
+SettingsPage > DataHooks
+
+DataHooks <> QueryCache
+DataHooks > ApiClient
+ApiClient > BackendApi
+LiveSocket > DataHooks: live updates
