@@ -1,4 +1,4 @@
-import { LayoutDashboard, Settings, Eye, BarChart3 } from "lucide-react";
+import { LayoutDashboard, Eye, BarChart3, UserCog } from "lucide-react";
 import { useContext } from "react";
 import { AuthContext } from "@/auth/AuthProvider";
 import { NavLink } from "@/components/NavLink";
@@ -19,11 +19,10 @@ import {
 const managerNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
-  { title: "Settings", url: "/settings", icon: Settings },
 ];
 
 const adminNavItems = [
-  { title: "Settings", url: "/settings", icon: Settings },
+  { title: "Managers", url: "/admin/managers", icon: UserCog },
 ];
 
 export function AppSidebar() {

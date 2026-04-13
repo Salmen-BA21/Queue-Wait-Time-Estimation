@@ -1,6 +1,8 @@
 \chapter{Sprint 5: Frontend Integration and Live Monitoring}
 \chaptertoc
 
+\clearpage
+
 \section{Introduction}
 Sprint 5 connected the dashboard to the live backend services and runtime events. At this stage, the frontend stopped being only a visual shell and became a monitoring interface that could react to feed changes and live metrics.
 
@@ -45,6 +47,9 @@ Three main flows were implemented:
 \section{Implementation}
 \subsection{API Integration}
 The frontend relies on a dedicated API layer that keeps the communication with the backend structured. It defines the main data types used by the dashboard and centralizes request handling so errors can be managed consistently.
+
+\subsection{Authentication and Role-Based Navigation}
+Sprint 5 also connected the login and sign-up flows to the dashboard. The auth provider clears cached data when the session changes, protected routes redirect users according to their role, and administrators are taken to the manager administration page while managers are routed to the monitoring dashboard. This keeps the frontend aligned with the backend access rules and avoids exposing the wrong interface to the wrong user.
 
 \subsection{Dashboard State Orchestration}
 A dedicated dashboard state layer coordinates data fetching and updates. From the received feed data, the dashboard derives indicators such as online feeds, total people, average wait time, and attention counts, then exposes them to the widgets.

@@ -38,7 +38,7 @@ export default function SignUp() {
       return;
     }
 
-    const destination = user.role === "manager" ? "/dashboard" : "/settings";
+    const destination = user.role === "manager" ? "/dashboard" : "/admin/managers";
     navigate(destination, { replace: true });
   }, [isSessionLoading, navigate, user]);
 
@@ -62,7 +62,7 @@ export default function SignUp() {
         display_name: data.display_name,
         password: data.password,
       });
-      const destination = registeredUser.role === "manager" ? "/dashboard" : "/settings";
+      const destination = registeredUser.role === "manager" ? "/dashboard" : "/admin/managers";
       navigate(destination, { replace: true });
     } catch (error) {
       const fallbackMessage = "Unable to create your account right now. Please try again.";

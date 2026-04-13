@@ -30,7 +30,7 @@ export default function Login() {
       return;
     }
 
-    const destination = user.role === "manager" ? "/dashboard" : "/settings";
+    const destination = user.role === "manager" ? "/dashboard" : "/admin/managers";
     navigate(destination, { replace: true });
   }, [isSessionLoading, navigate, user]);
 
@@ -48,7 +48,7 @@ export default function Login() {
     try {
       const loggedInUser = await login({ email: data.email, password: data.password });
       const requestedPath = (location.state as { from?: string } | null)?.from;
-      const defaultPath = loggedInUser.role === "manager" ? "/dashboard" : "/settings";
+      const defaultPath = loggedInUser.role === "manager" ? "/dashboard" : "/admin/managers";
       navigate(requestedPath || defaultPath, { replace: true });
     } catch (error) {
       console.error("Login failed:", error);

@@ -590,6 +590,43 @@ async def require_manager_for_api(
     return current_user
 
 
+def resolve_feed_owner_scope(current_user: AuthenticatedUser | None) -> int | None:
+    """Return manager feed ownership scope for API/feed websocket queries."""
+    if current_user is None:
+        return None
+    if current_user.role != "manager":
+        return None
+    return current_user.id
+
+
+async def resolve_websocket_current_user(websocket: WebSocket) -> AuthenticatedUser | None:
+    """Resolve authenticated user for websocket sessions using cookie or bearer token."""
+    access_token = websocket.cookies.get(ACCESS_TOKEN_COOKIE_NAME)
+
+    if not access_token:
+        authorization = websocket.headers.get("authorization")
+        if authorization:
+            scheme, _, token = authorization.partition(" ")
+            if scheme.lower() == "bearer" and token:
+                access_token = token.strip()
+
+    if not access_token:
+        return None
+
+    decoded = decode_access_token(access_token)
+    if decoded is None:
+        return None
+
+    user_record = await asyncio.to_thread(get_user_by_id, decoded.user_id)
+    if user_record is None:
+        return None
+
+    user = user_record_to_authenticated_user(user_record)
+    if not user.is_active:
+        return None
+    return user
+
+
 def build_establishment_model(record: dict) -> Establishment:
     """Convert a raw establishment row into the public API model."""
     return Establishment.model_validate(record)
@@ -1331,20 +1368,23 @@ async def serve_uploaded_video(
 
 @app.get("/api/feeds", response_model=ApiResponse[list[VideoFeed]])
 async def list_feeds(
-    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[list[VideoFeed]]:
-    feeds = await get_registry().list_feeds()
+    owner_user_id = resolve_feed_owner_scope(current_user)
+    feeds = await get_registry().list_feeds(owner_user_id=owner_user_id)
     return ApiResponse(data=feeds)
 
 
 @app.post("/api/feeds", response_model=ApiResponse[VideoFeed], status_code=201)
 async def create_feed(
     request: CreateFeedRequest,
-    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[VideoFeed]:
+    owner_user_id = resolve_feed_owner_scope(current_user)
     feed = await get_registry().create_feed(
         name=request.name,
         source=request.source,
+        manager_user_id=owner_user_id,
         model_size=request.model_size,
         establishment_id=request.establishment_id,
         caisse_id=request.caisse_id,
@@ -1358,13 +1398,15 @@ async def create_feed(
 @app.post("/api/feeds/batch-launch", response_model=ApiResponse[BatchFeedLaunchResponse])
 async def batch_launch_feeds(
     request: BatchFeedLaunchRequest,
-    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[BatchFeedLaunchResponse]:
+    owner_user_id = resolve_feed_owner_scope(current_user)
     result = await get_registry().launch_feed_batch(
         feeds=request.feeds,
         launch_mode=request.launch_mode,
         log_level=request.runtime.log_level,
         webhook_enabled=request.runtime.webhook_enabled,
+        manager_user_id=owner_user_id,
     )
     return ApiResponse(data=result, message="Batch feed launch processed.")
 
@@ -1372,9 +1414,10 @@ async def batch_launch_feeds(
 @app.get("/api/feeds/{feed_id}/status", response_model=ApiResponse[VideoFeed])
 async def get_feed_status(
     feed_id: str,
-    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[VideoFeed]:
-    feed = await get_registry().get_feed(feed_id)
+    owner_user_id = resolve_feed_owner_scope(current_user)
+    feed = await get_registry().get_feed(feed_id, owner_user_id=owner_user_id)
     if feed is None:
         raise HTTPException(status_code=404, detail="Feed not found.")
     return ApiResponse(data=feed)
@@ -1383,9 +1426,13 @@ async def get_feed_status(
 @app.get("/api/feeds/{feed_id}/transport", response_model=ApiResponse[FeedTransportCapabilities])
 async def get_feed_transport(
     feed_id: str,
-    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[FeedTransportCapabilities]:
-    capabilities = await get_registry().get_feed_transport_capabilities(feed_id)
+    owner_user_id = resolve_feed_owner_scope(current_user)
+    capabilities = await get_registry().get_feed_transport_capabilities(
+        feed_id,
+        owner_user_id=owner_user_id,
+    )
     if capabilities is None:
         raise HTTPException(status_code=404, detail="Feed not found.")
     return ApiResponse(data=capabilities)
@@ -1395,12 +1442,16 @@ async def get_feed_transport(
 async def create_feed_webrtc_offer(
     feed_id: str,
     request: FeedWebRTCOfferRequest,
-    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[FeedWebRTCOfferResponse]:
+    owner_user_id = resolve_feed_owner_scope(current_user)
     if not MEDIAMTX_WEBRTC_PREVIEW_ENABLED:
         raise HTTPException(status_code=503, detail="WebRTC preview is disabled on this backend.")
 
-    source_status, source = await get_registry().resolve_feed_webrtc_source(feed_id)
+    source_status, source = await get_registry().resolve_feed_webrtc_source(
+        feed_id,
+        owner_user_id=owner_user_id,
+    )
     if source_status == "not_found":
         raise HTTPException(status_code=404, detail="Feed not found.")
     if source_status == "not_running":
@@ -1416,7 +1467,10 @@ async def create_feed_webrtc_offer(
     if source is None:
         raise HTTPException(status_code=500, detail="WebRTC source resolution failed unexpectedly.")
 
-    transport = await get_registry().get_feed_transport_capabilities(feed_id)
+    transport = await get_registry().get_feed_transport_capabilities(
+        feed_id,
+        owner_user_id=owner_user_id,
+    )
     if transport is None:
         raise HTTPException(status_code=404, detail="Feed not found.")
 
@@ -1467,9 +1521,10 @@ async def create_feed_webrtc_offer(
 @app.get("/api/feeds/{feed_id}/snapshot", response_model=ApiResponse[FeedSnapshotResult])
 async def get_feed_snapshot(
     feed_id: str,
-    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[FeedSnapshotResult]:
-    snapshot = await get_registry().capture_feed_snapshot(feed_id)
+    owner_user_id = resolve_feed_owner_scope(current_user)
+    snapshot = await get_registry().capture_feed_snapshot(feed_id, owner_user_id=owner_user_id)
     if snapshot is None:
         raise HTTPException(status_code=404, detail="Feed not found.")
 
@@ -1482,10 +1537,11 @@ async def get_feed_snapshot(
 @app.get("/api/feeds/{feed_id}/stream")
 async def stream_feed(
     feed_id: str,
-    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> StreamingResponse:
     registry = get_registry()
-    stream_status = await registry.subscribe_feed_stream(feed_id)
+    owner_user_id = resolve_feed_owner_scope(current_user)
+    stream_status = await registry.subscribe_feed_stream(feed_id, owner_user_id=owner_user_id)
     if stream_status == "not_found":
         raise HTTPException(status_code=404, detail="Feed not found.")
     if stream_status == "not_running":
@@ -1505,7 +1561,7 @@ async def stream_feed(
                     break
 
                 if frame is None:
-                    feed = await registry.get_feed(feed_id)
+                    feed = await registry.get_feed(feed_id, owner_user_id=owner_user_id)
                     if feed is None or feed.status not in {"running", "initializing"}:
                         break
                     await asyncio.sleep(0.05)
@@ -1537,10 +1593,11 @@ async def stream_feed(
 @app.post("/api/feeds/{feed_id}/start", response_model=ApiResponse[VideoFeed])
 async def start_feed(
     feed_id: str,
-    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[VideoFeed]:
+    owner_user_id = resolve_feed_owner_scope(current_user)
     try:
-        feed = await get_registry().start_feed(feed_id)
+        feed = await get_registry().start_feed(feed_id, owner_user_id=owner_user_id)
     except FeedStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except FeedStartError as exc:
@@ -1555,10 +1612,11 @@ async def start_feed(
 @app.post("/api/feeds/{feed_id}/stop", response_model=ApiResponse[VideoFeed])
 async def stop_feed(
     feed_id: str,
-    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[VideoFeed]:
+    owner_user_id = resolve_feed_owner_scope(current_user)
     try:
-        feed = await get_registry().stop_feed(feed_id)
+        feed = await get_registry().stop_feed(feed_id, owner_user_id=owner_user_id)
     except FeedStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -1571,10 +1629,11 @@ async def stop_feed(
 @app.post("/api/feeds/{feed_id}/restart", response_model=ApiResponse[VideoFeed])
 async def restart_feed(
     feed_id: str,
-    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[VideoFeed]:
+    owner_user_id = resolve_feed_owner_scope(current_user)
     try:
-        feed = await get_registry().restart_feed(feed_id)
+        feed = await get_registry().restart_feed(feed_id, owner_user_id=owner_user_id)
     except FeedStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except FeedStartError as exc:
@@ -1589,9 +1648,10 @@ async def restart_feed(
 @app.delete("/api/feeds/{feed_id}", response_model=ApiResponse[dict[str, str]])
 async def delete_feed(
     feed_id: str,
-    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[dict[str, str]]:
-    removed = await get_registry().delete_feed(feed_id)
+    owner_user_id = resolve_feed_owner_scope(current_user)
+    removed = await get_registry().delete_feed(feed_id, owner_user_id=owner_user_id)
     if not removed:
         raise HTTPException(status_code=404, detail="Feed not found.")
     return ApiResponse(data={"feed_id": feed_id}, message="Feed deleted successfully.")
@@ -1601,9 +1661,10 @@ async def delete_feed(
 async def update_feed_zone(
     feed_id: str,
     request: ZoneUpdateRequest,
-    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[VideoFeed]:
-    feed = await get_registry().update_zone(feed_id, request.zone)
+    owner_user_id = resolve_feed_owner_scope(current_user)
+    feed = await get_registry().update_zone(feed_id, request.zone, owner_user_id=owner_user_id)
     if feed is None:
         raise HTTPException(status_code=404, detail="Feed not found.")
     return ApiResponse(data=feed, message="Zone updated successfully.")
@@ -1613,11 +1674,13 @@ async def update_feed_zone(
 async def update_feed_thresholds(
     feed_id: str,
     request: QueueThresholdUpdateRequest,
-    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[VideoFeed]:
+    owner_user_id = resolve_feed_owner_scope(current_user)
     feed = await get_registry().update_thresholds(
         feed_id,
         queue_length_warning=request.queue_length_warning,
+        owner_user_id=owner_user_id,
     )
     if feed is None:
         raise HTTPException(status_code=404, detail="Feed not found.")
@@ -1628,8 +1691,9 @@ async def update_feed_thresholds(
 async def update_feed_source(
     feed_id: str,
     request: FeedSourceUpdateRequest,
-    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[VideoFeed]:
+    owner_user_id = resolve_feed_owner_scope(current_user)
     fields_set = request.model_fields_set
 
     try:
@@ -1643,6 +1707,7 @@ async def update_feed_source(
             set_rtsp_password="rtsp_password" in fields_set,
             rtsp_transport=request.rtsp_transport,
             set_rtsp_transport="rtsp_transport" in fields_set,
+            owner_user_id=owner_user_id,
         )
     except FeedStateError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -1660,9 +1725,10 @@ async def update_feed_source(
 
 @app.get("/api/system/health", response_model=ApiResponse[SystemHealth])
 async def get_system_health(
-    _manager: AuthenticatedUser | None = Depends(require_manager_for_api),
+    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
 ) -> ApiResponse[SystemHealth]:
-    feeds = await get_registry().list_feeds()
+    owner_user_id = resolve_feed_owner_scope(current_user)
+    feeds = await get_registry().list_feeds(owner_user_id=owner_user_id)
     active_feeds = sum(1 for feed in feeds if feed.status == "running")
     health = SystemHealth(
         status="ok",
@@ -1737,9 +1803,11 @@ async def test_webhook_integration(
 async def metrics_websocket(websocket: WebSocket) -> None:
     broadcaster = get_broadcaster()
     registry = get_registry()
-    await broadcaster.connect(websocket)
+    current_user = await resolve_websocket_current_user(websocket)
+    owner_user_id = resolve_feed_owner_scope(current_user)
+    await broadcaster.connect(websocket, owner_user_id=owner_user_id)
 
-    snapshot = FeedSnapshotEvent(payload={"feeds": await registry.list_feeds()})
+    snapshot = FeedSnapshotEvent(payload={"feeds": await registry.list_feeds(owner_user_id=owner_user_id)})
     await websocket.send_json(snapshot.model_dump(mode="json"))
 
     try:

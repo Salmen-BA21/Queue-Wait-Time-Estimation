@@ -1,6 +1,8 @@
 \chapter{Sprint 3: Advanced Connectivity and API}
 \chaptertoc
 
+\clearpage
+
 \section{Introduction}
 Sprint 3 expanded the project from a single local pipeline into a platform that can work with several camera sources. At this stage, the backend became responsible for camera onboarding, feed control, and live delivery, so the rest of the application could communicate with it in a more structured way.
 
@@ -56,6 +58,9 @@ This part of the sprint focuses on making external cameras usable inside the pro
 \end{itemize}
 
 The source-handling layer routes local files and webcams through one path and live camera streams through another, which keeps the source logic easier to maintain.
+
+\subsection{Authenticated API Access}
+Sprint 3 also introduced session-aware access control in the backend API. Managers can only interact with the feeds that belong to their account, while administrators keep the broader management scope needed for account governance. The same identity context is applied to feed listing, feed creation, feed lifecycle actions, stream snapshots, and websocket subscriptions so the runtime respects the ownership rules defined earlier in the report.
 
 \subsection{Camera Discovery and Stream Setup}
 The camera discovery step is used to find available cameras automatically and recover their stream information. This avoids hardcoding stream addresses and makes onboarding easier when new IP cameras are added.

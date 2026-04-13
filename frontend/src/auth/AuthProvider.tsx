@@ -1,5 +1,6 @@
 import { createContext, useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import type { AuthUser, LoginInput, RegisterInput } from "@/lib/api";
 import { getCurrentSession, login as loginApi, logout as logoutApi, refreshSession, register as registerApi } from "@/lib/api";
@@ -20,6 +21,7 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -40,15 +42,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = useCallback(async (input: LoginInput) => {
     const result = await loginApi(input);
+    queryClient.clear();
     setUser(result.user);
     return result.user;
-  }, []);
+  }, [queryClient]);
 
   const register = useCallback(async (input: RegisterInput) => {
     const result = await registerApi(input);
+    queryClient.clear();
     setUser(result.user);
     return result.user;
-  }, []);
+  }, [queryClient]);
 
   const logout = useCallback(async () => {
     try {
@@ -56,8 +60,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch {
       // Intentionally ignore logout transport failures and clear local session state.
     }
+    queryClient.clear();
     setUser(null);
-  }, []);
+  }, [queryClient]);
 
   const refresh = useCallback(async () => {
     try {

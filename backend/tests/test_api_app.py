@@ -488,6 +488,70 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertEqual(list_response.status_code, 200)
         self.assertEqual(len(list_response.json()["data"]), 2)
 
+    def test_manager_accounts_only_see_their_own_feeds(self) -> None:
+        suffix = str(int(datetime.now().timestamp() * 1_000_000))
+        manager_a_email = f"manager.a.{suffix}@queuevision.local"
+        manager_b_email = f"manager.b.{suffix}@queuevision.local"
+
+        with TestClient(app) as manager_a_client, TestClient(app) as manager_b_client:
+            manager_a_register = manager_a_client.post(
+                "/api/auth/register",
+                json={
+                    "email": manager_a_email,
+                    "display_name": "Manager A",
+                    "password": "ManagerPass123",
+                },
+            )
+            self.assertEqual(manager_a_register.status_code, 201)
+
+            manager_b_register = manager_b_client.post(
+                "/api/auth/register",
+                json={
+                    "email": manager_b_email,
+                    "display_name": "Manager B",
+                    "password": "ManagerPass123",
+                },
+            )
+            self.assertEqual(manager_b_register.status_code, 201)
+
+            manager_a_feed = manager_a_client.post(
+                "/api/feeds",
+                json={
+                    "name": "Manager A Feed",
+                    "source": "rtsp://192.168.1.210/live/main",
+                },
+            )
+            self.assertEqual(manager_a_feed.status_code, 201)
+            manager_a_feed_id = manager_a_feed.json()["data"]["feed_id"]
+
+            manager_b_feed = manager_b_client.post(
+                "/api/feeds",
+                json={
+                    "name": "Manager B Feed",
+                    "source": "rtsp://192.168.1.211/live/main",
+                },
+            )
+            self.assertEqual(manager_b_feed.status_code, 201)
+            manager_b_feed_id = manager_b_feed.json()["data"]["feed_id"]
+
+            manager_a_list = manager_a_client.get("/api/feeds")
+            self.assertEqual(manager_a_list.status_code, 200)
+            manager_a_feeds = manager_a_list.json()["data"]
+            self.assertEqual(len(manager_a_feeds), 1)
+            self.assertEqual(manager_a_feeds[0]["feed_id"], manager_a_feed_id)
+
+            manager_b_list = manager_b_client.get("/api/feeds")
+            self.assertEqual(manager_b_list.status_code, 200)
+            manager_b_feeds = manager_b_list.json()["data"]
+            self.assertEqual(len(manager_b_feeds), 1)
+            self.assertEqual(manager_b_feeds[0]["feed_id"], manager_b_feed_id)
+
+            manager_a_cannot_read_b = manager_a_client.get(f"/api/feeds/{manager_b_feed_id}/status")
+            self.assertEqual(manager_a_cannot_read_b.status_code, 404)
+
+            manager_b_cannot_delete_a = manager_b_client.delete(f"/api/feeds/{manager_a_feed_id}")
+            self.assertEqual(manager_b_cannot_delete_a.status_code, 404)
+
     def test_start_feed_preserves_rtsp_runtime_options(self) -> None:
         response = self.client.post(
             "/api/feeds",
@@ -1835,7 +1899,7 @@ class TestQueueVisionApi(unittest.TestCase):
         )
 
         async def exercise() -> None:
-            hub._clients.add(cast(Any, websocket))
+            hub._clients[cast(Any, websocket)] = None
             await hub.broadcast_metrics_event(feed_id="feed-live", metrics=metrics)
             await hub.broadcast_alert_event(feed_id="feed-live", alert=alert)
             await hub.broadcast_system_warning(

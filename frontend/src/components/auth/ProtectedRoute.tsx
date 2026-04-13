@@ -22,7 +22,7 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    const fallbackRoute = user.role === "manager" ? "/dashboard" : "/settings";
+    const fallbackRoute = user.role === "manager" ? "/dashboard" : "/admin/managers";
     return <Navigate to={fallbackRoute} replace />;
   }
 

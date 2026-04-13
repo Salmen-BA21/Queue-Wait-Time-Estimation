@@ -206,6 +206,7 @@ class FeedPersistencePayload(TypedDict):
     feed_id: str
     name: str
     source: str
+    manager_user_id: int | None
     model_size: str
     status: str
     log_level: str
@@ -1053,6 +1054,7 @@ class FeedRecord:
     feed_id: str
     name: str
     source: str
+    manager_user_id: int | None
     model_size: ModelSize
     status: str
     created_at: datetime
@@ -1144,39 +1146,58 @@ class WebSocketHub:
     """Tracks connected websocket clients and broadcasts JSON events."""
 
     def __init__(self) -> None:
-        self._clients: set[WebSocket] = set()
+        self._clients: dict[WebSocket, int | None] = {}
         self._lock = asyncio.Lock()
 
-    async def connect(self, websocket: WebSocket) -> None:
+    async def connect(self, websocket: WebSocket, *, owner_user_id: int | None = None) -> None:
         await websocket.accept()
         async with self._lock:
-            self._clients.add(websocket)
+            self._clients[websocket] = owner_user_id
 
     async def disconnect(self, websocket: WebSocket) -> None:
         async with self._lock:
-            self._clients.discard(websocket)
+            self._clients.pop(websocket, None)
 
     async def broadcast(self, payload: dict) -> None:
+        await self._broadcast_to_clients(payload, owner_user_id=None, scoped=False)
+
+    async def _broadcast_to_clients(
+        self,
+        payload: dict,
+        *,
+        owner_user_id: int | None,
+        scoped: bool,
+    ) -> None:
         async with self._lock:
-            clients = list(self._clients)
+            clients = list(self._clients.items())
+
+        if not clients:
+            return
+
+        if scoped:
+            clients = [
+                (websocket, scope)
+                for websocket, scope in clients
+                if self._client_can_receive(scope, owner_user_id)
+            ]
 
         if not clients:
             return
 
         send_results = await asyncio.gather(
-            *(self._send_json(websocket, payload) for websocket in clients),
+            *(self._send_json(websocket, payload) for websocket, _ in clients),
             return_exceptions=False,
         )
 
         stale_clients: list[WebSocket] = []
-        for websocket, delivered in zip(clients, send_results):
+        for (websocket, _), delivered in zip(clients, send_results):
             if not delivered:
                 stale_clients.append(websocket)
 
         if stale_clients:
             async with self._lock:
                 for websocket in stale_clients:
-                    self._clients.discard(websocket)
+                    self._clients.pop(websocket, None)
 
             for websocket in stale_clients:
                 try:
@@ -1193,25 +1214,60 @@ class WebSocketHub:
         except (RuntimeError, WebSocketDisconnect, asyncio.TimeoutError):
             return False
 
+    @staticmethod
+    def _client_can_receive(client_owner_scope: int | None, event_owner_scope: int | None) -> bool:
+        if client_owner_scope is None:
+            return True
+
+        if event_owner_scope is None:
+            return False
+
+        return client_owner_scope == event_owner_scope
+
     async def broadcast_feed_event(
         self,
         *,
         action: Literal["created", "updated", "deleted"],
         feed: VideoFeed | None = None,
         feed_id: str | None = None,
+        owner_user_id: int | None = None,
     ) -> None:
         event = FeedStatusEvent(
             payload=FeedStatusEventPayload(action=action, feed=feed, feed_id=feed_id),
         )
-        await self.broadcast(event.model_dump(mode="json"))
+        await self._broadcast_to_clients(
+            event.model_dump(mode="json"),
+            owner_user_id=owner_user_id,
+            scoped=True,
+        )
 
-    async def broadcast_metrics_event(self, *, feed_id: str, metrics: QueueMetricsModel) -> None:
+    async def broadcast_metrics_event(
+        self,
+        *,
+        feed_id: str,
+        metrics: QueueMetricsModel,
+        owner_user_id: int | None = None,
+    ) -> None:
         event = MetricsUpdateEvent(payload=MetricsUpdateEventPayload(feed_id=feed_id, metrics=metrics))
-        await self.broadcast(event.model_dump(mode="json"))
+        await self._broadcast_to_clients(
+            event.model_dump(mode="json"),
+            owner_user_id=owner_user_id,
+            scoped=True,
+        )
 
-    async def broadcast_alert_event(self, *, feed_id: str, alert: AlertModel) -> None:
+    async def broadcast_alert_event(
+        self,
+        *,
+        feed_id: str,
+        alert: AlertModel,
+        owner_user_id: int | None = None,
+    ) -> None:
         event = AlertFiredEvent(payload=AlertFiredEventPayload(feed_id=feed_id, alert=alert))
-        await self.broadcast(event.model_dump(mode="json"))
+        await self._broadcast_to_clients(
+            event.model_dump(mode="json"),
+            owner_user_id=owner_user_id,
+            scoped=True,
+        )
 
     async def broadcast_system_warning(
         self,
@@ -1220,6 +1276,7 @@ class WebSocketHub:
         code: str,
         message: str,
         timestamp: datetime,
+        owner_user_id: int | None = None,
     ) -> None:
         event = SystemWarningEvent(
             payload=SystemWarningEventPayload(
@@ -1229,7 +1286,11 @@ class WebSocketHub:
                 timestamp=timestamp,
             )
         )
-        await self.broadcast(event.model_dump(mode="json"))
+        await self._broadcast_to_clients(
+            event.model_dump(mode="json"),
+            owner_user_id=owner_user_id,
+            scoped=True,
+        )
 
     @property
     def client_count(self) -> int:
@@ -1260,6 +1321,12 @@ class FeedRegistry:
             self._loop = asyncio.get_running_loop()
         except RuntimeError:
             self._loop = None
+
+    @staticmethod
+    def _is_record_visible_to_owner_scope(record: FeedRecord, owner_user_id: int | None) -> bool:
+        if owner_user_id is None:
+            return True
+        return record.manager_user_id == owner_user_id
 
     def _reserve_frame_channel_binding(self, feed_id: str) -> FrameChannelBinding | None:
         if self._frame_channel is None:
@@ -1326,21 +1393,37 @@ class FeedRegistry:
             frame_bytes=frame_bytes,
         )
 
-    async def list_feeds(self) -> list[VideoFeed]:
+    async def list_feeds(self, *, owner_user_id: int | None = None) -> list[VideoFeed]:
         async with self._lock:
-            records = sorted(self._feeds.values(), key=lambda item: item.created_at)
+            records = [
+                record
+                for record in self._feeds.values()
+                if self._is_record_visible_to_owner_scope(record, owner_user_id)
+            ]
+            records.sort(key=lambda item: item.created_at)
             return [record.to_model() for record in records]
 
-    async def get_feed(self, feed_id: str) -> VideoFeed | None:
+    async def get_feed(self, feed_id: str, *, owner_user_id: int | None = None) -> VideoFeed | None:
         async with self._lock:
             record = self._feeds.get(feed_id)
-            return record.to_model() if record else None
+            if record is None:
+                return None
+            if not self._is_record_visible_to_owner_scope(record, owner_user_id):
+                return None
+            return record.to_model()
 
-    async def get_feed_transport_capabilities(self, feed_id: str) -> FeedTransportCapabilities | None:
+    async def get_feed_transport_capabilities(
+        self,
+        feed_id: str,
+        *,
+        owner_user_id: int | None = None,
+    ) -> FeedTransportCapabilities | None:
         """Return frontend playback capability details for one feed."""
         async with self._lock:
             record = self._feeds.get(feed_id)
             if record is None:
+                return None
+            if not self._is_record_visible_to_owner_scope(record, owner_user_id):
                 return None
             return record.to_transport_capabilities()
 
@@ -1349,6 +1432,7 @@ class FeedRegistry:
         *,
         name: str,
         source: str,
+        manager_user_id: int | None = None,
         model_size: ModelSize = "n",
         zone: ZonePolygon | None = None,
         log_level: LogLevel = "INFO",
@@ -1366,6 +1450,7 @@ class FeedRegistry:
             feed_id=str(uuid4()),
             name=name.strip(),
             source=source.strip(),
+            manager_user_id=manager_user_id,
             log_level=log_level,
             webhook_enabled=webhook_enabled,
             queue_length_warning=queue_length_warning,
@@ -1393,14 +1478,20 @@ class FeedRegistry:
             self._feeds[record.feed_id] = record
             model = record.to_model()
 
-        await self._broadcaster.broadcast_feed_event(action="created", feed=model)
+        await self._broadcaster.broadcast_feed_event(
+            action="created",
+            feed=model,
+            owner_user_id=record.manager_user_id,
+        )
         return model
 
-    async def delete_feed(self, feed_id: str) -> bool:
+    async def delete_feed(self, feed_id: str, *, owner_user_id: int | None = None) -> bool:
         async with self._lock:
             record = self._feeds.get(feed_id)
 
         if record is None:
+            return False
+        if not self._is_record_visible_to_owner_scope(record, owner_user_id):
             return False
 
         if record.worker is not None and self._runner.poll(record.worker) is None:
@@ -1416,13 +1507,25 @@ class FeedRegistry:
         await self._frame_streams.terminate(feed_id)
         await asyncio.to_thread(delete_feed_config, feed_id)
 
-        await self._broadcaster.broadcast_feed_event(action="deleted", feed_id=feed_id)
+        await self._broadcaster.broadcast_feed_event(
+            action="deleted",
+            feed_id=feed_id,
+            owner_user_id=removed.manager_user_id,
+        )
         return True
 
-    async def update_zone(self, feed_id: str, zone: ZonePolygon) -> VideoFeed | None:
+    async def update_zone(
+        self,
+        feed_id: str,
+        zone: ZonePolygon,
+        *,
+        owner_user_id: int | None = None,
+    ) -> VideoFeed | None:
         async with self._lock:
             record = self._feeds.get(feed_id)
             if record is None:
+                return None
+            if not self._is_record_visible_to_owner_scope(record, owner_user_id):
                 return None
 
             record.zone = zone
@@ -1438,7 +1541,11 @@ class FeedRegistry:
 
         await self._persist_record(record)
 
-        await self._broadcaster.broadcast_feed_event(action="updated", feed=model)
+        await self._broadcaster.broadcast_feed_event(
+            action="updated",
+            feed=model,
+            owner_user_id=record.manager_user_id,
+        )
         return model
 
     async def update_thresholds(
@@ -1446,10 +1553,13 @@ class FeedRegistry:
         feed_id: str,
         *,
         queue_length_warning: int,
+        owner_user_id: int | None = None,
     ) -> VideoFeed | None:
         async with self._lock:
             record = self._feeds.get(feed_id)
             if record is None:
+                return None
+            if not self._is_record_visible_to_owner_scope(record, owner_user_id):
                 return None
 
             record.queue_length_warning = queue_length_warning
@@ -1460,10 +1570,14 @@ class FeedRegistry:
         await self._persist_record(record)
 
         if should_restart:
-            await self.restart_feed(feed_id)
-            return await self.get_feed(feed_id)
+            await self.restart_feed(feed_id, owner_user_id=owner_user_id)
+            return await self.get_feed(feed_id, owner_user_id=owner_user_id)
 
-        await self._broadcaster.broadcast_feed_event(action="updated", feed=model)
+        await self._broadcaster.broadcast_feed_event(
+            action="updated",
+            feed=model,
+            owner_user_id=record.manager_user_id,
+        )
         return model
 
     async def update_source(
@@ -1478,6 +1592,7 @@ class FeedRegistry:
         set_rtsp_password: bool = False,
         rtsp_transport: Literal["tcp", "udp"] | None = None,
         set_rtsp_transport: bool = False,
+        owner_user_id: int | None = None,
     ) -> VideoFeed | None:
         """Update a feed source and optionally restart the worker when running."""
         normalized_source = source.strip()
@@ -1487,6 +1602,8 @@ class FeedRegistry:
         async with self._lock:
             record = self._feeds.get(feed_id)
             if record is None:
+                return None
+            if not self._is_record_visible_to_owner_scope(record, owner_user_id):
                 return None
 
             record.source = normalized_source
@@ -1512,10 +1629,14 @@ class FeedRegistry:
         await self._persist_record(record)
 
         if should_restart:
-            await self.restart_feed(feed_id)
-            return await self.get_feed(feed_id)
+            await self.restart_feed(feed_id, owner_user_id=owner_user_id)
+            return await self.get_feed(feed_id, owner_user_id=owner_user_id)
 
-        await self._broadcaster.broadcast_feed_event(action="updated", feed=model)
+        await self._broadcaster.broadcast_feed_event(
+            action="updated",
+            feed=model,
+            owner_user_id=record.manager_user_id,
+        )
         return model
 
     async def start_feed(
@@ -1524,12 +1645,15 @@ class FeedRegistry:
         *,
         log_level: LogLevel | None = None,
         webhook_enabled: bool | None = None,
+        owner_user_id: int | None = None,
     ) -> VideoFeed | None:
         self._bind_event_loop()
 
         async with self._lock:
             record = self._feeds.get(feed_id)
             if record is None:
+                return None
+            if not self._is_record_visible_to_owner_scope(record, owner_user_id):
                 return None
 
             if record.worker is not None and self._runner.poll(record.worker) is None:
@@ -1569,7 +1693,11 @@ class FeedRegistry:
 
         await self._persist_record(record)
 
-        await self._broadcaster.broadcast_feed_event(action="updated", feed=initializing_model)
+        await self._broadcaster.broadcast_feed_event(
+            action="updated",
+            feed=initializing_model,
+            owner_user_id=record.manager_user_id,
+        )
 
         handle: FeedWorkerHandle | None = None
         try:
@@ -1614,13 +1742,19 @@ class FeedRegistry:
         await self._persist_record(current)
 
         asyncio.create_task(self._monitor_feed(feed_id, handle))
-        await self._broadcaster.broadcast_feed_event(action="updated", feed=running_model)
+        await self._broadcaster.broadcast_feed_event(
+            action="updated",
+            feed=running_model,
+            owner_user_id=current.manager_user_id,
+        )
         return running_model
 
-    async def stop_feed(self, feed_id: str) -> VideoFeed | None:
+    async def stop_feed(self, feed_id: str, *, owner_user_id: int | None = None) -> VideoFeed | None:
         async with self._lock:
             record = self._feeds.get(feed_id)
             if record is None:
+                return None
+            if not self._is_record_visible_to_owner_scope(record, owner_user_id):
                 return None
 
             handle = record.worker
@@ -1664,7 +1798,11 @@ class FeedRegistry:
 
         await self._persist_record(current)
 
-        await self._broadcaster.broadcast_feed_event(action="updated", feed=stopped_model)
+        await self._broadcaster.broadcast_feed_event(
+            action="updated",
+            feed=stopped_model,
+            owner_user_id=current.manager_user_id,
+        )
         return stopped_model
 
     async def restart_feed(
@@ -1673,22 +1811,26 @@ class FeedRegistry:
         *,
         log_level: LogLevel | None = None,
         webhook_enabled: bool | None = None,
+        owner_user_id: int | None = None,
     ) -> VideoFeed | None:
         async with self._lock:
             record = self._feeds.get(feed_id)
             if record is None:
+                return None
+            if not self._is_record_visible_to_owner_scope(record, owner_user_id):
                 return None
 
             handle = record.worker
             is_running = handle is not None and self._runner.poll(handle) is None
 
         if is_running:
-            await self.stop_feed(feed_id)
+            await self.stop_feed(feed_id, owner_user_id=owner_user_id)
 
         return await self.start_feed(
             feed_id,
             log_level=log_level,
             webhook_enabled=webhook_enabled,
+            owner_user_id=owner_user_id,
         )
 
     async def launch_feed_batch(
@@ -1698,6 +1840,7 @@ class FeedRegistry:
         launch_mode: BatchLaunchMode,
         log_level: LogLevel,
         webhook_enabled: bool,
+        manager_user_id: int | None = None,
     ) -> BatchFeedLaunchResponse:
         results: list[BatchFeedLaunchItemResult] = []
         created_count = 0
@@ -1709,6 +1852,7 @@ class FeedRegistry:
                 created_feed = await self.create_feed(
                     name=draft.name,
                     source=draft.source,
+                    manager_user_id=manager_user_id,
                     model_size=draft.model_size,
                     zone=draft.zone,
                     log_level=log_level,
@@ -1742,7 +1886,10 @@ class FeedRegistry:
                 continue
 
             try:
-                started_feed = await self.start_feed(created_feed.feed_id)
+                started_feed = await self.start_feed(
+                    created_feed.feed_id,
+                    owner_user_id=manager_user_id,
+                )
                 if started_feed is None:
                     raise FeedStartError("Feed disappeared during batch start.")
 
@@ -1756,7 +1903,10 @@ class FeedRegistry:
                 )
             except (FeedStartError, FeedStateError, RuntimeError) as exc:
                 failed_count += 1
-                current_feed = await self.get_feed(created_feed.feed_id)
+                current_feed = await self.get_feed(
+                    created_feed.feed_id,
+                    owner_user_id=manager_user_id,
+                )
                 results.append(
                     BatchFeedLaunchItemResult(
                         client_id=draft.client_id,
@@ -1781,10 +1931,17 @@ class FeedRegistry:
             ),
         )
 
-    async def capture_feed_snapshot(self, feed_id: str) -> FeedSnapshotResult | None:
+    async def capture_feed_snapshot(
+        self,
+        feed_id: str,
+        *,
+        owner_user_id: int | None = None,
+    ) -> FeedSnapshotResult | None:
         async with self._lock:
             record = self._feeds.get(feed_id)
             if record is None:
+                return None
+            if not self._is_record_visible_to_owner_scope(record, owner_user_id):
                 return None
 
             source = record.source
@@ -1837,11 +1994,15 @@ class FeedRegistry:
     async def resolve_feed_webrtc_source(
         self,
         feed_id: str,
+        *,
+        owner_user_id: int | None = None,
     ) -> tuple[Literal["ok", "not_found", "not_running", "unsupported_source"], str | None]:
         """Resolve an authenticated RTSP source for WebRTC preview handshakes."""
         async with self._lock:
             record = self._feeds.get(feed_id)
             if record is None:
+                return "not_found", None
+            if not self._is_record_visible_to_owner_scope(record, owner_user_id):
                 return "not_found", None
 
             if record.status != "running":
@@ -1856,10 +2017,17 @@ class FeedRegistry:
 
         return "ok", _build_authenticated_rtsp_source(source, username, password)
 
-    async def subscribe_feed_stream(self, feed_id: str) -> Literal["ok", "not_found", "not_running"]:
+    async def subscribe_feed_stream(
+        self,
+        feed_id: str,
+        *,
+        owner_user_id: int | None = None,
+    ) -> Literal["ok", "not_found", "not_running"]:
         async with self._lock:
             record = self._feeds.get(feed_id)
             if record is None:
+                return "not_found"
+            if not self._is_record_visible_to_owner_scope(record, owner_user_id):
                 return "not_found"
 
             if record.status not in {"running", "initializing"}:
@@ -1937,6 +2105,7 @@ class FeedRegistry:
             "feed_id": record.feed_id,
             "name": record.name,
             "source": record.source,
+            "manager_user_id": record.manager_user_id,
             "model_size": record.model_size,
             "status": record.status,
             "log_level": record.log_level,
@@ -1979,6 +2148,7 @@ class FeedRegistry:
                 feed_id=str(persisted["feed_id"]),
                 name=str(persisted["name"]),
                 source=str(persisted["source"]),
+                manager_user_id=int(persisted["manager_user_id"]) if persisted.get("manager_user_id") is not None else None,
                 model_size=cast(ModelSize, persisted.get("model_size") or "n"),
                 status=str(status),
                 created_at=coerce_datetime(persisted.get("created_at"), fallback=recovered_at),
@@ -2025,7 +2195,11 @@ class FeedRegistry:
 
         await self._persist_record(record)
 
-        await self._broadcaster.broadcast_feed_event(action="updated", feed=model)
+        await self._broadcaster.broadcast_feed_event(
+            action="updated",
+            feed=model,
+            owner_user_id=record.manager_user_id,
+        )
         return model
 
     async def _apply_metrics_update(self, feed_id: str, metrics: QueueMetricsModel) -> None:
@@ -2040,6 +2214,8 @@ class FeedRegistry:
             if record is None:
                 return
 
+            owner_user_id = record.manager_user_id
+
             now_monotonic = time.monotonic()
             backend_annotations_active = bool(
                 record.last_worker_frame_at_monotonic is not None
@@ -2053,10 +2229,22 @@ class FeedRegistry:
             )
             record.latest_metrics = metrics_without_frame.model_dump(mode="python")
 
-        await self._broadcaster.broadcast_metrics_event(feed_id=feed_id, metrics=metrics_without_frame)
+        await self._broadcaster.broadcast_metrics_event(
+            feed_id=feed_id,
+            metrics=metrics_without_frame,
+            owner_user_id=owner_user_id,
+        )
 
     async def _apply_alert_fired(self, feed_id: str, alert: AlertModel) -> None:
-        await self._broadcaster.broadcast_alert_event(feed_id=feed_id, alert=alert)
+        async with self._lock:
+            record = self._feeds.get(feed_id)
+            owner_user_id = record.manager_user_id if record is not None else None
+
+        await self._broadcaster.broadcast_alert_event(
+            feed_id=feed_id,
+            alert=alert,
+            owner_user_id=owner_user_id,
+        )
 
     async def _apply_system_warning(
         self,
@@ -2068,6 +2256,7 @@ class FeedRegistry:
     ) -> None:
         async with self._lock:
             record = self._feeds.get(feed_id)
+            owner_user_id = record.manager_user_id if record is not None else None
             if record is not None:
                 record.last_warning = message
                 record.last_warning_code = code
@@ -2077,6 +2266,7 @@ class FeedRegistry:
             code=code,
             message=message,
             timestamp=timestamp,
+            owner_user_id=owner_user_id,
         )
 
     async def _drain_worker_events(self, feed_id: str, handle: FeedWorkerHandle) -> None:
@@ -2215,5 +2405,9 @@ class FeedRegistry:
             self._clear_frame_channel_binding(feed_id)
             await self._frame_streams.terminate(feed_id)
 
-            await self._broadcaster.broadcast_feed_event(action="updated", feed=model)
+            await self._broadcaster.broadcast_feed_event(
+                action="updated",
+                feed=model,
+                owner_user_id=record.manager_user_id,
+            )
             return

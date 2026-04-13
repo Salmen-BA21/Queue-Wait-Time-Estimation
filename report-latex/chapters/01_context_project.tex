@@ -1,6 +1,8 @@
 \chapter{Context of the Project}
 \chaptertoc
 
+\clearpage
+
 \section{Introduction}
 This chapter places the Queue Wait-Time Estimation System in its operational, organizational, and methodological context. After a short introduction, it explains why queue monitoring remains an important problem for service organizations and why an end-to-end technical solution is needed rather than isolated counting tools.
 
@@ -13,7 +15,7 @@ This end-of-studies project was carried out with DataDoIt, a data-driven sustain
 
 The collaboration provided a concrete setting for work centered on data collection, real-time monitoring, and automated analytics, and these concerns directly shaped the design and scope of the project.
 
-\begin{table}[ht]
+\begin{table}[H]
     \centering
     \caption{Collaboration perimeter with DataDoIt}
     \label{tab:datadoit_perimeter}
@@ -56,7 +58,7 @@ Existing operational practices and basic counting tools present recurring limita
 
 As a consequence, interventions (staff reallocation, lane opening, escalation) can be delayed or triggered on incomplete signals. The problem is therefore both analytical and integration-related: it is not enough to produce robust indicators; they also need to be delivered through actionable channels.
 
-\begin{table}[ht]
+\begin{table}[H]
     \centering
     \caption{From operational pain points to system-level requirements}
     \label{tab:painpoint_to_requirement}
@@ -75,17 +77,20 @@ Recent computer-vision frameworks provide strong building blocks for person perc
 
 In practice, many deployments remain incomplete. Some focus only on counting and ignore identity continuity; others provide visualization without defining stability clearly; and others stop at analytics without connecting to alert delivery. The result is often a set of disconnected tools instead of one coherent architecture.
 
-\begin{table}[ht]
+\begin{table}[H]
     \centering
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \renewcommand{\arraystretch}{0.92}
     \caption{Positioning of the proposed solution against common approach families}
     \label{tab:approach_positioning}
     \begin{tabularx}{\textwidth}{|l|X|X|}
         \hline
         Approach family & Strengths & Typical limitation \\ \hline
-        Manual or occupancy-only monitoring & Simple to deploy and easy to interpret at first glance. & Weak predictive capability and high human subjectivity. \\ \hline
-        Vision detection without persistent tracking & Fast frame-level counting. & Identity discontinuity can distort arrival and departure logic. \\ \hline
-        Analytical queue models without vision coupling & Strong mathematical interpretability. & Requires reliable event extraction pipeline from real scenes. \\ \hline
-        Proposed integrated pipeline & Couples perception, queue analytics, web monitoring, and automation. & Requires careful multi-layer integration and validation. \\ \hline
+        Manual or occupancy-only monitoring & Easy to deploy and interpret. & Weak predictive value and high subjectivity. \\ \hline
+        Vision detection without persistent tracking & Fast frame-level counting. & No persistent identities, so arrival and departure logic can drift. \\ \hline
+        Analytical queue models without vision coupling & Strong mathematical interpretability. & Needs reliable event extraction from real scenes. \\ \hline
+        Proposed integrated pipeline & Links perception, queue analytics, monitoring, and automation. & Requires careful integration and validation. \\ \hline
     \end{tabularx}
 \end{table}
 
@@ -115,8 +120,11 @@ The project objectives are to:
 
 To keep the implementation traceable, the objectives are mapped to delivery modules and observable outputs.
 
-\begin{table}[ht]
+\begin{table}[H]
     \centering
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \renewcommand{\arraystretch}{0.92}
     \caption{Objective-to-module traceability}
     \label{tab:objective_traceability}
     \begin{tabularx}{\textwidth}{|l|X|l|X|}
@@ -179,16 +187,19 @@ This module covered integration hardening and closure:
     \item Sprint 8: report finalization and project consolidation.
 \end{itemize}
 
-\begin{table}[ht]
+\begin{table}[H]
     \centering
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \renewcommand{\arraystretch}{0.92}
     \caption{Scrum module mapping used in this report}
     \label{tab:scrum_module_mapping}
     \begin{tabularx}{\textwidth}{|l|l|X|X|}
         \hline
         Module & Sprints & Main focus & Validation perspective \\ \hline
-        Module A: Backend Core & 1 to 3 & Vision pipeline, queue analytics, camera connectivity, API services & Technical correctness of perception and metrics contracts. \\ \hline
-        Module B: Web Experience & 4 to 5 & Frontend design system, dashboard scaffolding, live integration & Usability, interaction continuity, and live data rendering stability. \\ \hline
-        Module C: Automation and Finalization & 6 to 8 & n8n alerting, optimization, validation, and reporting & End-to-end operability, alert reliability, and delivery readiness. \\ \hline
+        Module A: Backend Core & 1 to 3 & Vision pipeline, queue analytics, camera connectivity, API services & Perception correctness and metric contracts. \\ \hline
+        Module B: Web Experience & 4 to 5 & Frontend design system, dashboard scaffolding, live integration & Usability and live-rendering stability. \\ \hline
+        Module C: Automation and Finalization & 6 to 8 & n8n alerting, optimization, validation, and reporting & End-to-end operability and delivery readiness. \\ \hline
     \end{tabularx}
 \end{table}
 

@@ -1,6 +1,8 @@
 \chapter{Requirements Specification and Analysis}
 \chaptertoc
 
+
+
 \section{Introduction}
 This chapter turns the project objective into the requirements that guided the implementation. We identify the actors, list the functions and quality constraints they need, and show how those requirements are spread across the implementation plan.
 
@@ -20,31 +22,22 @@ The actors of the system are:
 This split makes the functional scope easier to explain and validate, because access-control flows and operational monitoring flows can be tested separately.
 
 \subsection{Authentication and Access Governance}
-The platform also includes a lightweight identity layer so that the dashboard is not open to anonymous use. Administrators authenticate to manage manager accounts, while managers can create an account, sign in, and continue their session through secure cookies. The backend supports session refresh, logout, password policy checks, account lockout after repeated failures, and audit logging. These controls matter because the monitoring and automation functions are tied to operational decisions and should not be exposed without clear access boundaries.
+The platform also includes a lightweight identity layer so that the dashboard is not open to anonymous use. Managers can register, sign in, refresh their session, and log out, while administrators manage manager accounts and audit the resulting actions. The detailed backend and frontend implementation is described in the sprint chapters, but the requirements are captured here because access boundaries are part of the core system behavior.
 
-\begin{table}[ht]
+\begin{table}[H]
     \centering
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \renewcommand{\arraystretch}{0.92}
     \caption{Authentication and access-control requirements}
     \label{tab:auth_access_requirements}
     \begin{tabularx}{\textwidth}{|l|X|X|X|}
         \hline
-        ID & Requirement statement & Priority & Verification strategy \\ \hline
-        AR-01 & Allow a manager to register, sign in, refresh the session, and log out through a secure cookie-based workflow. & High & Validate register, login, refresh, and logout flows with API and frontend integration tests. \\ \hline
-        AR-02 & Allow the administrator to create, update, deactivate, and reset manager accounts. & High & Validate administrator account-governance endpoints and audit events. \\ \hline
-        AR-03 & Enforce password policy, lockout after repeated failures, and role-based protection on operational endpoints. & High & Validate failed-login counters, lockout behavior, and unauthorized-access paths. \\ \hline
-        AR-04 & Record authentication and account-governance actions for later traceability. & Medium & Validate audit-log entries during registration, login, and account updates. \\ \hline
-    \end{tabularx}
-\end{table}
-
-\begin{table}[ht]
-    \centering
-    \caption{Actor responsibility matrix}
-    \label{tab:actor_responsibility_matrix}
-    \begin{tabularx}{\textwidth}{|l|X|X|}
-        \hline
-        Actor & Main responsibilities & Typical interactions \\ \hline
-        Administrator & Create, update, and delete manager accounts; enforce access governance rules. & Uses account-management and audit-oriented flows to maintain authorized manager access. \\ \hline
-        Manager & Configure feeds, zones, and thresholds; monitor live queue status; react to warning/critical alerts; review trends and performance summaries. & Uses setup workflows, dashboard KPIs, live feed views, alert panels, and analytics views for operational decision-making. \\ \hline
+        ID & Requirement & Priority & Verification \\ \hline
+        AR-01 & Allow a manager to register, sign in, refresh, and log out through secure cookies. & High & Validate register, login, refresh, logout, and session checks. \\ \hline
+        AR-02 & Allow the administrator to create, update, deactivate, and reset manager accounts. & High & Validate account-governance endpoints and audit events. \\ \hline
+        AR-03 & Enforce password policy, lockout after repeated failures, and role-based protection on operational endpoints. & High & Validate failed-login counters, lockout behavior, and unauthorized access. \\ \hline
+        AR-04 & Record authentication and account-governance actions for later traceability. & Medium & Validate audit-log entries during register and login flows. \\ \hline
     \end{tabularx}
 \end{table}
 
@@ -64,23 +57,26 @@ At a high level, the system captures a feed, counts people, estimates queue beha
 
 These requirements define the minimum end-to-end behavior expected from the platform. To keep the implementation trackable, we formalize them in a traceability matrix.
 
-\begin{table}[ht]
+\begin{table}[H]
     \centering
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \renewcommand{\arraystretch}{0.92}
     \caption{Functional requirement traceability matrix}
     \label{tab:functional_requirement_matrix}
     \begin{tabularx}{\textwidth}{|l|X|l|X|}
         \hline
-        ID & Requirement statement & Priority & Verification strategy \\ \hline
-        FR-01 & Detect people from live or recorded video streams in near real time. & High & Validate detector outputs and runtime overlays in the perception layer. \\ \hline
-        FR-02 & Maintain identity continuity through tracking for event-level queue analysis. & High & Validate tracker ID continuity in representative runtime scenarios. \\ \hline
-        FR-03 & Restrict counting to configurable polygon queue zones. & High & Validate polygon inclusion behavior in the zone-management layer. \\ \hline
-        FR-04 & Compute $\lambda$, $\mu$, and expected wait time from event windows. & High & Validate queue formulas and stability handling in the analytics layer. \\ \hline
-        FR-05 & Classify stable/unstable queue states and apply safe fallback wait-time logic. & High & Validate stability branches and fallback behavior in queue analytics. \\ \hline
-        FR-06 & Expose feed control and live updates through API and websocket channels. & High & Validate endpoint and runtime behavior through API and integration tests. \\ \hline
-        FR-07 & Dispatch alert payloads to external automation workflows. & Medium & Validate webhook dispatch and n8n branch behavior using script-based scenarios. \\ \hline
-        FR-08 & Persist operational metrics and metadata for analysis and auditing. & Medium & Validate SQLite persistence behavior through runtime execution and database checks. \\ \hline
-        FR-09 & Support manager registration, sign-in, session refresh, and logout through secure cookies. & High & Validate register, login, refresh, logout, and session-check endpoints across API and frontend integration tests. \\ \hline
-        FR-10 & Protect administrative and operational APIs with role-based access control and audit logging. & High & Validate unauthorized access paths, lockout behavior, and audit-event creation. \\ \hline
+        ID & Requirement & Priority & Verification \\ \hline
+        FR-01 & Detect people in live or recorded streams in near real time. & High & Validate detections and overlays in the perception layer. \\ \hline
+        FR-02 & Preserve identity continuity across frames for queue analysis. & High & Validate tracker ID continuity in runtime scenarios. \\ \hline
+        FR-03 & Restrict counting to configurable polygon queue zones. & High & Validate polygon inclusion in the zone-management layer. \\ \hline
+        FR-04 & Compute $\lambda$, $\mu$, and expected wait time from event windows. & High & Validate queue formulas and stability handling in analytics. \\ \hline
+        FR-05 & Classify stable/unstable queue states with fallback wait-time logic. & High & Validate stability branches and fallback behavior. \\ \hline
+        FR-06 & Expose feed control and live updates through API and websocket channels. & High & Validate endpoint and runtime behavior in API tests. \\ \hline
+        FR-07 & Dispatch alert payloads to automation workflows. & Medium & Validate webhook dispatch and n8n branching. \\ \hline
+        FR-08 & Persist operational metrics and metadata for analysis and auditing. & Medium & Validate SQLite persistence in runtime and database checks. \\ \hline
+        FR-09 & Support manager registration, sign-in, refresh, and logout through secure cookies. & High & Validate register, login, refresh, logout, and session checks. \\ \hline
+        FR-10 & Protect administrative and operational APIs with role-based access control and audit logging. & High & Validate unauthorized access paths and audit events. \\ \hline
     \end{tabularx}
 \end{table}
 
@@ -97,19 +93,22 @@ In addition to functional behavior, the platform must satisfy quality constraint
 
 We treat these quality attributes as engineering contracts rather than only design intentions.
 
-\begin{table}[ht]
+\begin{table}[H]
     \centering
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \renewcommand{\arraystretch}{0.92}
     \caption{Non-functional requirement quality matrix}
     \label{tab:nonfunctional_quality_matrix}
     \begin{tabularx}{\textwidth}{|l|X|X|X|}
         \hline
-        ID & Quality attribute & Target indicator & Validation approach \\ \hline
-        NFR-01 & Performance & Stable near-real-time loop and bounded alert propagation delay. & Runtime observation under representative feed scenarios. \\ \hline
-        NFR-02 & Scalability & Independent lifecycle control for multiple feed contexts. & Feed registry behavior and state-transition verification. \\ \hline
-        NFR-03 & Reliability & Graceful handling of camera drops and webhook transmission failures. & Reconnect paths and retry/fallback test scenarios. \\ \hline
-        NFR-04 & Usability & Clear setup-to-monitoring flow for non-developer users. & Dashboard integration tests and workflow walkthroughs. \\ \hline
-        NFR-05 & Security & Controlled integration access via shared secret and credential isolation. & Webhook secret validation and credentialized channel checks. \\ \hline
-        NFR-06 & Maintainability & Modular architecture with explicit contracts and targeted tests. & Code organization review and test-suite coverage by module. \\ \hline
+        ID & Quality & Target indicator & Validation \\ \hline
+        NFR-01 & Performance & Keep the loop near real time and limit alert delay. & Runtime observation under representative feed scenarios. \\ \hline
+        NFR-02 & Scalability & Support independent control for multiple feed contexts. & Feed registry behavior and state-transition checks. \\ \hline
+        NFR-03 & Reliability & Recover gracefully from camera drops and webhook failures. & Reconnect paths and retry/fallback test scenarios. \\ \hline
+        NFR-04 & Usability & Keep setup and monitoring clear for non-developer users. & Dashboard integration tests and workflow walkthroughs. \\ \hline
+        NFR-05 & Security & Restrict integration access through secrets and credentials. & Webhook secret validation and credential checks. \\ \hline
+        NFR-06 & Maintainability & Keep the architecture modular and testable. & Code review and test-suite coverage by module. \\ \hline
     \end{tabularx}
 \end{table}
 
@@ -123,19 +122,6 @@ The product backlog was prioritized according to business value and technical de
 
 The first sprints focused on backend foundations, because the dashboard and automation layers depend on a stable metric contract. This order reduced integration risk and made later validation clearer.
 
-\begin{table}[ht]
-    \centering
-    \caption{Backlog domain structuring}
-    \label{tab:backlog_domain_structuring}
-    \begin{tabularx}{\textwidth}{|l|X|X|}
-        \hline
-        Domain & Representative backlog scope & Dependency rationale \\ \hline
-        Backend & Detection/tracking, zone logic, queue formulas, and feed runtime services. & Provides source-of-truth metrics consumed by all upper layers. \\ \hline
-        Web & Dashboard pages, typed API integration, websocket synchronization, feed controls. & Depends on stable backend contracts and event schemas. \\ \hline
-        Automation & Webhook payload contract, routing, cooldown, external notifications, archival. & Depends on reliable alert semantics and validated thresholds. \\ \hline
-    \end{tabularx}
-\end{table}
-
 \section{Global Use Case Diagram}
 The global use case diagram gives a high-level view of how the administrator and manager interact with the platform during configuration, monitoring, and alert handling.
 
@@ -148,7 +134,7 @@ The global use case diagram gives a high-level view of how the administrator and
 
 At the system level, the use cases can be grouped into four interactions: configuration, live monitoring, analytics interpretation, and alert handling. The table below lists the use cases that should appear in the diagram and the main actor responsible for each one.
 
-\begin{table}[ht]
+\begin{table}[H]
     \centering
     \caption{Primary global use cases}
     \label{tab:global_use_cases}
@@ -165,25 +151,7 @@ At the system level, the use cases can be grouped into four interactions: config
 \end{table}
 
 \section{Sprint Scope Overview}
-We organized the project into eight sprints so that the pipeline could be delivered step by step and checked at each stage. Table~\ref{tab:sprint_plan} summarizes the main outcome of each sprint and the lens used to evaluate it.
-
-\begin{table}[ht]
-    \centering
-    \caption{Project sprint scope overview}
-    \label{tab:sprint_plan}
-    \begin{tabularx}{\textwidth}{|l|X|X|}
-        \hline
-        Sprint & Main outcome & Representative validation lens \\ \hline
-        Sprint 1 & Detection, tracking, and queue-zone perception foundation & Perception correctness and tracker continuity \\ \hline
-        Sprint 2 & Queue analytics and stability handling & Formula validity and stability-branch consistency \\ \hline
-        Sprint 3 & Camera connectivity and backend API exposure & Runtime control and contract stability \\ \hline
-        Sprint 4 & Web design system and frontend scaffolding & UX structure and component baseline \\ \hline
-        Sprint 5 & Frontend integration and live monitoring & API/websocket synchronization quality \\ \hline
-        Sprint 6 & n8n automation and Telegram alerting & Alert routing and delivery reliability \\ \hline
-        Sprint 7 & Evaluation and optimization & Test depth and runtime hardening \\ \hline
-        Sprint 8 & Final consolidation, reporting, and delivery & End-to-end consistency and documentation quality \\ \hline
-    \end{tabularx}
-\end{table}
+We organized the project into eight sprints so that the pipeline could be delivered step by step and checked at each stage. The sprint chapters that follow describe those implementation phases in detail, from perception and analytics to automation and evaluation.
 
 \section{Data Modeling}
 The data model combines runtime monitoring entities with persistence-oriented entities. Its role is to keep live telemetry, configuration data, and alert history aligned so that the system can support both immediate supervision and later analysis without the modules drifting apart.
@@ -209,20 +177,7 @@ The authentication layer adds its own persistence objects for manager accounts, 
     \label{fig:auth_audit_data_model}
 \end{figure}
 
-\begin{table}[ht]
-    \centering
-    \caption{Conceptual entity mapping}
-    \label{tab:conceptual_entity_mapping}
-    \begin{tabularx}{\textwidth}{|l|X|X|}
-        \hline
-        Entity & Core semantics & Producer/consumer context \\ \hline
-        VideoFeed & Declares source type, identity, status, and runtime control metadata. & Produced by onboarding/configuration flows; consumed by runtime and dashboard layers. \\ \hline
-        FeedTransportCapabilities & Declares transport readiness (WebRTC and MJPEG), source mode, and unavailability reason for each feed. & Produced by API runtime transport endpoint; consumed by dashboard playback routing and fallback logic. \\ \hline
-        QueueMetrics & Captures analytical outputs used for monitoring and decision support. & Produced by analysis loop; consumed by websocket/API/dashboard and alert logic. \\ \hline
-        Alert & Encodes threshold breach context and notification-ready payload content. & Produced by threshold evaluation; consumed by webhook automation and archival paths. \\ \hline
-        Establishment / Cashier & Binds feeds to business-level organization context. & Produced by metadata management APIs; consumed by setup and filtering interfaces. \\ \hline
-    \end{tabularx}
-\end{table}
+These entities map directly to the runtime and persistence layers used by the application.
 
 \subsection{Data Lifecycle and Persistence Strategy}
 Runtime metrics are generated continuously and distributed through live channels, while selected records are persisted for auditability and trend analysis. This dual-path strategy improves resilience because temporary integration failures do not imply complete data loss.
@@ -241,7 +196,7 @@ SQLite persistence stores operational metrics, structured metadata, authenticati
 \subsection{Hardware and Software Environment}
 The hardware environment used during development is shown in Table~\ref{tab:hardware_environment}. The software and runtime layers are summarized in Table~\ref{tab:execution_environment_profile}.
 
-\begin{table}[ht]
+\begin{table}[H]
     \centering
     \caption{Hardware environment}
     \label{tab:hardware_environment}
@@ -255,7 +210,7 @@ The hardware environment used during development is shown in Table~\ref{tab:hard
     \end{tabularx}
 \end{table}
 
-\begin{table}[ht]
+\begin{table}[H]
     \centering
     \caption{Execution environment profile}
     \label{tab:execution_environment_profile}
@@ -269,19 +224,51 @@ The hardware environment used during development is shown in Table~\ref{tab:hard
     \end{tabularx}
 \end{table}
 
-\subsection{Technologies Used}
-The technology stack follows the main stages of the system:
-\begin{itemize}
-    \item \textbf{Vision pipeline}: YOLO26 (object detection model), ByteTrack (multi-object tracker), OpenCV (image processing and camera utilities) \cite{ultralytics_docs,bytetrack2022,opencv_docs}.
-    \item \textbf{Queue analytics}: NumPy (numerical arrays), Pandas (table-oriented data), SciPy (statistical routines) and M/M/1 modeling (basic queueing theory) \cite{gross_queueing}.
-    \item \textbf{Backend API}: FastAPI (chosen for its async support and automatic OpenAPI documentation generation) with Pydantic v2 (typed data validation and parsing).
-    \item \textbf{Live transport}: WebRTC signaling via MediaMTX WHEP gateway (low-latency streaming) with MJPEG fallback (simple HTTP frame stream) \cite{webrtc_w3c,mediamtx_docs}.
-    \item \textbf{Frontend}: React (component UI library), TypeScript (typed JavaScript), Vite (fast dev/build tool), Tailwind CSS (selected for rapid UI development with a consistent design system).
-    \item \textbf{Automation}: n8n workflows (visual automation engine) with Telegram notifications (messaging alerts).
-    \item \textbf{Persistence}: SQLite (lightweight relational database for metrics, metadata, and alert archival).
-\end{itemize}
+\subsection{Development Tools}
+The project also relied on a small set of development tools for editing, versioning, diagramming, container support, and report generation. Keeping them separate from the technology stack makes it easier to distinguish what was used to build the project from what the project actually runs on.
 
-Each component was selected because it fits one layer of the system and keeps the implementation modular from perception through automation.
+\begin{table}[H]
+    \centering
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \renewcommand{\arraystretch}{0.92}
+    \caption{Development tools used in the project}
+    \label{tab:development_tools}
+    \begin{tabularx}{\textwidth}{|l|X|X|}
+        \hline
+        Tool & Role in the project & Typical use \\ \hline
+        VS Code & Main editor for the backend, frontend, and report sources. & Day-to-day implementation, review, and navigation. \\ \hline
+        Git / GitHub & Version control and change history tracking. & Commit management, branching, and collaboration. \\ \hline
+        draw.io / Eraser & Diagram authoring for architecture and data models. & Use case, ERD, and system architecture diagrams. \\ \hline
+        Docker / Docker Compose & Local service orchestration and reproducible setup. & Supporting services such as MediaMTX and n8n. \\ \hline
+        MiKTeX / latexmk & LaTeX report compilation. & Build the final PDF report from the chapter sources. \\ \hline
+    \end{tabularx}
+\end{table}
+
+\subsection{Technologies Used}
+The technology stack follows the main stages of the system and is summarized in Table~\ref{tab:technologies_used}.
+
+\begin{table}[H]
+    \centering
+    \small
+    \setlength{\tabcolsep}{4pt}
+    \renewcommand{\arraystretch}{0.92}
+    \caption{Technologies used in the project}
+    \label{tab:technologies_used}
+    \begin{tabularx}{\textwidth}{|l|X|X|}
+        \hline
+        Layer & Main technologies & Role in the project \\ \hline
+        Vision pipeline & YOLO26, ByteTrack, and OpenCV \cite{ultralytics_docs,bytetrack2022,opencv_docs} & Detects people, tracks them across frames, and prepares the visual input for queue analysis. \\ \hline
+        Queue analytics & NumPy, Pandas, SciPy, and M/M/1 modeling \cite{gross_queueing} & Computes arrival rate, service rate, wait time, and uncertainty indicators. \\ \hline
+        Backend API & FastAPI and Pydantic v2 & Exposes typed endpoints, validates payloads, and coordinates the backend services. \\ \hline
+        Live transport & WebRTC, MediaMTX WHEP gateway, and MJPEG fallback \cite{webrtc_w3c,mediamtx_docs} & Delivers low-latency video streaming while keeping a simpler HTTP fallback available. \\ \hline
+        Frontend & React, TypeScript, Vite, and Tailwind CSS & Implements the dashboard, user interactions, and responsive presentation layer. \\ \hline
+        Automation & n8n workflows and Telegram notifications & Routes alerts and sends operational messages to users. \\ \hline
+        Persistence & SQLite & Stores metrics, metadata, and alert history for later analysis. \\ \hline
+    \end{tabularx}
+\end{table}
+
+This selection keeps the implementation modular from perception through automation.
 
 \section{Software Architecture}
 
@@ -302,20 +289,6 @@ We describe the architecture as four stages that match the flow of data through 
 \end{enumerate}
 
 This separation keeps perception, analysis, the user interface, and automation independently testable. For example, queue formulas depend on perception events, but they do not depend on the frontend or notification delivery.
-
-\begin{table}[ht]
-    \centering
-    \caption{Architecture layer-to-module mapping}
-    \label{tab:architecture_layer_mapping}
-    \begin{tabularx}{\textwidth}{|l|X|X|}
-        \hline
-        Layer & Responsibilities & Representative components \\ \hline
-        Video acquisition & Source opening, stream transport handling, reconnect behavior. & Source-access and camera-adapter layers \\ \hline
-        Perception & Person detection, tracking continuity, zone-aware filtering. & Detection, tracking, and zone-management layers \\ \hline
-        Analysis & Event-window rates, wait-time logic, and stability-aware fallback handling. & Queue analysis and stability-handling logic \\ \hline
-        Output/integration & API/websocket exposure, webhook dispatch, persistence, dashboard consumption. & API runtime, webhook delivery, and frontend integration layers \\ \hline
-    \end{tabularx}
-\end{table}
 
 \subsection{Backend Architecture}
 The backend exposes REST and websocket interfaces for feed lifecycle control and live metrics. It includes modules for detection orchestration, tracking, queue analysis, threshold evaluation, webhook delivery, and camera-source management.

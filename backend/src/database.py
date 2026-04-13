@@ -75,6 +75,7 @@ def _create_current_schema(cursor: sqlite3.Cursor) -> None:
             feed_id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             source TEXT NOT NULL,
+            manager_user_id INTEGER,
             model_size TEXT NOT NULL DEFAULT 'n',
             status TEXT NOT NULL DEFAULT 'created',
             log_level TEXT NOT NULL DEFAULT 'INFO',
@@ -90,7 +91,8 @@ def _create_current_schema(cursor: sqlite3.Cursor) -> None:
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             FOREIGN KEY (establishment_id) REFERENCES establishments (id) ON DELETE SET NULL,
-            FOREIGN KEY (caisse_id) REFERENCES caisses (id) ON DELETE SET NULL
+            FOREIGN KEY (caisse_id) REFERENCES caisses (id) ON DELETE SET NULL,
+            FOREIGN KEY (manager_user_id) REFERENCES users (id) ON DELETE SET NULL
         )
     """)
 
@@ -167,6 +169,10 @@ def _create_current_schema(cursor: sqlite3.Cursor) -> None:
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_users_role_is_active ON users(role, is_active)"
     )
+    if "manager_user_id" in _get_table_columns(cursor, "feed_configs"):
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_feed_configs_manager_user_id ON feed_configs(manager_user_id)"
+        )
 
 
 def _migrate_feed_configs_schema(cursor: sqlite3.Cursor) -> None:
@@ -187,6 +193,14 @@ def _migrate_feed_configs_schema(cursor: sqlite3.Cursor) -> None:
         cursor.execute(
             "ALTER TABLE feed_configs ADD COLUMN queue_length_warning INTEGER NOT NULL DEFAULT 8"
         )
+    if "manager_user_id" not in columns:
+        cursor.execute(
+            "ALTER TABLE feed_configs ADD COLUMN manager_user_id INTEGER"
+        )
+
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_feed_configs_manager_user_id ON feed_configs(manager_user_id)"
+    )
 
 
 def _migrate_legacy_sections_to_caisses(cursor: sqlite3.Cursor) -> None:
@@ -515,6 +529,7 @@ def upsert_feed_config(
     webhook_enabled: bool = True,
     created_at: datetime,
     updated_at: datetime,
+    manager_user_id: Optional[int] = None,
     queue_length_warning: int = 8,
     rtsp_username: Optional[str] = None,
     rtsp_password: Optional[str] = None,
@@ -535,6 +550,7 @@ def upsert_feed_config(
                 feed_id,
                 name,
                 source,
+                manager_user_id,
                 model_size,
                 status,
                 log_level,
@@ -549,10 +565,11 @@ def upsert_feed_config(
                 last_error,
                 created_at,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(feed_id) DO UPDATE SET
                 name = excluded.name,
                 source = excluded.source,
+                manager_user_id = excluded.manager_user_id,
                 model_size = excluded.model_size,
                 status = excluded.status,
                 log_level = excluded.log_level,
@@ -571,6 +588,7 @@ def upsert_feed_config(
                 feed_id,
                 name,
                 source,
+                manager_user_id,
                 model_size,
                 status,
                 log_level,
@@ -603,6 +621,7 @@ def get_feed_configs() -> List[Dict[str, Any]]:
                 feed_id,
                 name,
                 source,
+                manager_user_id,
                 model_size,
                 status,
                 log_level,
