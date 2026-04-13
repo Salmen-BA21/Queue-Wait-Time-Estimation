@@ -4,7 +4,7 @@
 \section{Introduction}
 This chapter turns the project objective into the requirements that guided the implementation. We identify the actors, list the functions and quality constraints they need, and show how those requirements are spread across the implementation plan.
 
-Rather than treating the requirements as an isolated checklist, we connect them to the queue-monitoring pipeline used throughout the project: video ingestion, person detection and tracking, queue-metric estimation, dashboard delivery, and alert automation. That link matters because the later chapters follow the same path from requirement to implementation.
+Rather than treating the requirements as an isolated checklist, we connect them to the queue-monitoring pipeline used throughout the project: video ingestion, person detection and tracking, queue-metric estimation, dashboard delivery, authentication, and alert automation. That link matters because the later chapters follow the same path from requirement to implementation, including the access layer used for manager onboarding and administrator governance.
 
 \section{Requirements Specification}
 
@@ -18,6 +18,23 @@ The actors of the system are:
 \end{itemize}
 
 This split makes the functional scope easier to explain and validate, because access-control flows and operational monitoring flows can be tested separately.
+
+\subsection{Authentication and Access Governance}
+The platform also includes a lightweight identity layer so that the dashboard is not open to anonymous use. Administrators authenticate to manage manager accounts, while managers can create an account, sign in, and continue their session through secure cookies. The backend supports session refresh, logout, password policy checks, account lockout after repeated failures, and audit logging. These controls matter because the monitoring and automation functions are tied to operational decisions and should not be exposed without clear access boundaries.
+
+\begin{table}[ht]
+    \centering
+    \caption{Authentication and access-control requirements}
+    \label{tab:auth_access_requirements}
+    \begin{tabularx}{\textwidth}{|l|X|X|X|}
+        \hline
+        ID & Requirement statement & Priority & Verification strategy \\ \hline
+        AR-01 & Allow a manager to register, sign in, refresh the session, and log out through a secure cookie-based workflow. & High & Validate register, login, refresh, and logout flows with API and frontend integration tests. \\ \hline
+        AR-02 & Allow the administrator to create, update, deactivate, and reset manager accounts. & High & Validate administrator account-governance endpoints and audit events. \\ \hline
+        AR-03 & Enforce password policy, lockout after repeated failures, and role-based protection on operational endpoints. & High & Validate failed-login counters, lockout behavior, and unauthorized-access paths. \\ \hline
+        AR-04 & Record authentication and account-governance actions for later traceability. & Medium & Validate audit-log entries during registration, login, and account updates. \\ \hline
+    \end{tabularx}
+\end{table}
 
 \begin{table}[ht]
     \centering
@@ -41,6 +58,7 @@ At a high level, the system captures a feed, counts people, estimates queue beha
     \item real-time web dashboard updates and alerts,
     \item RTSP and ONVIF camera integration,
     \item automated webhook and Telegram notifications,
+    \item secure manager sign-up, sign-in, and role-based access control,
     \item historical data logging and analytics.
 \end{itemize}
 
@@ -61,6 +79,8 @@ These requirements define the minimum end-to-end behavior expected from the plat
         FR-06 & Expose feed control and live updates through API and websocket channels. & High & Validate endpoint and runtime behavior through API and integration tests. \\ \hline
         FR-07 & Dispatch alert payloads to external automation workflows. & Medium & Validate webhook dispatch and n8n branch behavior using script-based scenarios. \\ \hline
         FR-08 & Persist operational metrics and metadata for analysis and auditing. & Medium & Validate SQLite persistence behavior through runtime execution and database checks. \\ \hline
+        FR-09 & Support manager registration, sign-in, session refresh, and logout through secure cookies. & High & Validate register, login, refresh, logout, and session-check endpoints across API and frontend integration tests. \\ \hline
+        FR-10 & Protect administrative and operational APIs with role-based access control and audit logging. & High & Validate unauthorized access paths, lockout behavior, and audit-event creation. \\ \hline
     \end{tabularx}
 \end{table}
 
@@ -180,6 +200,15 @@ The main objects are:
 
 These entities mirror the runtime contract used by the backend so that live metrics, configuration data, and persisted records stay consistent across modules.
 
+The authentication layer adds its own persistence objects for manager accounts, refresh sessions, and audit events.
+
+\begin{figure}[H]
+    \centering
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for authentication and audit data model diagram}}
+    \caption{Authentication and audit data model used for manager accounts, refresh sessions, and audit logging.}
+    \label{fig:auth_audit_data_model}
+\end{figure}
+
 \begin{table}[ht]
     \centering
     \caption{Conceptual entity mapping}
@@ -198,7 +227,7 @@ These entities mirror the runtime contract used by the backend so that live metr
 \subsection{Data Lifecycle and Persistence Strategy}
 Runtime metrics are generated continuously and distributed through live channels, while selected records are persisted for auditability and trend analysis. This dual-path strategy improves resilience because temporary integration failures do not imply complete data loss.
 
-SQLite persistence stores operational metrics, structured metadata, and alert archives in a single source of truth. That supports operational continuity as well as post-run diagnosis.
+SQLite persistence stores operational metrics, structured metadata, authentication records, and alert archives in a single source of truth. That supports operational continuity as well as post-run diagnosis.
 
 \begin{figure}[H]
     \centering
@@ -258,6 +287,13 @@ Each component was selected because it fits one layer of the system and keeps th
 
 \subsection{Overall Architecture}
 We describe the architecture as four stages that match the flow of data through the system:
+\begin{figure}[H]
+    \centering
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for overall system architecture diagram}}
+    \caption{Overall system architecture from video acquisition to alert delivery.}
+    \label{fig:overall_architecture}
+\end{figure}
+
 \begin{enumerate}
     \item \textbf{Video acquisition}: local files, RTSP streams, and ONVIF discovery.
     \item \textbf{Perception}: detection, tracking, and queue-zone filtering.
