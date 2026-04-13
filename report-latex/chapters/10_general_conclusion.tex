@@ -2,9 +2,9 @@
 \chaptertoc
 
 \section{Summary}
-This end-of-studies project delivered a complete queue wait-time estimation platform that connects computer vision, queue analytics, web supervision, and automation workflows.
+This end-of-studies project produced a complete queue wait-time estimation platform that brings together computer vision, queue analytics, web supervision, and automation workflows.
 
-From a technical standpoint, the system now includes:
+In practical terms, the system now includes:
 \begin{itemize}
     \item a perception pipeline based on YOLO detection and ByteTrack identity continuity,
     \item queue-zone filtering and event-driven estimation of $\lambda$, $\mu$, and expected wait time,
@@ -14,27 +14,27 @@ From a technical standpoint, the system now includes:
     \item n8n and Telegram integration for operational alert routing.
 \end{itemize}
 
-The resulting architecture demonstrates that a full monitoring-to-action loop can be achieved with modular components while keeping the system maintainable and testable.
+The resulting architecture shows that a full monitoring-to-action loop can be built from modular components without losing maintainability or testability.
 
 \section{Objective Review}
-The initial objectives are considered achieved at project scope level:
+The initial objectives were achieved at the project scope level:
 \begin{enumerate}
-    \item \textbf{Real-time detection and tracking:} implemented through dedicated detector and tracker modules.
-    \item \textbf{Queue-zone counting:} implemented with polygon-zone management and in-zone identity filtering.
-    \item \textbf{Queue metric estimation:} implemented for arrival rate, service rate, and wait time.
-    \item \textbf{Queue stability handling:} implemented through stable/unstable classification and fallback wait-time logic.
-    \item \textbf{Web monitoring:} implemented through a multi-feed dashboard with live updates.
-    \item \textbf{Automation integration:} implemented through webhook transport, n8n routing, and Telegram notifications.
+    \item \textbf{Real-time detection and tracking:} achieved through dedicated detector and tracker modules.
+    \item \textbf{Queue-zone counting:} achieved with polygon-zone management and in-zone identity filtering.
+    \item \textbf{Queue metric estimation:} achieved for arrival rate, service rate, and wait time.
+    \item \textbf{Queue stability handling:} achieved through stable and unstable classification with fallback wait-time logic.
+    \item \textbf{Web monitoring:} achieved through a multi-feed dashboard with live updates.
+    \item \textbf{Automation integration:} achieved through webhook transport, n8n routing, and Telegram notifications.
 \end{enumerate}
 
-The main remaining gap is not architectural completeness, but depth of long-horizon evaluation under broader operational scenarios.
+The main remaining gap is not architectural completeness, but the depth of long-horizon evaluation under broader operational scenarios.
 
 \section{Future Work}
-Potential extensions include:
+Possible extensions include:
 \begin{itemize}
-    \item multi-zone and multi-server queue modeling (for parallel cashier configurations),
-    \item richer alert strategies (cooldown tuning, escalation policies, acknowledgment loops),
-    \item edge deployment optimization (ONNX/TensorRT profiling and resource-aware scheduling),
+    \item multi-zone and multi-server queue modeling for parallel cashier configurations,
+    \item richer alert strategies with cooldown tuning, escalation policies, and acknowledgment loops,
+    \item edge deployment optimization through ONNX/TensorRT profiling and resource-aware scheduling,
     \item long-duration field evaluation with domain-specific KPI baselines,
     \item stronger security controls for production webhook exposure and secrets management.
 \end{itemize}

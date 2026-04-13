@@ -2,61 +2,61 @@
 \chaptertoc
 
 \section{Introduction}
-Sprint 7 acted as the validation pass for the full stack. The work checked whether perception, API, frontend, and alerting held together under tests, retries, and throughput pressure.
+This sprint served as the final validation step for the full stack. It checked whether perception, the API layer, the frontend, and the alerting path still worked together when the system was tested under retries, changing feeds, and higher throughput.
 
 \section{Sprint Backlog}
-Sprint 7 backlog included:
+Sprint 7 focused on the last round of verification and improvement work:
 \begin{itemize}
-	\item consolidate backend and frontend automated test coverage,
-	\item validate feed lifecycle, stream continuity, and API contracts,
-	\item optimize runtime throughput and responsiveness,
-	\item harden failure handling (network drops, stale data, worker exits),
-	\item document residual limitations for final delivery planning.
+	\item bring backend and frontend automated tests together into one verification pass,
+	\item confirm feed lifecycle behavior, stream continuity, and API contracts,
+	\item improve runtime throughput and responsiveness,
+	\item strengthen failure handling for network drops, stale data, and worker exits,
+	\item record the remaining limitations before final delivery planning.
 \end{itemize}
 
 \section{Design}
 
-\subsection{Test Plan}
-Validation followed a layered strategy:
+\subsection{Verification Plan}
+Validation followed a layered strategy that covered the system from the backend to the dashboard:
 \begin{itemize}
-	\item \textbf{Backend unit/integration tests:} queue analytics logic, API endpoints (including transport capability and WebRTC signaling), runtime streaming behavior, webhook payload handling.
-	\item \textbf{Frontend integration tests:} dashboard setup flow, websocket event handling, WebRTC lifecycle/fallback behavior, and API error handling.
-	\item \textbf{Scenario tests:} n8n send/acknowledge flows, unauthorized branch, and multi-feed alert scenarios.
+	\item \textbf{Backend unit/integration tests:} queue analytics logic, API endpoints, runtime streaming behavior, and webhook payload handling.
+	\item \textbf{Frontend integration tests:} dashboard setup flow, websocket event handling, media fallback behavior, and API error handling.
+	\item \textbf{Scenario tests:} n8n send/acknowledge flows, unauthorized access paths, and multi-feed alert scenarios.
 \end{itemize}
 
-\subsection{Performance Metrics}
-The optimization targets were tied directly to operational requirements:
+\subsection{Performance Targets}
+The optimization work was guided by the main operational requirements of the project:
 \begin{itemize}
-	\item processing responsiveness (loop cadence and processed-frame throughput),
-	\item stream continuity under feed state transitions,
-	\item webhook impact on main-loop latency,
-	\item dashboard freshness under websocket degradation.
+	\item processing responsiveness, especially loop cadence and processed-frame throughput,
+	\item stream continuity when a feed changes state,
+	\item webhook impact on the main-loop latency,
+	\item dashboard freshness when websocket quality degrades.
 \end{itemize}
 
 \section{Implementation}
-\subsection{Automated Test Coverage}
-The test suite covers API transport-capability and WebRTC-offer cases, runtime stream behavior, webhook delivery handling, dashboard integration, live-state synchronization, API error contracts, and transport fallback behavior.
-These tests verify API envelopes, event contracts, WebRTC signaling and fallback paths, stream handoff, and setup-workflow behavior.
+\subsection{Verification Coverage}
+The test suite covers API transport behavior, runtime stream handling, webhook delivery, dashboard integration, live-state synchronization, API error cases, and transport fallback behavior.
+Taken together, these tests check the API envelope, the event contract, stream handoff, and the setup workflow.
 
-\subsection{Runtime Optimization Actions}
-Key optimizations implemented across the runtime loop and configuration layers include:
+\subsection{Runtime Tuning}
+The main tuning actions applied across the runtime loop and configuration layers included:
 \begin{itemize}
 	\item configurable detector image size and frame stride,
-	\item explicit inference device control and diagnostics,
-	\item asynchronous webhook dispatch to keep the processing loop responsive,
-	\item real-time playback pacing for file sources.
+	\item explicit control over the inference device and its diagnostics,
+	\item asynchronous webhook dispatch so the processing loop stayed responsive,
+	\item real-time playback pacing for file-based sources.
 \end{itemize}
 
-\subsection{Resilience Improvements}
-Runtime resilience was improved at multiple levels:
+\subsection{Fault-Tolerance Improvements}
+Runtime resilience was improved at several levels:
 \begin{itemize}
 	\item feed worker supervision and exit recovery in \texttt{FeedRegistry},
 	\item capture-to-worker frame handoff continuity in \texttt{FeedFrameStreamManager},
-	\item websocket reconnect/fallback logic on the frontend side.
+	\item websocket reconnect and fallback behavior on the frontend side.
 \end{itemize}
 
-\subsection{Observed Outcome}
-By the end of the sprint, the system had reached a stable integration point where perception, analytics, API runtime, dashboard, and n8n automation operated as one pipeline. The remaining work is mostly benchmarking and deployment hardening rather than missing core functionality.
+\subsection{Overall Outcome}
+By the end of the sprint, the system had reached a stable integration point where perception, analytics, the API runtime, the dashboard, and n8n automation operated as one pipeline. What remains is mainly benchmarking and deployment hardening, not missing core functionality.
 
 \section{Conclusion}
-Sprint 7 closed the loop with structured testing and targeted performance improvements. The resulting platform is solid enough for demonstration and academic evaluation, with a clear path to production hardening.
+Sprint 7 closed the project with structured testing and targeted performance improvements. At this stage, the platform is strong enough for demonstration and academic evaluation, while the remaining work is mainly about deployment hardening and longer-term benchmarking.

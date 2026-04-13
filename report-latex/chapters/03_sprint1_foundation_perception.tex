@@ -2,16 +2,16 @@
 \chaptertoc
 
 \section{Introduction}
-Sprint 1 built the perception pipeline that turns video frames into queue-relevant events. The main outcome was a reliable chain from capture to detection, tracking, and zone filtering inside the frame loop.
+Sprint 1 built the first perception flow of the system. It takes a video stream, identifies people, keeps track of them across frames, and limits counting to the queue area. The goal of this sprint was to prepare clean and reliable input for the later analysis stages.
 
 \section{Sprint Backlog}
-The committed Sprint 1 backlog focused on the minimum viable perception chain:
+The Sprint 1 backlog focused on the basic perception flow:
 \begin{itemize}
-    \item Integrate YOLO-based person detection with configurable model size and inference device.
-    \item Integrate persistent tracking so each detected person keeps a stable ID across frames.
-    \item Define queue zones as polygons and count only detections inside these zones.
-    \item Build a real-time loop that connects capture, detection, tracking, zone filtering, and rendering.
-    \item Expose runtime controls through CLI options for source type, model parameters, and processing stride.
+    \item Detect people in the video stream while keeping the detector adjustable to different machines.
+    \item Keep the same person identifiable across frames so the counts stay consistent.
+    \item Define queue zones as polygons and count only the people inside these zones.
+    \item Connect capture, detection, tracking, zone filtering, and display into one continuous flow.
+    \item Allow basic runtime settings so the pipeline can be adapted without changing the code.
 \end{itemize}
 
 \section{Sprint Analysis}
@@ -24,14 +24,14 @@ The committed Sprint 1 backlog focused on the minimum viable perception chain:
     \label{fig:sprint1_use_case}
 \end{figure}
 
-The use case follows a manager configuring a source and queue zone, then letting the runtime turn each frame into queue state updates. That sequence becomes the base for the analytics and automation layers that follow.
+The use case starts when a manager sets up a source and defines the queue area. After that, the runtime processes each frame and updates the queue state. This gives the later analytics layers a stable perception base to work with.
 
 \subsection{Use Case Scenarios}
 Three key scenarios are implemented in Sprint 1:
 \begin{enumerate}
-    \item \textbf{Person entry into queue zone:} a new tracker ID appears inside the polygon and is treated as a queue arrival candidate.
-    \item \textbf{Tracker continuity across frames:} the same person is followed through consecutive frames using ByteTrack, reducing duplicate counting.
-    \item \textbf{Zone filtering under mixed scenes:} detections outside the polygon are ignored for queue metrics, preventing unrelated people from polluting queue state.
+    \item \textbf{Person entry into queue zone:} when a person enters the queue area, the system treats that person as a possible arrival.
+    \item \textbf{Consistency across frames:} when the same person appears in consecutive frames, the system keeps the identification stable and avoids double counting.
+    \item \textbf{Zone filtering under mixed scenes:} people outside the queue area are ignored so the queue state stays focused on the relevant part of the scene.
 \end{enumerate}
 
 \section{Design}
@@ -44,7 +44,7 @@ Three key scenarios are implemented in Sprint 1:
     \label{fig:sprint1_activity}
 \end{figure}
 
-The activity starts from a video source (local file, webcam, or RTSP stream), applies person detection, enriches detections with tracker IDs, then evaluates polygon-zone membership. The filtered state is forwarded to the queue analyzer for rate and wait-time computation.
+The activity starts from a video source, whether it is a local file or a live camera stream. The system then detects people, keeps track of them, checks whether they are inside the queue area, and passes the filtered result to the next analysis stage.
 
 \subsection{Sequence Diagrams}
 \begin{figure}[H]
@@ -54,29 +54,28 @@ The activity starts from a video source (local file, webcam, or RTSP stream), ap
     \label{fig:sprint1_sequence}
 \end{figure}
 
-The implemented sequence in the codebase is:
-\texttt{VideoStream/RTSPCamera} $\rightarrow$ \texttt{PersonDetector.detect()} $\rightarrow$ \texttt{ObjectTracker.update()} $\rightarrow$ \texttt{ZoneManager.trigger()} $\rightarrow$ \texttt{QueueAnalyzer.update()}. This call chain is orchestrated per frame by the runtime \texttt{run()} loop.
+In practice, each frame moves through source handling, detection, tracking, zone checking, and then the queue analysis stage. That ordered flow is what lets Sprint 1 feed the later metric work.
 
 \section{Implementation}
 \subsection{Detection Layer}
-The detection layer is built around the \texttt{PersonDetector} class. It wraps Ultralytics YOLO inference and filters results to person class only (COCO class ID 0). The detector resolves device selection (\texttt{auto}/\texttt{cpu}/\texttt{cuda}/\texttt{mps}) and supports configurable image size for throughput control \cite{ultralytics_docs}.
+The detection layer focuses on finding people in each frame while keeping the process adjustable for different machines. It is tuned to balance speed and accuracy, so the system stays responsive without losing the main detections that matter for the queue.
 
 \subsection{Tracking Layer}
-The tracking layer uses \texttt{supervision.ByteTrack}. The tracker propagates persistent \texttt{tracker\_id} values across frames, which is essential for counting arrivals and departures rather than raw per-frame detections \cite{bytetrack2022}.
+The tracking layer keeps the same person identifiable from one frame to the next. This is what makes arrival and departure counts more reliable than simply reading detections in a single frame \cite{bytetrack2022}.
 
 \subsection{Zone-Aware Filtering}
-Zone logic is handled by the zone-management module. It accepts polygons in normalized or pixel coordinates, auto-scales normalized points to frame size, and evaluates inclusion using \texttt{PolygonZone} with bottom-center anchors for robust queue-ground contact checks.
+Zone logic defines the queue area as a polygon on the frame and keeps only the people inside it. This avoids counting unrelated movement elsewhere in the scene and makes the measurement more relevant to the waiting line.
 
 \subsection{Main Loop Integration}
 The pipeline integration is handled in the runtime orchestration layer. The runtime supports:
 \begin{itemize}
-    \item Source abstraction via \texttt{open\_video\_source()} for file/webcam/RTSP.
-    \item Process stride control through \texttt{--process-every-n-frames}.
-    \item Real-time overlay rendering (detections, IDs, zone, and metrics).
-    \item Headless mode and dashboard event emission hooks for future API/runtime integration.
+    \item handling local files, webcams, and live camera streams,
+    \item adjusting how often frames are processed so the system stays responsive,
+    \item showing detections, IDs, the queue zone, and metrics on screen,
+    \item running without a visible interface when needed for later integration.
 \end{itemize}
 
 The sprint left behind a stable perception baseline that later sprints could build on for queue analytics and automation integration \cite{opencv_docs}.
 
 \section{Conclusion}
-Sprint 1 delivered the operational perception core: reliable person detection, persistent IDs, and queue-zone filtering. That baseline gave Sprint 2 stable event data to turn into rates and wait-time estimates.
+Sprint 1 delivered the first working perception layer: people can be detected, followed across frames, and counted only inside the queue area. That gives Sprint 2 cleaner input for rate estimation and wait-time analysis.

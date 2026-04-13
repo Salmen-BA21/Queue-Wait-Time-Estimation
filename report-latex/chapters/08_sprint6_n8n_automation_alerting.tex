@@ -2,16 +2,16 @@
 \chaptertoc
 
 \section{Introduction}
-Sprint 6 connected queue metrics to n8n so alerts could leave the backend in a controlled way. The focus was not just sending payloads, but keeping delivery reliable, auditable, and safe to repeat.
+This sprint connected the queue metrics produced by the backend with n8n, so alerts could be forwarded in a controlled way. The main concern was not only to transmit the payload, but also to keep the process reliable, traceable, and easy to repeat during testing.
 
 \section{Sprint Backlog}
-Sprint 6 backlog focused on operational automation:
+Sprint 6 focused on the automation tasks needed to move alerts from the backend into n8n:
 \begin{itemize}
-    \item define and validate a stable webhook payload contract,
-    \item implement robust webhook transmission with retries and backup logging,
-    \item integrate alert triggers from runtime threshold detection,
-    \item implement n8n routing for authorization, cooldown, formatting, and delivery,
-    \item provide test scripts for repeated workflow validation.
+    \item define a stable webhook payload and validate it before dispatch,
+    \item add retry-based webhook delivery with logging for failures and successes,
+    \item connect runtime threshold detection to alert triggering,
+    \item configure n8n routing for authorization, cooldown, formatting, and delivery,
+    \item prepare test scripts for repeated workflow validation.
 \end{itemize}
 
 \section{Design}
@@ -24,7 +24,7 @@ Sprint 6 backlog focused on operational automation:
     \label{fig:sprint6_component}
 \end{figure}
 
-The automation path has five pieces: queue runtime metrics, webhook payload serializer, HTTP delivery client, n8n workflow router, and notification endpoints. Alert archival is routed back to the backend through a dedicated API endpoint.
+The automation chain is made up of the runtime metrics collector, the webhook serializer, the HTTP delivery client, the n8n workflow, and the final notification channel. When an alert needs to be preserved for later review, it is sent back to the backend through a dedicated archive endpoint.
 
 \subsection{Data Flow Diagram}
 \begin{figure}[H]
@@ -34,26 +34,26 @@ The automation path has five pieces: queue runtime metrics, webhook payload seri
     \label{fig:sprint6_data_flow}
 \end{figure}
 
-Data flow starts with periodic metrics dispatch from the runtime loop, branches on alert presence and cooldown in n8n, and then either sends Telegram notifications or returns acknowledgment without external dispatch. Archived alert payloads are persisted through \texttt{/api/alerts/archive}.
+The process begins when the runtime loop sends metrics at regular intervals. n8n then checks whether an alert is present and whether the cooldown allows delivery. If the alert can be sent, Telegram receives the notification; otherwise the workflow only acknowledges the request. Archived alert payloads are stored through \texttt{/api/alerts/archive}.
 
 \section{Implementation}
-\subsection{Webhook Payload Contract}
-The webhook schema module defines \texttt{QueuePayload}, a structured contract carrying:
+\subsection{Alert Payload Structure}
+The webhook schema is centered on \texttt{QueuePayload}, which keeps the information needed by n8n in one structure. It carries:
 \begin{itemize}
     \item source metadata (timestamp, frame, source, feed ID),
     \item queue metrics ($\lambda$, $\mu$, wait time, stability),
     \item alert flags and severity fields.
 \end{itemize}
-The module includes payload validation before dispatch.
+Before anything is sent, the payload is validated so malformed records do not leave the backend.
 
-\subsection{Reliable Webhook Delivery}
-The webhook delivery client sends payloads to n8n with timeout, retry policy, optional shared-secret header, and success/failure statistics. Payload persistence is handled through the SQLite database layer, keeping one source of truth for historical records.
+\subsection{Delivery Reliability}
+To reduce the risk of missed notifications, the delivery client uses a timeout, a retry policy, an optional shared-secret header, and logging for both successes and failures. Historical payloads remain in SQLite, which gives the system one place to recover past events if needed.
 
-\subsection{Runtime Alert Dispatch Integration}
-In the main runtime loop, webhook sending is offloaded to \texttt{AsyncWebhookDispatcher} to avoid blocking the perception pipeline. The implementation supports periodic metric dispatch and immediate warning dispatch with deduplication windows to limit repeated alert spam.
+\subsection{Alert Dispatch in the Runtime Loop}
+Inside the main loop, alert sending is moved to \texttt{AsyncWebhookDispatcher} so the perception pipeline keeps running without waiting on the network. This makes it possible to send periodic metric updates and immediate alerts, while a deduplication window limits repeated notifications for the same situation.
 
 \subsection{n8n Workflow Routing and Telegram Delivery}
-The n8n alert workflow implements:
+The n8n alert workflow follows a simple path:
 \begin{itemize}
     \item webhook reception and secret validation,
     \item alert detection and cooldown gating,
@@ -61,10 +61,10 @@ The n8n alert workflow implements:
     \item message formatting and Telegram send node,
     \item explicit acknowledge/reject branches.
 \end{itemize}
-That flow keeps the no-alert, alert-suppressed, and alert-delivered branches distinct enough to audit later.
+Keeping the no-alert, alert-suppressed, and alert-delivered branches separate makes the behavior easier to audit later.
 
-\subsection{Automation Testing Artifacts}
-Workflow validation is supported by dedicated PowerShell automation scripts for single-alert checks, automated execution polling, and multi-feed branch scenarios. These scripts automate webhook submission and branch-validation workflows during sprint testing.
+\subsection{Workflow Validation}
+Workflow validation was supported by PowerShell scripts for single-alert checks, automated execution polling, and multi-feed scenarios. These scripts made it possible to replay webhook submissions and confirm that each branch behaved as expected during sprint verification.
 
 \section{Conclusion}
-Sprint 6 turned analytics output into actionable notifications and kept the historical trail inside the backend.
+Sprint 6 turned the analytics output into notifications that could reach the operations side, while still preserving a clear history inside the backend.

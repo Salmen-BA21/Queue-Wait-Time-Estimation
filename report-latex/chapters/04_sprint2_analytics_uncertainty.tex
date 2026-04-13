@@ -2,15 +2,15 @@
 \chaptertoc
 
 \section{Introduction}
-Sprint 2 shifted the system from counting people to describing queue dynamics. The analytical layer now derives arrival and service rates, computes wait time, and marks when the queue should be treated as unstable.
+Sprint 2 moved the project from simple counting to queue interpretation. At this stage, the system starts estimating how people arrive, how quickly service is handled, and how long waiting should take. It also decides when the queue is no longer behaving in a stable way.
 
 \section{Sprint Backlog}
-Sprint 2 backlog priorities were:
+The Sprint 2 backlog focused on turning tracking results into usable queue indicators:
 \begin{itemize}
-    \item Implement event-based queue rate estimation from tracked IDs in zone.
-    \item Compute wait-time estimates with explicit stable/unstable queue handling.
-    \item Add denominator-safety guards and fallback wait-time logic.
-    \item Expose a consistent runtime metric contract for dashboard and webhook consumption.
+    \item estimate queue rates from people tracked inside the queue area,
+    \item compute wait time while handling stable and unstable cases,
+    \item protect the calculations from empty windows and division-by-zero problems,
+    \item provide a clear metric output that later layers can reuse.
 \end{itemize}
 
 \section{Design}
@@ -23,7 +23,7 @@ Sprint 2 backlog priorities were:
     \label{fig:sprint2_component}
 \end{figure}
 
-At component level, \texttt{QueueAnalyzer} receives in-zone tracker IDs and produces \texttt{QueueMetrics} consumed by logs, webhook payloads, and dashboard updates.
+At the component level, the analysis module receives the people already identified inside the queue zone and turns them into queue indicators that can be reused by logs, dashboard updates, and alert messages.
 
 \subsection{Data Flow Diagram}
 \begin{figure}[H]
@@ -33,7 +33,7 @@ At component level, \texttt{QueueAnalyzer} receives in-zone tracker IDs and prod
     \label{fig:sprint2_data_flow}
 \end{figure}
 
-Data flow is event-centric: per-frame ID transitions produce arrival/departure events, event windows produce rates $(\lambda,\mu)$, and rates with occupancy produce wait-time estimates plus stable/unstable state labels.
+Data flow starts from changes in tracked people. Those changes are grouped over short windows to estimate arrival and service rates. The rates are then combined with the current occupancy to produce wait time and a stability label.
 
 \subsection{Sequence Diagrams}
 \begin{figure}[H]
@@ -43,37 +43,36 @@ Data flow is event-centric: per-frame ID transitions produce arrival/departure e
     \label{fig:sprint2_sequence}
 \end{figure}
 
-The implemented sequence is:
-\texttt{QueueAnalyzer.update()} computes counts and rates, evaluates queue stability, and applies either the stable wait-time formula or fallback wait-time branch before publishing \texttt{QueueMetrics}.
+In practice, the processing order is simple: the analysis stage reads the current counts, checks whether the queue is stable, and then applies either the usual wait-time formula or a safer fallback before publishing the metrics.
 
 \section{Implementation}
 \subsection{Queue Event Windows and Rate Estimation}
-In the queue-analysis module, arrivals and departures are tracked as timestamp deques over sliding windows. Let $N_a$ and $N_d$ be events in windows $T_a$ and $T_d$:
+The queue-analysis step uses short time windows to count arrivals and departures. Let $N_a$ and $N_d$ be the number of events observed in windows $T_a$ and $T_d$:
 \[
 \lambda = \frac{N_a}{T_a}, \qquad \mu = \frac{N_d}{T_d}
 \]
-The implementation enforces a minimum event count before returning non-zero rates, reducing unstable early-window estimates.
+From these counts, the system estimates the arrival rate and the service rate. To avoid unstable values at the beginning of a run, the implementation waits until enough events have been observed before returning non-zero rates.
 
 \subsection{Wait-Time Logic and Stability Handling}
-The runtime marks queue stability with:
+The queue is considered stable when arrivals stay below service and service is actually observed:
 \[
 \texttt{queue\_stable} = (\lambda < \mu) \land (\mu > 0)
 \]
-The wait-time logic follows two branches:
+When that condition is met, the normal wait-time formula is used. Otherwise, the system falls back to a more conservative estimate based on the current occupancy:
 \begin{itemize}
-    \item Stable queue: $W = \frac{1}{\mu-\lambda}$
-    \item Unstable but service observed: fallback $W = \frac{L}{\mu}$, where $L$ is people in zone
+    \item stable queue: $W = \frac{1}{\mu-\lambda}$,
+    \item unstable but service observed: fallback $W = \frac{L}{\mu}$, where $L$ is the number of people in the zone.
 \end{itemize}
-When no service events are observed, the implementation currently returns a zero fallback.
+When no service events are observed, the implementation returns a zero fallback so that downstream components do not use an unreliable value.
 
 \subsection{Runtime Contract for Monitoring and Automation}
-The final \texttt{QueueMetrics} object includes:
+The final metric output includes:
 \begin{itemize}
     \item point estimates ($\lambda$, $\mu$, $W$),
     \item people-in-zone occupancy,
     \item stability flag for safe downstream interpretation.
 \end{itemize}
-These fields are propagated to logs, overlays, webhook payloads, and dashboard events.
+These values are then reused by logs, overlays, webhook payloads, and dashboard events.
 
 \section{Conclusion}
-Sprint 2 delivered the analytical core of the project: event-to-rate modeling, stable and unstable wait-time semantics, and a runtime metric contract that downstream components can consume without guessing.
+Sprint 2 delivered the analytical core of the project. It transforms queue observations into rates, gives a practical wait-time estimate, and keeps a stability signal for the later parts of the system. That makes the next sprints easier to build and validate.

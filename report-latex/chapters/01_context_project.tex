@@ -2,16 +2,16 @@
 \chaptertoc
 
 \section{Introduction}
-This chapter positions the Queue Wait-Time Estimation System in its operational, organizational, and methodological context. Beyond a general introduction, it clarifies why queue monitoring remains a high-impact problem for service organizations and why an end-to-end technical solution is required instead of isolated counting tools.
+This chapter places the Queue Wait-Time Estimation System in its operational, organizational, and methodological context. After a short introduction, it explains why queue monitoring remains an important problem for service organizations and why an end-to-end technical solution is needed rather than isolated counting tools.
 
-The chapter also establishes the project baseline used in the rest of the report: collaboration context with DataDoIt, problem formalization, comparison with existing approaches, solution scope, and implementation governance through Scrum modules. This framing is intentionally detailed because later technical chapters depend on these assumptions.
+The chapter also defines the baseline used throughout the report: the collaboration context with DataDoIt, the problem formulation, the comparison with existing approaches, the solution scope, and the Scrum-based organization of the work. This level of detail matters because the later technical chapters rely on these assumptions.
 
 \section{Host Organization}
 
 \subsection{DataDoIt}
-This end-of-studies project was carried out in collaboration with DataDoIt, a data-driven sustainability consulting firm headquartered at Elghazal Technopark in Tunis, Tunisia. DataDoIt specializes in transforming environmental and sustainability commitments into measurable, actionable outcomes for governments, municipalities, and enterprises across the EMEA region. The company operates at the intersection of data science and sustainability, offering services that span decarbonization strategy, ESG reporting, smart resource analytics, and circular economy implementation. Its approach, summarized as Measure It, Optimize It, Do It, reflects a methodology grounded in quantitative assessment, strategic planning, and hands-on technical deployment. To date, the company has delivered over 15 active projects across 6 key sectors, with a reported average ROI of 2.3x and a 94\% client retention rate.
+This end-of-studies project was carried out with DataDoIt, a data-driven sustainability consulting firm headquartered at Elghazal Technopark in Tunis, Tunisia. DataDoIt works at the intersection of data science and sustainability, helping governments, municipalities, and enterprises turn environmental commitments into measurable results across the EMEA region. The company offers services that cover decarbonization strategy, ESG reporting, smart resource analytics, and circular economy implementation. Its motto, Measure It, Optimize It, Do It, reflects a practical methodology based on analysis, planning, and technical deployment. To date, the company has delivered more than 15 active projects across 6 sectors, with a reported average ROI of 2.3x and a 94\% client retention rate.
 
-The collaboration provided a concrete engineering context in which data collection, real-time monitoring, and automated analytics are central concerns, requirements that directly shaped the design and scope of this project.
+The collaboration provided a concrete setting for work centered on data collection, real-time monitoring, and automated analytics, and these concerns directly shaped the design and scope of the project.
 
 \begin{table}[ht]
     \centering
@@ -41,9 +41,9 @@ DataDoIt delivers sustainability solutions across six mission-critical sectors w
 \section{Presentation of the Project}
 
 \subsection{Project Context}
-Manual queue supervision is often subjective, difficult to scale, and highly dependent on continuous manual attention. In many environments, monitoring remains reactive: teams observe congestion after it appears rather than anticipating it early with measurable indicators.
+Manual queue supervision is often subjective, hard to scale, and dependent on continuous attention. In many environments, teams react only after congestion appears instead of anticipating it early with measurable indicators.
 
-This project addresses that gap by transforming camera streams into decision-oriented telemetry. The target output is not only occupancy counts, but a coherent set of operational metrics: people in zone, arrival rate, service rate, expected wait time, queue stability state, and alert states consumable by monitoring and automation layers.
+This project addresses that gap by turning camera streams into decision-oriented telemetry. The target output is not limited to occupancy counts, but includes people in zone, arrival rate, service rate, expected wait time, queue stability state, and alert states that can be consumed by monitoring and automation layers.
 
 \subsection{Problem Statement}
 Existing operational practices and basic counting tools present recurring limitations:
@@ -54,7 +54,7 @@ Existing operational practices and basic counting tools present recurring limita
     \item they are often disconnected from automated response workflows.
 \end{itemize}
 
-As a consequence, interventions (staff reallocation, lane opening, escalation) can be delayed or triggered on incomplete signals. The problem is therefore both analytical and integrational: producing robust indicators and delivering them through actionable channels.
+As a consequence, interventions (staff reallocation, lane opening, escalation) can be delayed or triggered on incomplete signals. The problem is therefore both analytical and integration-related: it is not enough to produce robust indicators; they also need to be delivered through actionable channels.
 
 \begin{table}[ht]
     \centering
@@ -73,7 +73,7 @@ As a consequence, interventions (staff reallocation, lane opening, escalation) c
 \subsection{Study of Existing Approaches}
 Recent computer-vision frameworks provide strong building blocks for person perception, notably YOLO-based detection and tracking algorithms such as ByteTrack \cite{ultralytics_docs,bytetrack2022}. Queueing theory, in parallel, offers formal models for service-system behavior, including interpretable relationships between arrival rate, service rate, and expected waiting time \cite{gross_queueing}.
 
-However, many practical deployments remain partial. Some focus on counting without identity continuity, others on visualization without explicit stability semantics, and others on analytics without operational delivery channels. In addition, integration boundaries between perception pipelines, web supervision, and alert automation are frequently treated as separate projects instead of one coherent architecture.
+In practice, many deployments remain incomplete. Some focus only on counting and ignore identity continuity; others provide visualization without defining stability clearly; and others stop at analytics without connecting to alert delivery. The result is often a set of disconnected tools instead of one coherent architecture.
 
 \begin{table}[ht]
     \centering
@@ -100,7 +100,7 @@ The proposed system combines perception, analytics, and integration in one modul
     \item automation through n8n webhooks and Telegram alerts.
 \end{enumerate}
 
-This architecture aims to convert visual observations into operational actions while keeping each layer independently testable. Detection/tracking modules can evolve without rewriting queue formulas; web and automation channels can evolve without changing the core metric contract.
+This architecture aims to convert visual observations into operational actions while keeping each layer independently testable. Detection and tracking modules can evolve without rewriting queue formulas, and the web and automation channels can evolve without changing the core metric contract.
 
 \subsection{Objectives of the Project}
 The project objectives are to:
@@ -113,7 +113,7 @@ The project objectives are to:
     \item expose metrics through web interfaces and automation workflows.
 \end{enumerate}
 
-To keep implementation traceable, objectives are mapped to delivery modules and observable outputs.
+To keep the implementation traceable, the objectives are mapped to delivery modules and observable outputs.
 
 \begin{table}[ht]
     \centering
@@ -132,7 +132,7 @@ To keep implementation traceable, objectives are mapped to delivery modules and 
 \end{table}
 
 \subsection{Project Scope and Boundaries}
-The implementation scope includes backend perception and analytics modules, API/runtime integration, web monitoring, and external workflow automation. The report deliberately focuses on this web-first operational architecture.
+The implementation scope covers backend perception and analytics modules, API/runtime integration, web monitoring, and external workflow automation. The report deliberately focuses on this web-first operational architecture.
 
 All implementation details and validation narratives are presented through the backend, web, and automation delivery tracks to maintain a consistent production-oriented scope.
 
@@ -193,5 +193,5 @@ This module covered integration hardening and closure:
 \end{table}
 
 \section{Conclusion}
-This chapter positioned the project in its organizational and technical context, formalized the addressed operational problem, and justified the selected delivery strategy. Chapter 2 builds on this baseline by formalizing requirements, architecture constraints, and analysis artifacts used to guide implementation decisions.
+This chapter set the project context, formalized the addressed operational problem, and justified the selected delivery strategy. Chapter 2 builds on this baseline by defining the requirements, architecture constraints, and analysis artifacts used to guide implementation decisions.
 

@@ -2,17 +2,17 @@
 \chaptertoc
 
 \section{Introduction}
-Sprint 5 linked the dashboard to live backend services and runtime events. With the API client, websocket updates, and transport routing in place, the frontend could behave as an operational control panel instead of a static shell.
+Sprint 5 connected the dashboard to the live backend services and runtime events. At this stage, the frontend stopped being only a visual shell and became a monitoring interface that could react to feed changes and live metrics.
 
 \section{Sprint Backlog}
-Sprint 5 backlog covered integration-critical items:
+The Sprint 5 backlog focused on the pieces needed to make the dashboard react to live data:
 \begin{itemize}
-    \item implement a typed API client aligned with backend response contracts,
-    \item integrate feed lifecycle actions (create/start/stop/restart/delete),
-    \item integrate websocket events for low-latency dashboard updates,
-    \item integrate capability-driven transport routing (WebRTC first, MJPEG fallback),
-    \item implement resilient live monitoring behavior (reconnect and fallback),
-    \item validate dashboard setup and onboarding workflows through integration tests.
+    \item connect the dashboard to backend responses in a reliable way,
+    \item allow the user to manage feeds from the interface,
+    \item receive live updates without refreshing the page,
+    \item choose the most suitable video transport depending on availability,
+    \item keep the dashboard usable when the live connection is interrupted,
+    \item validate the main setup and onboarding flows through integration tests.
 \end{itemize}
 
 \section{Design}
@@ -25,7 +25,7 @@ Sprint 5 backlog covered integration-critical items:
     \label{fig:sprint5_data_flow}
 \end{figure}
 
-In practice, REST endpoints handle CRUD and diagnostics, websocket events carry live updates, and local dashboard state aggregates those signals into KPI cards, activity logs, and attention panels.
+In practice, the backend handles configuration and diagnostic requests, live events carry the real-time updates, and the dashboard groups those signals into KPI cards, activity logs, and attention panels.
 
 \subsection{Sequence Diagrams}
 \begin{figure}[H]
@@ -35,51 +35,51 @@ In practice, REST endpoints handle CRUD and diagnostics, websocket events carry 
     \label{fig:sprint5_sequence}
 \end{figure}
 
-Three primary sequences were implemented:
+Three main flows were implemented:
 \begin{enumerate}
-    \item \textbf{Feed lifecycle:} dashboard action $\rightarrow$ REST endpoint $\rightarrow$ registry update $\rightarrow$ websocket \texttt{feed\_status} event.
-    \item \textbf{Live metrics:} worker metrics event $\rightarrow$ backend websocket $\rightarrow$ frontend cache merge $\rightarrow$ visual refresh.
-    \item \textbf{Alert surfacing:} backend alert event $\rightarrow$ websocket \texttt{alert\_fired}/\texttt{system\_warning} $\rightarrow$ activity and attention views.
+    \item \textbf{Feed lifecycle:} a dashboard action updates the feed state and the new status is sent back to the interface.
+    \item \textbf{Live metrics:} metric updates are received from the backend and reflected immediately on the dashboard.
+    \item \textbf{Alert surfacing:} alerts reach the interface and appear in the activity and attention areas.
 \end{enumerate}
 
 \section{Implementation}
-\subsection{Typed API Contract Integration}
-The frontend contract is implemented in a dedicated TypeScript API client layer. It defines typed entities for feeds, metrics, alerts, and websocket events, and wraps network calls with explicit error classes (\texttt{ApiError}, \texttt{NetworkError}, \texttt{ValidationError}). This improved reliability of frontend-side error handling and debugging.
+\subsection{API Integration}
+The frontend relies on a dedicated API layer that keeps the communication with the backend structured. It defines the main data types used by the dashboard and centralizes request handling so errors can be managed consistently.
 
 \subsection{Dashboard State Orchestration}
-A dedicated dashboard state hook coordinates data fetching and mutations through React Query. Derived indicators (online feeds, total people, average wait time, attention counts) are computed from normalized feed state and exposed to dashboard widgets.
+A dedicated dashboard state layer coordinates data fetching and updates. From the received feed data, the dashboard derives indicators such as online feeds, total people, average wait time, and attention counts, then exposes them to the widgets.
 
-\subsection{WebSocket Reliability and Fallback Logic}
-The websocket coordination hook implements:
+\subsection{Live Update Reliability}
+The live-update layer includes:
 \begin{itemize}
-    \item reconnect backoff,
-    \item heartbeat ping,
-    \item stale-data watchdog,
-    \item REST polling fallback during websocket degradation,
-    \item batched metric flush to reduce UI re-render pressure.
+    \item reconnection delays,
+    \item a heartbeat check,
+    \item a guard against stale data,
+    \item fallback polling when live updates fail,
+    \item grouped updates to keep the interface responsive.
 \end{itemize}
-When the connection drops, the dashboard falls back to REST polling instead of freezing, so operators still have a usable view during transient issues.
+When the connection drops, the dashboard falls back to periodic polling instead of freezing, so operators still have a usable view during transient issues.
 
-\subsection{Transport Capability Routing and WebRTC Lifecycle}
-Live feed cards use capability-driven routing through the feed-grid component. For each running feed, the frontend queries \texttt{/api/feeds/\{feed\_id\}/transport}. If \texttt{webrtc.enabled=true}, \texttt{webrtc.ready=true}, and \texttt{source\_mode != none}, the dashboard selects WebRTC as the primary transport; otherwise it falls back to MJPEG.
+\subsection{Live Video Delivery}
+Live feed cards use a transport decision layer to choose the most suitable viewing mode. For each running feed, the frontend checks whether live viewing is ready. If the higher-quality live stream is available, it is used first; otherwise the dashboard falls back to the simpler video stream.
 
-The WebRTC lifecycle is implemented in a dedicated feed-connection hook using \texttt{RTCPeerConnection} \cite{webrtc_w3c}:
+The live-streaming flow is handled through the browser's live video connection support \cite{webrtc_w3c}:
 \begin{itemize}
-    \item create connection with a receive-only video transceiver,
-    \item gather ICE candidates (bounded wait before signaling),
-    \item send browser SDP offer to \texttt{/api/feeds/\{feed\_id\}/webrtc/offer},
-    \item apply backend SDP answer and switch feed card to live state.
+    \item create a connection for receiving video,
+    \item gather the network information needed for signaling,
+    \item send the browser offer to the backend,
+    \item apply the backend response and switch the feed card to live state.
 \end{itemize}
 
-Reconnection uses exponential backoff (1s, 2s, 5s, 10s). Retry is intentionally skipped for non-recoverable API statuses (404, 409, 422). Under those conditions, the transport layer degrades to MJPEG while preserving dashboard continuity.
+Reconnection uses increasing delays between attempts. When the problem is not recoverable, the system stops retrying and switches to the fallback stream so the dashboard remains usable.
 
-When backend-annotated mode is active on WebRTC, client-side detection overlays are suppressed to avoid duplicate box rendering on top of server-rendered frames.
+When server-side annotations are active, the dashboard hides local overlays to avoid drawing the same boxes twice on the same video.
 
 \subsection{Dashboard UI Integration}
-The dashboard page integrates live feed controls, setup flow dialogs, source onboarding (RTSP/ONVIF/local file), KPI visualizations, and chart components. The page composes domain hooks and reusable dashboard components into one operational interface.
+The dashboard page brings together live feed controls, setup dialogs, source onboarding, KPI visualizations, and charts. In this sprint, the emphasis was on making those elements work together as one operational interface.
 
 \subsection{Integration Testing}
-Frontend integration behavior is validated with Vitest and Testing Library through scenario-based suites that cover dashboard setup flow execution, websocket-event handling, WebRTC lifecycle and fallback logic, feed-grid transport routing, and API error-contract behavior.
+Frontend integration behavior is validated through scenario-based tests that cover dashboard setup, live event handling, transport fallback, feed routing, and error behavior.
 
 \section{Conclusion}
-By the end of Sprint 5, the dashboard could react to live state, switch transport modes, and fall back cleanly when websocket or WebRTC paths failed. Sprint 6 then used that live surface for alert automation.
+By the end of Sprint 5, the dashboard could react to live state, switch transport modes, and stay usable when the live connection failed. Sprint 6 then built on that working interface for alert automation.

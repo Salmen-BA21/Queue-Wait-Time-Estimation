@@ -2,15 +2,15 @@
 \chaptertoc
 
 \section{Introduction}
-Sprint 3 turned the single local pipeline into a multi-source platform. Camera onboarding, feed lifecycle control, and real-time delivery now sit behind a typed API and websocket contract.
+Sprint 3 expanded the project from a single local pipeline into a platform that can work with several camera sources. At this stage, the backend became responsible for camera onboarding, feed control, and live delivery, so the rest of the application could communicate with it in a more structured way.
 
 \section{Sprint Backlog}
-The Sprint 3 backlog addressed four integration tracks:
+The Sprint 3 backlog focused on the parts needed to connect the system to real camera sources and expose them cleanly to the rest of the application:
 \begin{itemize}
-    \item RTSP connectivity with authentication, transport control, reconnection, and snapshots.
-    \item ONVIF discovery and stream resolution for IP camera onboarding.
-    \item REST API endpoints for feed CRUD, metadata management, and diagnostics.
-    \item Real-time delivery through websocket events and tiered video transport (WebRTC primary, MJPEG fallback, snapshots for zone workflows).
+    \item connect to RTSP cameras with authentication, transport control, reconnection, and snapshots,
+    \item discover IP cameras automatically and resolve their stream addresses,
+    \item expose feed management, metadata handling, and diagnostic operations through the API,
+    \item support live delivery through real-time events and a layered video transport strategy.
 \end{itemize}
 
 \section{Design}
@@ -23,7 +23,7 @@ The Sprint 3 backlog addressed four integration tracks:
     \label{fig:sprint3_component}
 \end{figure}
 
-The design keeps camera adapters, API models, runtime feed orchestration, and websocket broadcasting separate so each part can evolve without dragging the others with it.
+The design keeps camera integration, data handling, runtime control, and live event delivery separate so each part can evolve without forcing changes on the others.
 
 \subsection{Data Flow Diagram}
 \begin{figure}[H]
@@ -33,7 +33,7 @@ The design keeps camera adapters, API models, runtime feed orchestration, and we
     \label{fig:sprint3_data_flow}
 \end{figure}
 
-The principal data paths are: (1) onboarding/test flows through REST endpoints, (2) feed-control flows through start/stop/restart operations, and (3) runtime event flows from worker JSONL streams to websocket broadcast and dashboard cache updates.
+The main data paths are: first, onboarding and testing flow into the backend; second, feed-control actions update the running state of a camera; and third, runtime events are pushed to the live interface so the dashboard stays in sync.
 
 \subsection{Sequence Diagrams}
 \begin{figure}[H]
@@ -43,66 +43,64 @@ The principal data paths are: (1) onboarding/test flows through REST endpoints, 
     \label{fig:sprint3_sequence}
 \end{figure}
 
-The implemented sequence for a running feed is:
-frontend request $\rightarrow$ \texttt{/api/feeds/*} $\rightarrow$ \texttt{FeedRegistry} operation $\rightarrow$ worker process lifecycle change $\rightarrow$ websocket \texttt{feed\_status}/\texttt{metrics\_update} event.
+The running sequence is straightforward: a frontend action reaches the backend, the feed state is updated, the worker process changes accordingly, and the new status is sent back to the live interface.
 
 \section{Implementation}
-\subsection{RTSP Source Integration}
-In the RTSP camera adapter, the \texttt{RTSPCamera} class supports:
+\subsection{Camera Source Integration}
+This part of the sprint focuses on making external cameras usable inside the project. It supports:
 \begin{itemize}
-    \item credential embedding with safe log redaction,
-    \item TCP/UDP transport selection through OpenCV/FFMPEG options,
-    \item connection testing and snapshot capture,
-    \item automatic reconnection with bounded retries.
+    \item handling camera credentials without exposing them in logs,
+    \item choosing between TCP and UDP transport depending on the situation,
+    \item checking the connection and capturing snapshots,
+    \item reconnecting automatically when the stream is interrupted.
 \end{itemize}
 
-The source abstraction layer routes local/webcam sources to \texttt{VideoStream} and RTSP URLs to \texttt{RTSPCamera}.
+The source-handling layer routes local files and webcams through one path and live camera streams through another, which keeps the source logic easier to maintain.
 
-\subsection{ONVIF Discovery and Stream Resolution}
-The ONVIF client module implements WS-Discovery probes, ProbeMatch parsing, capability extraction, media-service resolution, and RTSP URI retrieval through SOAP requests with digest/basic authentication fallback. This enables dynamic IP camera onboarding without hardcoding stream URLs.
+\subsection{Camera Discovery and Stream Setup}
+The camera discovery step is used to find available cameras automatically and recover their stream information. This avoids hardcoding stream addresses and makes onboarding easier when new IP cameras are added.
 
-\subsection{FastAPI BFF and Typed Contract}
-The API layer is implemented as a FastAPI backend-for-frontend, with typed request and response models. Major endpoint groups include:
+\subsection{API Layer and Data Contract}
+The API layer acts as the bridge between the backend services and the rest of the project. It provides structured inputs and outputs so the frontend can interact with the backend in a predictable way. The main groups of operations are:
 \begin{itemize}
-    \item feed management (create/list/start/stop/restart/delete),
-    \item source onboarding (RTSP test/snapshot, ONVIF discovery/streams/test),
-    \item metadata (establishments and cashiers),
-    \item integration and health (webhook status/test, system health),
-    \item live transport channels (websocket, transport capability endpoint, WebRTC signaling endpoint, and MJPEG stream endpoint).
+    \item feed management, including creation, listing, start, stop, restart, and deletion,
+    \item source onboarding, including RTSP checks, snapshots, and camera discovery,
+    \item metadata management for establishments and cashiers,
+    \item integration and health checks,
+    \item live transport support for real-time viewing.
 \end{itemize}
 
-\subsection{Transport Capability and WebRTC Signaling}
-To reduce end-to-end viewing latency while preserving backward compatibility, Sprint 3 now exposes a capability-driven transport contract aligned with WebRTC signaling standards \cite{webrtc_w3c,ietf_rfc8830}.
+\subsection{Live Video Delivery}
+To reduce viewing latency while still keeping a fallback path, Sprint 3 introduces a transport system that chooses the most suitable stream mode for each feed \cite{webrtc_w3c,ietf_rfc8830}.
 
-The endpoint \texttt{/api/feeds/\{feed\_id\}/transport} returns per-feed \texttt{FeedTransportCapabilities} with both \texttt{webrtc} and \texttt{mjpeg} readiness fields. The frontend consumes this contract to decide transport routing:
+For each feed, the backend reports whether live viewing is available through WebRTC or through the fallback video stream. The frontend then uses that information to decide how to display the camera:
 \begin{itemize}
-    \item \texttt{enabled}: feature-level availability,
-    \item \texttt{ready}: runtime readiness for immediate use,
-    \item \texttt{source\_mode}: \texttt{direct}, \texttt{annotated}, or \texttt{none},
-    \item \texttt{reason}: machine-readable explanation when transport is unavailable.
+    \item whether the feature is available,
+    \item whether it is ready for immediate use,
+    \item which viewing mode is active,
+    \item why a transport option may be unavailable.
 \end{itemize}
 
-When WebRTC is ready, the endpoint \texttt{/api/feeds/\{feed\_id\}/webrtc/offer} accepts a browser SDP offer and proxies it to MediaMTX WHEP, then returns the SDP answer \cite{mediamtx_docs}. The backend validates feed existence, running state, and RTSP-source eligibility before proxying.
+When WebRTC is available, the backend forwards the browser offer to the media server and returns the response needed to start the stream \cite{mediamtx_docs}. Before doing that, it checks that the feed exists, is running, and can be used with the selected transport.
 
 Operational status semantics are explicit:
 \begin{itemize}
-    \item \texttt{200}: offer accepted and SDP answer returned,
-    \item \texttt{404}: feed not found,
-    \item \texttt{409}: feed not running, unsupported source, or transport not ready,
-    \item \texttt{422}: invalid SDP payload,
-    \item \texttt{502}/\texttt{503}: upstream or service-availability failures.
+    \item success when the offer is accepted and the response is returned,
+    \item not found when the feed does not exist,
+    \item conflict when the feed is not running or the transport is not ready,
+    \item invalid input when the stream request is malformed,
+    \item upstream or availability failure when the media service cannot answer.
 \end{itemize}
 
-In \texttt{direct} mode, backend runtime can ensure MediaMTX path configuration through the control API before offer proxying. Environment-driven configuration (WHEP URL, control URL, timeout, and feature flag) keeps deployment adaptable without changing API contracts.
+The configuration stays flexible through environment settings such as the media URL, control URL, timeout, and feature flag. That keeps deployment adaptable without changing the application itself.
 
-\subsection{Runtime Orchestration and Real-Time Events}
-Runtime control sits in the API orchestration service. \texttt{FeedRegistry} manages feed state, persistence sync, worker process lifecycle, and event dispatch. The worker command launches the headless analysis runtime and writes event JSONL. \texttt{WebSocketHub} broadcasts standardized events:
-\texttt{snapshot}, \texttt{feed\_status}, \texttt{metrics\_update}, \texttt{alert\_fired}, and \texttt{system\_warning}.
+\subsection{Runtime Control and Live Events}
+Runtime control sits inside the API orchestration layer. It keeps track of feed state, synchronizes persistence, manages the worker lifecycle, and dispatches events to the rest of the system. The live channel publishes updates such as snapshots, feed status changes, metric updates, alert notifications, and system warnings.
 
-For video surfaces, \texttt{FeedFrameStreamManager} supports shared MJPEG buffering with capture-to-worker handoff continuity, preventing stream discontinuities when runtime mode changes.
+For the video surface, the system keeps a shared fallback stream so that viewing does not break when the runtime mode changes.
 
 \subsection{Persistence and Recovery}
-The persistence layer provides SQLite storage for feed configuration, metadata, video sessions, and archived alerts. On API startup, persisted feeds are restored and stale running sessions are safely recovered to a stopped state.
+The persistence layer stores feed configuration, metadata, video sessions, and archived alerts in SQLite. When the backend starts, it reloads saved feeds and safely resets any stale running sessions so the system begins from a consistent state.
 
 \section{Conclusion}
-By the end of Sprint 3, the backend could onboard cameras, manage feed state, and broadcast events to the frontend without hardcoding source details. That made the web UI integration in Sprint 4 much more direct.
+By the end of Sprint 3, the backend could onboard cameras, manage feed state, and send live updates to the frontend without depending on hardcoded source details. That made the web UI work in Sprint 4 much easier to integrate.

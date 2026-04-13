@@ -2,20 +2,22 @@
 \chaptertoc
 
 \section{Introduction}
-This chapter defines the project requirements and shows how those requirements shaped the architecture choices that follow. Instead of listing features in isolation, it ties the functional scope, actors, and layers back to the implementation plan used across the sprint chapters.
+This chapter turns the project objective into the requirements that guided the implementation. We identify the actors, list the functions and quality constraints they need, and show how those requirements are spread across the implementation plan.
 
-The chapter goes beyond a feature list. It sets out requirement traceability, actor responsibilities, quality constraints, sprint-scope mapping, core data entities, and the architecture layers used throughout the report.
+Rather than treating the requirements as an isolated checklist, we connect them to the queue-monitoring pipeline used throughout the project: video ingestion, person detection and tracking, queue-metric estimation, dashboard delivery, and alert automation. That link matters because the later chapters follow the same path from requirement to implementation.
 
 \section{Requirements Specification}
 
 \subsection{Identification of Actors}
-The system involves two primary actors:
+The system has two actors whose responsibilities reflect the two main operating levels of the platform: governance and supervision. Both roles use the same application, but they do so with different permissions and goals.
+
+The actors of the system are:
 \begin{itemize}
     \item \textbf{Administrator}: manages manager accounts (create, update, delete) and controls access governance.
     \item \textbf{Manager}: configures sources and thresholds, monitors live queues, reacts to alerts, and reviews performance indicators.
 \end{itemize}
 
-Although these roles interact with the same platform, they consume different abstractions. Administrators require account-governance visibility, while managers require operational depth from setup through live supervision and KPI interpretation.
+This split makes the functional scope easier to explain and validate, because access-control flows and operational monitoring flows can be tested separately.
 
 \begin{table}[ht]
     \centering
@@ -30,7 +32,7 @@ Although these roles interact with the same platform, they consume different abs
 \end{table}
 
 \subsection{Functional Requirements}
-The system must provide the following core functionalities:
+At a high level, the system captures a feed, counts people, estimates queue behavior, updates the dashboard, and sends alerts when needed. From that workflow, the system must provide the following capabilities:
 \begin{itemize}
     \item real-time person detection and tracking,
     \item configurable queue zone definition,
@@ -42,7 +44,7 @@ The system must provide the following core functionalities:
     \item historical data logging and analytics.
 \end{itemize}
 
-To support verification and sprint-level accountability, these requirements are formalized in a traceability matrix.
+These requirements define the minimum end-to-end behavior expected from the platform. To keep the implementation trackable, we formalize them in a traceability matrix.
 
 \begin{table}[ht]
     \centering
@@ -63,7 +65,7 @@ To support verification and sprint-level accountability, these requirements are 
 \end{table}
 
 \subsection{Non-functional Requirements}
-The main quality constraints are:
+In addition to functional behavior, the platform must satisfy quality constraints that keep it usable in a live monitoring environment. Because the project combines computer vision, analytics, a web dashboard, and automation workflows, performance and reliability are as important as correctness. For this project, the main quality constraints are:
 \begin{itemize}
     \item \textbf{Performance}: maintain real-time behavior and low alert latency.
     \item \textbf{Scalability}: support multiple feeds and independent feed lifecycle control.
@@ -73,7 +75,7 @@ The main quality constraints are:
     \item \textbf{Maintainability}: keep modular code organization and testable interfaces.
 \end{itemize}
 
-These quality attributes are treated as engineering contracts, not only design intentions.
+We treat these quality attributes as engineering contracts rather than only design intentions.
 
 \begin{table}[ht]
     \centering
@@ -92,14 +94,14 @@ These quality attributes are treated as engineering contracts, not only design i
 \end{table}
 
 \section{Product Backlog}
-The product backlog was prioritized by business value and technical dependency. For implementation governance, backlog items were grouped into three domains:
+The product backlog was prioritized according to business value and technical dependency. To keep the implementation easy to follow, we grouped the items into three domains that mirror the system architecture: backend processing, web supervision, and automation.
 \begin{itemize}
     \item \textbf{Backend domain}: perception pipeline, queue analytics, API and stream interfaces.
     \item \textbf{Web domain}: dashboard UX, live monitoring integration, zone editing workflows.
     \item \textbf{Automation domain}: n8n workflow integration, alert routing, webhook reliability.
 \end{itemize}
 
-Early execution emphasized backend foundations to reduce downstream integration risk. This sequencing ensured that web and automation layers consumed a stable metric contract rather than moving targets.
+The first sprints focused on backend foundations, because the dashboard and automation layers depend on a stable metric contract. This order reduced integration risk and made later validation clearer.
 
 \begin{table}[ht]
     \centering
@@ -115,6 +117,8 @@ Early execution emphasized backend foundations to reduce downstream integration 
 \end{table}
 
 \section{Global Use Case Diagram}
+The global use case diagram gives a high-level view of how the administrator and manager interact with the platform during configuration, monitoring, and alert handling.
+
 \begin{figure}[H]
     \centering
     \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for global use case diagram}}
@@ -122,7 +126,7 @@ Early execution emphasized backend foundations to reduce downstream integration 
     \label{fig:global_use_case}
 \end{figure}
 
-At system level, use cases can be organized into four interaction groups: configuration, monitoring, analytics interpretation, and alert handling. The global diagram should reflect these groups and their actor responsibilities.
+At the system level, the use cases can be grouped into four interactions: configuration, live monitoring, analytics interpretation, and alert handling. The table below lists the use cases that should appear in the diagram and the main actor responsible for each one.
 
 \begin{table}[ht]
     \centering
@@ -141,7 +145,7 @@ At system level, use cases can be organized into four interaction groups: config
 \end{table}
 
 \section{Sprint Scope Overview}
-The project implementation is organized into eight sprints. Table~\ref{tab:sprint_plan} summarizes sprint scope and expected outcomes without using calendar-based timeline tracking.
+We organized the project into eight sprints so that the pipeline could be delivered step by step and checked at each stage. Table~\ref{tab:sprint_plan} summarizes the main outcome of each sprint and the lens used to evaluate it.
 
 \begin{table}[ht]
     \centering
@@ -162,7 +166,7 @@ The project implementation is organized into eight sprints. Table~\ref{tab:sprin
 \end{table}
 
 \section{Data Modeling}
-The data model combines runtime monitoring entities and persistence entities. Its design objective is to support both low-latency supervision and post-hoc analysis with minimal contract drift across modules.
+The data model combines runtime monitoring entities with persistence-oriented entities. Its role is to keep live telemetry, configuration data, and alert history aligned so that the system can support both immediate supervision and later analysis without the modules drifting apart.
 
 \subsection{Core Entities}
 The main objects are:
@@ -173,6 +177,8 @@ The main objects are:
     \item \textbf{Alert}: severity, threshold context, and notification payload.
     \item \textbf{Establishment} and \textbf{Cashier}: business metadata used to organize feeds.
 \end{itemize}
+
+These entities mirror the runtime contract used by the backend so that live metrics, configuration data, and persisted records stay consistent across modules.
 
 \begin{table}[ht]
     \centering
@@ -190,9 +196,9 @@ The main objects are:
 \end{table}
 
 \subsection{Data Lifecycle and Persistence Strategy}
-Runtime metrics are generated continuously and distributed through live channels, while selected records are persisted for auditability and trend analysis. This dual-path strategy (stream plus persistence) improves resilience: temporary integration failures do not imply complete data loss.
+Runtime metrics are generated continuously and distributed through live channels, while selected records are persisted for auditability and trend analysis. This dual-path strategy improves resilience because temporary integration failures do not imply complete data loss.
 
-SQLite database persistence stores operational metrics, structured metadata, and alert archives in one source of truth. This supports both operational continuity and post-run diagnosis.
+SQLite persistence stores operational metrics, structured metadata, and alert archives in a single source of truth. That supports operational continuity as well as post-run diagnosis.
 
 \begin{figure}[H]
     \centering
@@ -201,12 +207,24 @@ SQLite database persistence stores operational metrics, structured metadata, and
     \label{fig:database_schema}
 \end{figure}
 
-Figure~\ref{fig:database_schema} is intentionally kept as a single consolidated database view to avoid duplication across sprint chapters.
-
 \section{Project Environment}
 
 \subsection{Hardware and Software Environment}
-The development workflow combines a Python backend environment, a TypeScript frontend environment, and containerized automation services. The project is designed to run on standard workstations and can exploit hardware acceleration when compatible GPU resources are available.
+The hardware environment used during development is shown in Table~\ref{tab:hardware_environment}. The software and runtime layers are summarized in Table~\ref{tab:execution_environment_profile}.
+
+\begin{table}[ht]
+    \centering
+    \caption{Hardware environment}
+    \label{tab:hardware_environment}
+    \begin{tabularx}{0.8\textwidth}{|l|X|}
+        \hline
+        Component & Type \\ \hline
+        Processor & Intel Core i5 12th Generation \\ \hline
+        Memory (RAM) & 16 GB \\ \hline
+        Graphics card & NVIDIA GeForce RTX 4060 \\ \hline
+        Storage & 512 GB SSD \\ \hline
+    \end{tabularx}
+\end{table}
 
 \begin{table}[ht]
     \centering
@@ -223,23 +241,23 @@ The development workflow combines a Python backend environment, a TypeScript fro
 \end{table}
 
 \subsection{Technologies Used}
-The selected technology stack is:
+The technology stack follows the main stages of the system:
 \begin{itemize}
-    \item \textbf{Vision pipeline}: YOLO26, ByteTrack, OpenCV \cite{ultralytics_docs,bytetrack2022,opencv_docs}.
-    \item \textbf{Queue analytics}: NumPy, Pandas, SciPy, M/M/1 modeling \cite{gross_queueing}.
-    \item \textbf{Backend API}: FastAPI and Pydantic v2.
-    \item \textbf{Live transport}: WebRTC signaling with MediaMTX WHEP gateway and MJPEG fallback \cite{webrtc_w3c,mediamtx_docs}.
-    \item \textbf{Frontend}: React, TypeScript, Vite, Tailwind CSS.
-    \item \textbf{Automation}: n8n workflows with Telegram notifications.
-    \item \textbf{Persistence}: SQLite database for metrics, metadata, and alert archival.
+    \item \textbf{Vision pipeline}: YOLO26 (object detection model), ByteTrack (multi-object tracker), OpenCV (image processing and camera utilities) \cite{ultralytics_docs,bytetrack2022,opencv_docs}.
+    \item \textbf{Queue analytics}: NumPy (numerical arrays), Pandas (table-oriented data), SciPy (statistical routines) and M/M/1 modeling (basic queueing theory) \cite{gross_queueing}.
+    \item \textbf{Backend API}: FastAPI (chosen for its async support and automatic OpenAPI documentation generation) with Pydantic v2 (typed data validation and parsing).
+    \item \textbf{Live transport}: WebRTC signaling via MediaMTX WHEP gateway (low-latency streaming) with MJPEG fallback (simple HTTP frame stream) \cite{webrtc_w3c,mediamtx_docs}.
+    \item \textbf{Frontend}: React (component UI library), TypeScript (typed JavaScript), Vite (fast dev/build tool), Tailwind CSS (selected for rapid UI development with a consistent design system).
+    \item \textbf{Automation}: n8n workflows (visual automation engine) with Telegram notifications (messaging alerts).
+    \item \textbf{Persistence}: SQLite (lightweight relational database for metrics, metadata, and alert archival).
 \end{itemize}
 
-The stack was chosen to keep each layer modular: every component needed a clear boundary, practical interoperability with the next layer, and enough flexibility to support live queue monitoring.
+Each component was selected because it fits one layer of the system and keeps the implementation modular from perception through automation.
 
 \section{Software Architecture}
 
 \subsection{Overall Architecture}
-The architecture is easier to read as four layers:
+We describe the architecture as four stages that match the flow of data through the system:
 \begin{enumerate}
     \item \textbf{Video acquisition}: local files, RTSP streams, and ONVIF discovery.
     \item \textbf{Perception}: detection, tracking, and queue-zone filtering.
@@ -247,7 +265,7 @@ The architecture is easier to read as four layers:
     \item \textbf{Output and integration}: web dashboard, webhook dispatch, and alert automation.
 \end{enumerate}
 
-That separation keeps perception, analysis, UI, and automation independent enough to test on their own. For example, queue formulas depend on perception events, but do not depend on frontend rendering details.
+This separation keeps perception, analysis, the user interface, and automation independently testable. For example, queue formulas depend on perception events, but they do not depend on the frontend or notification delivery.
 
 \begin{table}[ht]
     \centering
@@ -264,17 +282,17 @@ That separation keeps perception, analysis, UI, and automation independent enoug
 \end{table}
 
 \subsection{Backend Architecture}
-The backend exposes REST and websocket interfaces for feed lifecycle control and live metrics. It includes modules for detector orchestration, tracking, queue analysis, threshold detection, webhook delivery, and camera-source management.
+The backend exposes REST and websocket interfaces for feed lifecycle control and live metrics. It includes modules for detection orchestration, tracking, queue analysis, threshold evaluation, webhook delivery, and camera-source management.
 
-Runtime orchestration focuses on feed-level lifecycle control and event broadcasting. That keeps feed state transitions independent and gives the dashboard and automation pipeline a clear event contract.
+Feed-level orchestration lets each camera be started, stopped, or refreshed independently. If one feed fails, the others keep running, and the dashboard still receives a predictable event stream.
 
-Persistence and integration are treated as part of the core system, not add-ons: SQLite-backed state and webhook reliability both belong to the operational architecture.
+We treat persistence and integration as core responsibilities rather than add-ons: SQLite-backed state preserves operational context, while webhook delivery turns queue events into external notifications.
 
 \subsection{Frontend Architecture}
-The frontend is built as a component-based interface with typed API integration, feed-oriented dashboard composition, and websocket-driven synchronization. Data access lives in hooks and client utilities, while pages and reusable components handle presentation.
+The frontend is built as a component-based interface with typed API integration, feed-oriented dashboard composition, and websocket-driven synchronization. Data access is isolated in hooks and client utilities, while pages and reusable components focus on presentation and interaction.
 
-That split keeps API changes localized to the integration layer and leaves the visual components focused on rendering and interaction.
+That separation keeps API changes localized to the integration layer and lets the visual components stay stable even when the backend contract changes. It also makes the dashboard easier to extend when new feed controls or indicators are added.
 
 \section{Conclusion}
-This chapter defines the functional baseline and the architectural logic that the later sprint chapters realize in code and tests. The next chapters move from perception foundations to connectivity, automation, and evaluation.
+This chapter establishes the functional baseline, the quality constraints, and the architecture choices that guide the rest of the report. The next chapters turn these requirements into perception, connectivity, automation, and evaluation work.
 
