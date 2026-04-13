@@ -51,10 +51,10 @@ Technologies effectivement utilisées dans le projet (extrait de `requirements.t
   \item Langage : Python 3.x
   \item Détection : Ultralytics YOLO26 via le package `ultralytics` (modèles `yolo26*.pt`).
   \item Traitement d'image : `opencv-python` (OpenCV) et `supervision` pour aides géométriques/tracking.
-  \item Tracking / helpers : `supervision` (SORT/associations) et logique interne dans `src/tracker.py`.
+  \item Tracking / helpers : `supervision` (SORT/associations) et logique interne de suivi.
   \item Calculs et data : `numpy`, `pandas`.
   \item GUI : `tkinter` (interface locale) et `Pillow` (PIL) pour gestion d'images.
-  \item Intégration & webhooks : `requests` pour envoi d'alertes HTTP.
+  \item Intégration \& webhooks : `requests` pour envoi d'alertes HTTP.
   \item Outils dev / visualisation : `jupyter`, `matplotlib`.
   \item Stockage : base SQLite comme source unique pour historisation.
 \end{itemize}
@@ -70,7 +70,7 @@ La solution se compose des modules suivants :
   \item \texttt{detector} : intégration du modèle de détection et prétraitement des frames.
   \item \texttt{tracker} : association des détections et maintien des identifiants persistants.
   \item \texttt{zone\_manager} : définition et gestion des zones d'intérêt, détection des transitions.
-  \item \texttt{queue\\_analyzer} : comptage, estimation des taux (arrivée/service) et calcul du temps d'attente.
+  \item \texttt{queue\_analyzer} : comptage, estimation des taux (arrivée/service) et calcul du temps d'attente.
   \item \texttt{uncertainty} : propagation des incertitudes et production d'intervalles ou scores de fiabilité.
   \item \texttt{webhook} / \texttt{notifier} : règles d'alerte et envoi de notifications/executions d'actions.
   \item \texttt{gui} / \texttt{dashboard} : affichage en temps réel et historisation.
@@ -95,8 +95,8 @@ Principes adoptés :
 \section{Architecture}
 L'architecture proposée comprend :
 \begin{itemize}
-  \item Acquisition vidéo (RTSP/MP4) \rightarrow Prétraitement des frames.
-  \item Module de détection \rightarrow Module de tracking \rightarrow Zone Manager (génération d'événements).
+  \item Acquisition vidéo (RTSP/MP4) $\rightarrow$ Prétraitement des frames.
+  \item Module de détection $\rightarrow$ Module de tracking $\rightarrow$ Zone Manager (génération d'événements).
   \item Queue Analyzer et Uncertainty Engine qui calculent indicateurs et intervalles.
   \item Notifier/Rules Engine qui déclenche alertes (webhook/email) et stocke métriques via SQLite/DB.
   \item Dashboard (GUI) qui consomme API pour affichage temps réel et historiques.

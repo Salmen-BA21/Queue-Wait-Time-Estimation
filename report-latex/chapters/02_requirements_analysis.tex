@@ -2,9 +2,9 @@
 \chaptertoc
 
 \section{Introduction}
-This chapter formalizes the requirement baseline that guided implementation choices across backend perception, queue analytics, web supervision, and automation workflows. Its role is twofold: define what the system must provide, and justify how architectural decomposition supports those requirements.
+This chapter defines the project requirements and shows how those requirements shaped the architecture choices that follow. Instead of listing features in isolation, it ties the functional scope, actors, and layers back to the implementation plan used across the sprint chapters.
 
-The chapter therefore goes beyond feature listing. It introduces requirement traceability, actor responsibilities, quality constraints, sprint-scope mapping, conceptual data entities, and software architecture layers. These elements are used as reference contracts for the sprint implementation chapters.
+The chapter goes beyond a feature list. It sets out requirement traceability, actor responsibilities, quality constraints, sprint-scope mapping, core data entities, and the architecture layers used throughout the report.
 
 \section{Requirements Specification}
 
@@ -51,14 +51,14 @@ To support verification and sprint-level accountability, these requirements are 
     \begin{tabularx}{\textwidth}{|l|X|l|X|}
         \hline
         ID & Requirement statement & Priority & Verification strategy \\ \hline
-        FR-01 & Detect people from live or recorded video streams in near real time. & High & Validate detector outputs and runtime overlays from \texttt{backend/src/detector.py} integration. \\ \hline
-        FR-02 & Maintain identity continuity through tracking for event-level queue analysis. & High & Validate tracker ID continuity from \texttt{backend/src/tracker.py} in runtime scenarios. \\ \hline
-        FR-03 & Restrict counting to configurable polygon queue zones. & High & Validate zone inclusion logic from \texttt{backend/src/zone\_manager.py}. \\ \hline
-        FR-04 & Compute $\lambda$, $\mu$, and expected wait time from event windows. & High & Validate queue formulas and stability handling in \texttt{backend/src/queue\_analyzer.py}. \\ \hline
-        FR-05 & Classify stable/unstable queue states and apply safe fallback wait-time logic. & High & Validate stability branches and fallback behavior in \texttt{backend/src/queue\_analyzer.py}. \\ \hline
+        FR-01 & Detect people from live or recorded video streams in near real time. & High & Validate detector outputs and runtime overlays in the perception layer. \\ \hline
+        FR-02 & Maintain identity continuity through tracking for event-level queue analysis. & High & Validate tracker ID continuity in representative runtime scenarios. \\ \hline
+        FR-03 & Restrict counting to configurable polygon queue zones. & High & Validate polygon inclusion behavior in the zone-management layer. \\ \hline
+        FR-04 & Compute $\lambda$, $\mu$, and expected wait time from event windows. & High & Validate queue formulas and stability handling in the analytics layer. \\ \hline
+        FR-05 & Classify stable/unstable queue states and apply safe fallback wait-time logic. & High & Validate stability branches and fallback behavior in queue analytics. \\ \hline
         FR-06 & Expose feed control and live updates through API and websocket channels. & High & Validate endpoint and runtime behavior through API and integration tests. \\ \hline
         FR-07 & Dispatch alert payloads to external automation workflows. & Medium & Validate webhook dispatch and n8n branch behavior using script-based scenarios. \\ \hline
-        FR-08 & Persist operational metrics and metadata for analysis and auditing. & Medium & Validate SQLite persistence paths through runtime execution and database checks. \\ \hline
+        FR-08 & Persist operational metrics and metadata for analysis and auditing. & Medium & Validate SQLite persistence behavior through runtime execution and database checks. \\ \hline
     \end{tabularx}
 \end{table}
 
@@ -115,7 +115,7 @@ Early execution emphasized backend foundations to reduce downstream integration 
 \end{table}
 
 \section{Global Use Case Diagram}
-\begin{figure}[ht]
+\begin{figure}[H]
     \centering
     \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for global use case diagram}}
     \caption{Global use case diagram of the queue wait-time estimation system.}
@@ -194,7 +194,7 @@ Runtime metrics are generated continuously and distributed through live channels
 
 SQLite database persistence stores operational metrics, structured metadata, and alert archives in one source of truth. This supports both operational continuity and post-run diagnosis.
 
-\begin{figure}[ht]
+\begin{figure}[H]
     \centering
     \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for unified database schema diagram (single ERD)}}
     \caption{Unified SQLite schema used for feed metadata, queue sessions, and alert archival.}
@@ -234,12 +234,12 @@ The selected technology stack is:
     \item \textbf{Persistence}: SQLite database for metrics, metadata, and alert archival.
 \end{itemize}
 
-Technology selection follows a modular criterion: each component must provide clear contract boundaries and practical interoperability with adjacent layers.
+The stack was chosen to keep each layer modular: every component needed a clear boundary, practical interoperability with the next layer, and enough flexibility to support live queue monitoring.
 
 \section{Software Architecture}
 
 \subsection{Overall Architecture}
-The system architecture is organized in four layers:
+The architecture is easier to read as four layers:
 \begin{enumerate}
     \item \textbf{Video acquisition}: local files, RTSP streams, and ONVIF discovery.
     \item \textbf{Perception}: detection, tracking, and queue-zone filtering.
@@ -247,7 +247,7 @@ The system architecture is organized in four layers:
     \item \textbf{Output and integration}: web dashboard, webhook dispatch, and alert automation.
 \end{enumerate}
 
-This layering constrains coupling and simplifies testing. For example, queue formulas depend on perception events, but do not depend on frontend rendering details.
+That separation keeps perception, analysis, UI, and automation independent enough to test on their own. For example, queue formulas depend on perception events, but do not depend on frontend rendering details.
 
 \begin{table}[ht]
     \centering
@@ -255,26 +255,26 @@ This layering constrains coupling and simplifies testing. For example, queue for
     \label{tab:architecture_layer_mapping}
     \begin{tabularx}{\textwidth}{|l|X|X|}
         \hline
-        Layer & Responsibilities & Representative modules \\ \hline
-        Video acquisition & Source opening, stream transport handling, reconnect behavior. & \texttt{video\_capture.py}, \texttt{rtsp\_camera.py}, \texttt{onvif\_client.py} \\ \hline
-        Perception & Person detection, tracking continuity, zone-aware filtering. & \texttt{detector.py}, \texttt{tracker.py}, \texttt{zone\_manager.py} \\ \hline
-        Analysis & Event-window rates, wait-time logic, and stability-aware fallback handling. & \texttt{queue\_analyzer.py}, \texttt{threshold\_detector.py} \\ \hline
-        Output/integration & API/websocket exposure, webhook dispatch, persistence, dashboard consumption. & \texttt{api/app.py}, \texttt{api/runtime.py}, \texttt{webhook\_client.py}, frontend hooks/pages \\ \hline
+        Layer & Responsibilities & Representative components \\ \hline
+        Video acquisition & Source opening, stream transport handling, reconnect behavior. & Source-access and camera-adapter layers \\ \hline
+        Perception & Person detection, tracking continuity, zone-aware filtering. & Detection, tracking, and zone-management layers \\ \hline
+        Analysis & Event-window rates, wait-time logic, and stability-aware fallback handling. & Queue analysis and stability-handling logic \\ \hline
+        Output/integration & API/websocket exposure, webhook dispatch, persistence, dashboard consumption. & API runtime, webhook delivery, and frontend integration layers \\ \hline
     \end{tabularx}
 \end{table}
 
 \subsection{Backend Architecture}
 The backend exposes REST and websocket interfaces for feed lifecycle control and live metrics. It includes modules for detector orchestration, tracking, queue analysis, threshold detection, webhook delivery, and camera-source management.
 
-Runtime orchestration is centered around feed-level lifecycle control and event broadcasting. This design supports independent feed state transitions and clear event contracts consumed by the dashboard and automation pipeline.
+Runtime orchestration focuses on feed-level lifecycle control and event broadcasting. That keeps feed state transitions independent and gives the dashboard and automation pipeline a clear event contract.
 
-Persistence and integration are treated as first-class concerns: SQLite-backed metrics and metadata state, plus webhook dispatch reliability, are all part of the operational architecture rather than optional add-ons.
+Persistence and integration are treated as part of the core system, not add-ons: SQLite-backed state and webhook reliability both belong to the operational architecture.
 
 \subsection{Frontend Architecture}
-The frontend follows a component-based architecture with typed API contract mapping, feed-oriented dashboard composition, and websocket-driven synchronization. It separates data-access concerns (API client and hooks) from presentation concerns (pages and reusable components).
+The frontend is built as a component-based interface with typed API integration, feed-oriented dashboard composition, and websocket-driven synchronization. Data access lives in hooks and client utilities, while pages and reusable components handle presentation.
 
-This separation improves maintainability: backend contract adjustments can be localized to integration hooks and API utilities, while visual components remain focused on rendering and interaction logic.
+That split keeps API changes localized to the integration layer and leaves the visual components focused on rendering and interaction.
 
 \section{Conclusion}
-This chapter established the detailed requirement baseline and architecture rationale used throughout implementation. The next chapters translate these contracts into sprint-by-sprint technical realization, from perception foundations to integration, automation, and validation outcomes.
+This chapter defines the functional baseline and the architectural logic that the later sprint chapters realize in code and tests. The next chapters move from perception foundations to connectivity, automation, and evaluation.
 

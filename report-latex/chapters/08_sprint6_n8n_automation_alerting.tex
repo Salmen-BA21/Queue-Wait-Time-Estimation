@@ -2,7 +2,7 @@
 \chaptertoc
 
 \section{Introduction}
-Sprint 6 integrated the queue analytics pipeline with external automation workflows through n8n. The objective was to transform runtime metrics into actionable alerts with transport reliability, cooldown control, and optional Telegram notification delivery.
+Sprint 6 connected queue metrics to n8n so alerts could leave the backend in a controlled way. The focus was not just sending payloads, but keeping delivery reliable, auditable, and safe to repeat.
 
 \section{Sprint Backlog}
 Sprint 6 backlog focused on operational automation:
@@ -17,17 +17,17 @@ Sprint 6 backlog focused on operational automation:
 \section{Design}
 
 \subsection{Component Diagram}
-\begin{figure}[ht]
+\begin{figure}[H]
     \centering
     \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 6 automation component diagram}}
     \caption{Components involved in backend-to-n8n-to-Telegram automation flow.}
     \label{fig:sprint6_component}
 \end{figure}
 
-The automation design includes five components: queue runtime metrics, webhook payload serializer, HTTP delivery client, n8n workflow router, and notification endpoints. Alert archival is additionally routed back to backend through a dedicated API endpoint.
+The automation path has five pieces: queue runtime metrics, webhook payload serializer, HTTP delivery client, n8n workflow router, and notification endpoints. Alert archival is routed back to the backend through a dedicated API endpoint.
 
 \subsection{Data Flow Diagram}
-\begin{figure}[ht]
+\begin{figure}[H]
     \centering
     \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 6 automation data flow diagram}}
     \caption{Alert payload flow from backend metrics to external notifications.}
@@ -38,7 +38,7 @@ Data flow starts with periodic metrics dispatch from the runtime loop, branches 
 
 \section{Implementation}
 \subsection{Webhook Payload Contract}
-\texttt{backend/src/webhook.py} defines \texttt{QueuePayload}, a structured contract carrying:
+The webhook schema module defines \texttt{QueuePayload}, a structured contract carrying:
 \begin{itemize}
     \item source metadata (timestamp, frame, source, feed ID),
     \item queue metrics ($\lambda$, $\mu$, wait time, stability),
@@ -47,13 +47,13 @@ Data flow starts with periodic metrics dispatch from the runtime loop, branches 
 The module includes payload validation before dispatch.
 
 \subsection{Reliable Webhook Delivery}
-\texttt{backend/src/webhook\_client.py} sends payloads to n8n with timeout, retry policy, optional shared-secret header, and success/failure statistics. Payload persistence is handled through the SQLite database path, keeping one source of truth for historical records.
+The webhook delivery client sends payloads to n8n with timeout, retry policy, optional shared-secret header, and success/failure statistics. Payload persistence is handled through the SQLite database layer, keeping one source of truth for historical records.
 
 \subsection{Runtime Alert Dispatch Integration}
-In \texttt{backend/src/main.py}, webhook sending is offloaded to \texttt{AsyncWebhookDispatcher} to avoid blocking the main perception loop. The implementation supports periodic metric dispatch and immediate warning dispatch with deduplication windows to limit repeated alert spam.
+In the main runtime loop, webhook sending is offloaded to \texttt{AsyncWebhookDispatcher} to avoid blocking the perception pipeline. The implementation supports periodic metric dispatch and immediate warning dispatch with deduplication windows to limit repeated alert spam.
 
 \subsection{n8n Workflow Routing and Telegram Delivery}
-The workflow file \texttt{n8n\_workflow\_with\_telegram.json} implements:
+The n8n alert workflow implements:
 \begin{itemize}
     \item webhook reception and secret validation,
     \item alert detection and cooldown gating,
@@ -61,10 +61,10 @@ The workflow file \texttt{n8n\_workflow\_with\_telegram.json} implements:
     \item message formatting and Telegram send node,
     \item explicit acknowledge/reject branches.
 \end{itemize}
-This structure provides auditable routing between no-alert, alert-suppressed, and alert-delivered branches.
+That flow keeps the no-alert, alert-suppressed, and alert-delivered branches distinct enough to audit later.
 
 \subsection{Automation Testing Artifacts}
-Workflow validation scripts are provided in \texttt{scripts/} (e.g., \texttt{test\_n8n\_send\_alert.ps1}, \texttt{test\_n8n\_automated.ps1}, \texttt{test\_n8n\_multi\_feed\_scenario.ps1}). These scripts automate webhook submission, optional execution polling, and branch validation scenarios.
+Workflow validation is supported by dedicated PowerShell automation scripts for single-alert checks, automated execution polling, and multi-feed branch scenarios. These scripts automate webhook submission and branch-validation workflows during sprint testing.
 
 \section{Conclusion}
-Sprint 6 operationalized the analytics output through a robust automation path. With validated payload contracts, resilient transport, and n8n-driven routing, queue events are now consumable by external alerting channels and archival workflows.
+Sprint 6 turned analytics output into actionable notifications and kept the historical trail inside the backend.

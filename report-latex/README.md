@@ -17,13 +17,17 @@ If you have TeX Live / MiKTeX installed:
 
 ```powershell
 cd report-latex
-pdflatex main.tex
-biber main
-pdflatex main.tex
-pdflatex main.tex
+latexmk -g -pdf main.tex
 ```
 
-Or with latexmk (recommended):
+Or use the local wrapper, which always forces a rebuild:
+
+```powershell
+cd report-latex
+.\compile_main.ps1
+```
+
+If you want the incremental latexmk flow instead:
 
 ```powershell
 cd report-latex

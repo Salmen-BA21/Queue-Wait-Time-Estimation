@@ -2,7 +2,7 @@
 \chaptertoc
 
 \section{Introduction}
-Sprint 7 focused on validation and runtime optimization of the end-to-end stack. The work combined unit and integration tests, operational hardening, and throughput tuning for both backend runtime and dashboard experience.
+Sprint 7 acted as the validation pass for the full stack. The work checked whether perception, API, frontend, and alerting held together under tests, retries, and throughput pressure.
 
 \section{Sprint Backlog}
 Sprint 7 backlog included:
@@ -25,7 +25,7 @@ Validation followed a layered strategy:
 \end{itemize}
 
 \subsection{Performance Metrics}
-The optimization metrics were aligned with operational requirements:
+The optimization targets were tied directly to operational requirements:
 \begin{itemize}
 	\item processing responsiveness (loop cadence and processed-frame throughput),
 	\item stream continuity under feed state transitions,
@@ -35,15 +35,11 @@ The optimization metrics were aligned with operational requirements:
 
 \section{Implementation}
 \subsection{Automated Test Coverage}
-Representative test assets include:
-\begin{itemize}
-	\item backend: \texttt{backend/tests/test\_api\_app.py} (transport capability and WebRTC offer endpoint cases), \texttt{test\_runtime\_streams.py}, \texttt{test\_webhook.py},
-	\item frontend: \texttt{frontend/src/pages/Dashboard.integration.test.tsx}, \texttt{frontend/src/hooks/use-live-dashboard.test.tsx}, \texttt{frontend/src/lib/api.test.ts}, \texttt{frontend/src/hooks/use-feed-webrtc.test.tsx}, \texttt{frontend/src/components/dashboard/FeedGrid.test.tsx}.
-\end{itemize}
+The test suite covers API transport-capability and WebRTC-offer cases, runtime stream behavior, webhook delivery handling, dashboard integration, live-state synchronization, API error contracts, and transport fallback behavior.
 These tests verify API envelopes, event contracts, WebRTC signaling and fallback paths, stream handoff, and setup-workflow behavior.
 
 \subsection{Runtime Optimization Actions}
-Key optimizations implemented in \texttt{backend/src/main.py} and \texttt{backend/src/config.py} include:
+Key optimizations implemented across the runtime loop and configuration layers include:
 \begin{itemize}
 	\item configurable detector image size and frame stride,
 	\item explicit inference device control and diagnostics,
@@ -60,7 +56,7 @@ Runtime resilience was improved at multiple levels:
 \end{itemize}
 
 \subsection{Observed Outcome}
-The system reached a stable integration state where perception, analytics, API runtime, dashboard, and n8n automation operate as a coherent pipeline. Remaining work is mostly focused on extended benchmarking campaigns and production-grade deployment hardening rather than missing core functionality.
+By the end of the sprint, the system had reached a stable integration point where perception, analytics, API runtime, dashboard, and n8n automation operated as one pipeline. The remaining work is mostly benchmarking and deployment hardening rather than missing core functionality.
 
 \section{Conclusion}
-Sprint 7 consolidated quality and readiness through structured testing and targeted performance improvements. The resulting platform is functionally complete for demonstration and academic evaluation, with clearly identified extensions for industrial-scale rollout.
+Sprint 7 closed the loop with structured testing and targeted performance improvements. The resulting platform is solid enough for demonstration and academic evaluation, with a clear path to production hardening.

@@ -2,7 +2,7 @@
 \chaptertoc
 
 \section{Introduction}
-Sprint 3 extended the system from a single local pipeline to a connected multi-source platform. The work introduced robust RTSP and ONVIF camera handling, a typed FastAPI backend-for-frontend (BFF), and runtime services for feed lifecycle and real-time event distribution.
+Sprint 3 turned the single local pipeline into a multi-source platform. Camera onboarding, feed lifecycle control, and real-time delivery now sit behind a typed API and websocket contract.
 
 \section{Sprint Backlog}
 The Sprint 3 backlog addressed four integration tracks:
@@ -16,17 +16,17 @@ The Sprint 3 backlog addressed four integration tracks:
 \section{Design}
 
 \subsection{Component Diagram}
-\begin{figure}[ht]
+\begin{figure}[H]
     \centering
     \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 3 component diagram}}
     \caption{Sprint 3 components for camera integration and backend services.}
     \label{fig:sprint3_component}
 \end{figure}
 
-The design separates responsibilities between camera adapters (RTSP/ONVIF), API contract models, runtime feed orchestration, and websocket broadcasting. This modularization allows independent evolution of source onboarding, analysis workers, and frontend-facing interfaces.
+The design keeps camera adapters, API models, runtime feed orchestration, and websocket broadcasting separate so each part can evolve without dragging the others with it.
 
 \subsection{Data Flow Diagram}
-\begin{figure}[ht]
+\begin{figure}[H]
     \centering
     \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 3 data flow diagram}}
     \caption{Data flow from video feeds to API responses and WebSocket broadcasts.}
@@ -36,12 +36,19 @@ The design separates responsibilities between camera adapters (RTSP/ONVIF), API 
 The principal data paths are: (1) onboarding/test flows through REST endpoints, (2) feed-control flows through start/stop/restart operations, and (3) runtime event flows from worker JSONL streams to websocket broadcast and dashboard cache updates.
 
 \subsection{Sequence Diagrams}
+\begin{figure}[H]
+    \centering
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 3 sequence diagram}}
+    \caption{Sprint 3 sequence diagram for feed orchestration and live event distribution.}
+    \label{fig:sprint3_sequence}
+\end{figure}
+
 The implemented sequence for a running feed is:
 frontend request $\rightarrow$ \texttt{/api/feeds/*} $\rightarrow$ \texttt{FeedRegistry} operation $\rightarrow$ worker process lifecycle change $\rightarrow$ websocket \texttt{feed\_status}/\texttt{metrics\_update} event.
 
 \section{Implementation}
 \subsection{RTSP Source Integration}
-In \texttt{backend/src/rtsp\_camera.py}, the \texttt{RTSPCamera} class supports:
+In the RTSP camera adapter, the \texttt{RTSPCamera} class supports:
 \begin{itemize}
     \item credential embedding with safe log redaction,
     \item TCP/UDP transport selection through OpenCV/FFMPEG options,
@@ -49,13 +56,13 @@ In \texttt{backend/src/rtsp\_camera.py}, the \texttt{RTSPCamera} class supports:
     \item automatic reconnection with bounded retries.
 \end{itemize}
 
-The source abstraction in \texttt{backend/src/video\_capture.py} routes local/webcam sources to \texttt{VideoStream} and RTSP URLs to \texttt{RTSPCamera}.
+The source abstraction layer routes local/webcam sources to \texttt{VideoStream} and RTSP URLs to \texttt{RTSPCamera}.
 
 \subsection{ONVIF Discovery and Stream Resolution}
-\texttt{backend/src/onvif\_client.py} implements WS-Discovery probes, ProbeMatch parsing, capability extraction, media-service resolution, and RTSP URI retrieval through SOAP requests with digest/basic authentication fallback. This enables dynamic IP camera onboarding without hardcoding stream URLs.
+The ONVIF client module implements WS-Discovery probes, ProbeMatch parsing, capability extraction, media-service resolution, and RTSP URI retrieval through SOAP requests with digest/basic authentication fallback. This enables dynamic IP camera onboarding without hardcoding stream URLs.
 
 \subsection{FastAPI BFF and Typed Contract}
-The API layer is implemented in \texttt{backend/src/api/app.py}, with typed models in \texttt{backend/src/api/models.py}. Major endpoint groups include:
+The API layer is implemented as a FastAPI backend-for-frontend, with typed request and response models. Major endpoint groups include:
 \begin{itemize}
     \item feed management (create/list/start/stop/restart/delete),
     \item source onboarding (RTSP test/snapshot, ONVIF discovery/streams/test),
@@ -89,13 +96,13 @@ Operational status semantics are explicit:
 In \texttt{direct} mode, backend runtime can ensure MediaMTX path configuration through the control API before offer proxying. Environment-driven configuration (WHEP URL, control URL, timeout, and feature flag) keeps deployment adaptable without changing API contracts.
 
 \subsection{Runtime Orchestration and Real-Time Events}
-Runtime control resides in \texttt{backend/src/api/runtime.py}. \texttt{FeedRegistry} manages feed state, persistence sync, worker process lifecycle, and event dispatch. The worker command launches \texttt{src.main} in headless mode and writes event JSONL. \texttt{WebSocketHub} broadcasts standardized events:
+Runtime control sits in the API orchestration service. \texttt{FeedRegistry} manages feed state, persistence sync, worker process lifecycle, and event dispatch. The worker command launches the headless analysis runtime and writes event JSONL. \texttt{WebSocketHub} broadcasts standardized events:
 \texttt{snapshot}, \texttt{feed\_status}, \texttt{metrics\_update}, \texttt{alert\_fired}, and \texttt{system\_warning}.
 
 For video surfaces, \texttt{FeedFrameStreamManager} supports shared MJPEG buffering with capture-to-worker handoff continuity, preventing stream discontinuities when runtime mode changes.
 
 \subsection{Persistence and Recovery}
-\texttt{backend/src/database.py} provides SQLite persistence for feed configuration, metadata, video sessions, and archived alerts. On API startup, persisted feeds are restored and stale running sessions are safely recovered to a stopped state.
+The persistence layer provides SQLite storage for feed configuration, metadata, video sessions, and archived alerts. On API startup, persisted feeds are restored and stale running sessions are safely recovered to a stopped state.
 
 \section{Conclusion}
-Sprint 3 delivered the system connectivity layer and formal service contract required by the web application. With source onboarding, runtime orchestration, typed API/websocket channels, and capability-driven WebRTC signaling in place, the project was ready for full web UI integration and operational workflows.
+By the end of Sprint 3, the backend could onboard cameras, manage feed state, and broadcast events to the frontend without hardcoding source details. That made the web UI integration in Sprint 4 much more direct.

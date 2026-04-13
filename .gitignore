@@ -77,3 +77,4 @@ report-latex/*.pdf
 !report-latex/main.pdf
 # ────────────────── Zip files ──────────────────
 *.zip
+report-latex/.latexmkrc

@@ -2,7 +2,7 @@
 \chaptertoc
 
 \section{Introduction}
-Sprint 2 transformed perception outputs into operational queue indicators. The focus moved from ``who is detected'' to ``how the queue behaves'' through arrival/service-rate estimation, wait-time computation, and stability-aware decision logic.
+Sprint 2 shifted the system from counting people to describing queue dynamics. The analytical layer now derives arrival and service rates, computes wait time, and marks when the queue should be treated as unstable.
 
 \section{Sprint Backlog}
 Sprint 2 backlog priorities were:
@@ -16,7 +16,7 @@ Sprint 2 backlog priorities were:
 \section{Design}
 
 \subsection{Component Diagram}
-\begin{figure}[ht]
+\begin{figure}[H]
     \centering
     \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 2 component diagram}}
     \caption{Sprint 2 components for queue analysis and stability handling.}
@@ -26,7 +26,7 @@ Sprint 2 backlog priorities were:
 At component level, \texttt{QueueAnalyzer} receives in-zone tracker IDs and produces \texttt{QueueMetrics} consumed by logs, webhook payloads, and dashboard updates.
 
 \subsection{Data Flow Diagram}
-\begin{figure}[ht]
+\begin{figure}[H]
     \centering
     \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 2 data flow diagram}}
     \caption{Data flow from tracked events to queue metrics and stability state.}
@@ -36,12 +36,19 @@ At component level, \texttt{QueueAnalyzer} receives in-zone tracker IDs and prod
 Data flow is event-centric: per-frame ID transitions produce arrival/departure events, event windows produce rates $(\lambda,\mu)$, and rates with occupancy produce wait-time estimates plus stable/unstable state labels.
 
 \subsection{Sequence Diagrams}
+\begin{figure}[H]
+    \centering
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 2 sequence diagram}}
+    \caption{Sprint 2 sequence diagram for queue rate estimation and stability handling.}
+    \label{fig:sprint2_sequence}
+\end{figure}
+
 The implemented sequence is:
 \texttt{QueueAnalyzer.update()} computes counts and rates, evaluates queue stability, and applies either the stable wait-time formula or fallback wait-time branch before publishing \texttt{QueueMetrics}.
 
 \section{Implementation}
 \subsection{Queue Event Windows and Rate Estimation}
-In \texttt{backend/src/queue\_analyzer.py}, arrivals and departures are tracked as timestamp deques over sliding windows. Let $N_a$ and $N_d$ be events in windows $T_a$ and $T_d$:
+In the queue-analysis module, arrivals and departures are tracked as timestamp deques over sliding windows. Let $N_a$ and $N_d$ be events in windows $T_a$ and $T_d$:
 \[
 \lambda = \frac{N_a}{T_a}, \qquad \mu = \frac{N_d}{T_d}
 \]
@@ -69,4 +76,4 @@ The final \texttt{QueueMetrics} object includes:
 These fields are propagated to logs, overlays, webhook payloads, and dashboard events.
 
 \section{Conclusion}
-Sprint 2 delivered the analytical intelligence of the project: event-to-rate modeling, stable/unstable wait-time semantics, and a consistent runtime metric contract. This provided the operational core required for API exposure and external automation in the next sprint.
+Sprint 2 delivered the analytical core of the project: event-to-rate modeling, stable and unstable wait-time semantics, and a runtime metric contract that downstream components can consume without guessing.
