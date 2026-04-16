@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import AsyncMock, patch
 
@@ -551,6 +552,39 @@ class TestQueueVisionApi(unittest.TestCase):
 
             manager_b_cannot_delete_a = manager_b_client.delete(f"/api/feeds/{manager_a_feed_id}")
             self.assertEqual(manager_b_cannot_delete_a.status_code, 404)
+
+    def test_manager_can_access_legacy_unowned_feeds_for_compatibility(self) -> None:
+        suffix = str(int(datetime.now().timestamp() * 1_000_000))
+        manager_email = f"manager.legacy.{suffix}@queuevision.local"
+
+        with TestClient(app) as anonymous_client, TestClient(app) as manager_client:
+            register_response = manager_client.post(
+                "/api/auth/register",
+                json={
+                    "email": manager_email,
+                    "display_name": "Manager Legacy",
+                    "password": "ManagerPass123",
+                },
+            )
+            self.assertEqual(register_response.status_code, 201)
+
+            legacy_feed_response = anonymous_client.post(
+                "/api/feeds",
+                json={
+                    "name": "Legacy Shared Feed",
+                    "source": "rtsp://192.168.1.212/live/main",
+                },
+            )
+            self.assertEqual(legacy_feed_response.status_code, 201)
+            legacy_feed_id = legacy_feed_response.json()["data"]["feed_id"]
+
+            manager_list_response = manager_client.get("/api/feeds")
+            self.assertEqual(manager_list_response.status_code, 200)
+            manager_feed_ids = {feed["feed_id"] for feed in manager_list_response.json()["data"]}
+            self.assertIn(legacy_feed_id, manager_feed_ids)
+
+            start_response = manager_client.post(f"/api/feeds/{legacy_feed_id}/start")
+            self.assertEqual(start_response.status_code, 200)
 
     def test_start_feed_preserves_rtsp_runtime_options(self) -> None:
         response = self.client.post(
@@ -1179,8 +1213,44 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertIn(b"--frame", chunk)
         self.assertIn(b"Content-Type: image/jpeg", chunk)
         self.assertIn(b"jpeg-frame-bytes", chunk)
-        subscribe_mock.assert_awaited_once_with(feed["feed_id"])
+        subscribe_mock.assert_awaited_once_with(feed["feed_id"], owner_user_id=None)
         next_frame_mock.assert_awaited()
+        unsubscribe_mock.assert_awaited_once_with(feed["feed_id"])
+
+    def test_feed_stream_closes_when_running_feed_has_no_frames(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "Camera Stalled Stream",
+                "source": "rtsp://192.168.1.98/live/main",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        registry = app.state.registry
+        subscribe_mock = AsyncMock(return_value="ok")
+        next_frame_mock = AsyncMock(side_effect=[None, None, None, None])
+        get_feed_mock = AsyncMock(return_value=SimpleNamespace(status="running"))
+        unsubscribe_mock = AsyncMock(return_value=None)
+
+        with patch.object(registry, "subscribe_feed_stream", subscribe_mock), patch.object(
+            registry,
+            "next_feed_stream_frame",
+            next_frame_mock,
+        ), patch.object(registry, "get_feed", get_feed_mock), patch.object(
+            registry,
+            "unsubscribe_feed_stream",
+            unsubscribe_mock,
+        ), patch("src.api.app.MJPEG_STREAM_IDLE_TIMEOUT_SEC", 0.01):
+            with self.client.stream("GET", f"/api/feeds/{feed['feed_id']}/stream") as stream_response:
+                self.assertEqual(stream_response.status_code, 200)
+                chunks = list(stream_response.iter_bytes())
+
+        self.assertEqual(chunks, [])
+        subscribe_mock.assert_awaited_once_with(feed["feed_id"], owner_user_id=None)
+        self.assertGreater(next_frame_mock.await_count, 0)
+        self.assertGreater(get_feed_mock.await_count, 0)
         unsubscribe_mock.assert_awaited_once_with(feed["feed_id"])
 
     def test_feed_config_persists_across_registry_restart(self) -> None:
@@ -1919,6 +1989,33 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertEqual(websocket.payloads[0]["payload"]["metrics"]["people_in_zone"], 4)
         self.assertEqual(websocket.payloads[1]["payload"]["alert"]["alert_type"], "queue_backlog")
         self.assertEqual(websocket.payloads[2]["payload"]["code"], "queue_length_warning")
+
+    def test_websocket_hub_delivers_legacy_unscoped_events_to_scoped_clients(self) -> None:
+        hub = WebSocketHub()
+        websocket = CapturingWebSocket()
+
+        metrics = QueueMetricsModel(
+            timestamp=1710000000.0,
+            people_in_zone=3,
+            arrival_rate=0.15,
+            service_rate=0.30,
+            wait_time_seconds=6.0,
+            queue_stable=True,
+        )
+
+        async def exercise() -> None:
+            hub._clients[cast(Any, websocket)] = 42
+            await hub.broadcast_metrics_event(
+                feed_id="legacy-feed",
+                metrics=metrics,
+                owner_user_id=None,
+            )
+
+        asyncio.run(exercise())
+
+        self.assertEqual(len(websocket.payloads), 1)
+        self.assertEqual(websocket.payloads[0]["event"], "metrics_update")
+        self.assertEqual(websocket.payloads[0]["payload"]["feed_id"], "legacy-feed")
 
     def test_websocket_warning_persists_on_feed_status(self) -> None:
         feed = self.client.post(

@@ -143,6 +143,10 @@ from src.webhook_client import WebhookClient
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 UPLOAD_DIR = BACKEND_DIR / "data" / "uploads"
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv"}
+MJPEG_STREAM_IDLE_TIMEOUT_SEC = max(
+    2.0,
+    float(os.getenv("QUEUE_DASHBOARD_MJPEG_IDLE_TIMEOUT_SEC", "12.0")),
+)
 
 DEFAULT_CORS_ORIGINS = [
     "http://localhost:3000",
@@ -1549,6 +1553,8 @@ async def stream_feed(
 
     async def iter_mjpeg():
         last_frame_index = 0
+        no_frame_since = 0.0
+        loop = asyncio.get_running_loop()
         try:
             while True:
                 try:
@@ -1564,9 +1570,18 @@ async def stream_feed(
                     feed = await registry.get_feed(feed_id, owner_user_id=owner_user_id)
                     if feed is None or feed.status not in {"running", "initializing"}:
                         break
+
+                    if no_frame_since <= 0:
+                        no_frame_since = loop.time()
+                    elif (loop.time() - no_frame_since) >= MJPEG_STREAM_IDLE_TIMEOUT_SEC:
+                        # Avoid indefinitely pending multipart responses when a
+                        # feed is marked running but no frames are arriving.
+                        break
+
                     await asyncio.sleep(0.05)
                     continue
 
+                no_frame_since = 0.0
                 last_frame_index, jpeg_bytes = frame
                 yield (
                     b"--frame\r\n"

@@ -1220,7 +1220,10 @@ class WebSocketHub:
             return True
 
         if event_owner_scope is None:
-            return False
+            # Legacy feeds persisted before manager ownership tracking do not have
+            # an owner scope. Deliver these events to connected manager clients so
+            # pre-migration feeds keep streaming after auth rollout.
+            return True
 
         return client_owner_scope == event_owner_scope
 
@@ -1325,6 +1328,10 @@ class FeedRegistry:
     @staticmethod
     def _is_record_visible_to_owner_scope(record: FeedRecord, owner_user_id: int | None) -> bool:
         if owner_user_id is None:
+            return True
+        # Keep feeds created before manager ownership support visible while users
+        # migrate existing records to explicit manager assignments.
+        if record.manager_user_id is None:
             return True
         return record.manager_user_id == owner_user_id
 

@@ -287,8 +287,11 @@ describe("FeedGrid MJPEG transport", () => {
       />,
     );
 
+    const liveFrame = screen.getByAltText("Checkout 1 live frame") as HTMLImageElement;
+    expect(liveFrame).toBeInTheDocument();
+
+    fireEvent.load(liveFrame);
     expect(screen.getByTestId("transport-badge")).toHaveTextContent("MJPEG FB");
-    expect(screen.getByAltText("Checkout 1 live frame")).toBeInTheDocument();
   });
 
   it("suppresses browser detection boxes when backend annotations are active on WEBRTC ANN", () => {
@@ -449,7 +452,7 @@ describe("FeedGrid MJPEG transport", () => {
     expect(videoEl!.src).toContain("/api/uploads/files/retail.mp4");
   });
 
-  it("shows loading state for running feed until first worker metrics arrive", () => {
+  it("starts MJPEG transport for running feed before first worker metrics arrive", () => {
     render(
       <FeedGrid
         feeds={[
@@ -471,7 +474,7 @@ describe("FeedGrid MJPEG transport", () => {
 
     expect(screen.getByText("Preparing live stream")).toBeInTheDocument();
     expect(screen.getByText("Waiting for the first analyzed frame from the backend worker.")).toBeInTheDocument();
-    expect(screen.queryByAltText("Checkout 1 live frame")).not.toBeInTheDocument();
+    expect((screen.getByAltText("Checkout 1 live frame") as HTMLImageElement).src).toContain("attempt=0");
     expect(document.querySelector("video")).toBeNull();
   });
 });

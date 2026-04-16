@@ -125,11 +125,13 @@ function FeedTransportSurface({
   const [videoDims, setVideoDims] = useState<{ width: number; height: number } | null>(null);
   const [streamAttempt, setStreamAttempt] = useState(0);
   const [streamErrorCount, setStreamErrorCount] = useState(0);
+  const [mjpegFrameLoaded, setMjpegFrameLoaded] = useState(false);
   const previousStatusRef = useRef(feed.status);
   const lastForcedReconnectAtRef = useRef(0);
 
   useEffect(() => {
     setPlaybackFailed(false);
+    setMjpegFrameLoaded(false);
     previousStatusRef.current = feed.status;
     lastForcedReconnectAtRef.current = 0;
   }, [feed.feed_id, feed.preview_path]);
@@ -150,7 +152,6 @@ function FeedTransportSurface({
     && (feed.status === "initializing" || (feed.status === "running" && !hasWorkerMetrics));
   const shouldAttemptWebRtc = transportActive
     && feed.status === "running"
-    && hasWorkerMetrics
     && canUseWebRtc;
   const {
     videoRef: webRtcVideoRef,
@@ -167,7 +168,6 @@ function FeedTransportSurface({
     || Boolean(webRtcConnectionError);
   const shouldUseMjpegStream = transportActive
     && feed.status === "running"
-    && hasWorkerMetrics
     && shouldUseMjpegFallback;
   const streamUrl = shouldUseMjpegStream
     ? `${getFeedMjpegStreamUrl(feed.feed_id)}?attempt=${streamAttempt}`
@@ -195,6 +195,7 @@ function FeedTransportSurface({
     if (!shouldUseMjpegStream) {
       setStreamAttempt(0);
       setStreamErrorCount(0);
+      setMjpegFrameLoaded(false);
       lastForcedReconnectAtRef.current = 0;
       return;
     }
@@ -214,18 +215,40 @@ function FeedTransportSurface({
     };
   }, [shouldUseMjpegStream, streamErrorCount]);
 
+  useEffect(() => {
+    setMjpegFrameLoaded(false);
+  }, [streamUrl]);
+
+  useEffect(() => {
+    if (!streamUrl || playbackFailed || mjpegFrameLoaded) {
+      return;
+    }
+
+    const stallId = window.setTimeout(() => {
+      setPlaybackFailed(true);
+      setStreamErrorCount((count) => count + 1);
+    }, 12_000);
+
+    return () => {
+      window.clearTimeout(stallId);
+    };
+  }, [streamUrl, playbackFailed, mjpegFrameLoaded, streamAttempt]);
+
   const previewUrl = feed.preview_path ? resolveApiUrl(feed.preview_path) : null;
-  const showMjpegFrame = Boolean(streamUrl) && !playbackFailed;
+  const shouldRenderMjpegStream = Boolean(streamUrl) && !playbackFailed;
+  const showMjpegFrame = shouldRenderMjpegStream && mjpegFrameLoaded;
   const showWebRtcLoadingState = shouldAttemptWebRtc
     && !showWebRtcFrame
     && !showMjpegFrame;
-  const showLoadingState = shouldShowWorkerLoading
-    ? !showWebRtcFrame && !showMjpegFrame
-    : showWebRtcLoadingState;
+  const showMjpegLoadingState = shouldRenderMjpegStream && !showMjpegFrame;
+  const showLoadingState = (shouldShowWorkerLoading || showWebRtcLoadingState || showMjpegLoadingState)
+    && !showWebRtcFrame
+    && !showMjpegFrame;
   const showPreview = transportActive
     && !shouldShowWorkerLoading
     && !showWebRtcFrame
     && !showMjpegFrame
+    && !shouldRenderMjpegStream
     && Boolean(previewUrl)
     && !playbackFailed;
   const transportState: FeedTransportState = (() => {
@@ -350,7 +373,7 @@ function FeedTransportSurface({
             </svg>
           )}
         </>
-      ) : transportState === "mjpeg-live" ? (
+      ) : shouldRenderMjpegStream ? (
         <>
           <img
             key={streamUrl}
@@ -360,13 +383,26 @@ function FeedTransportSurface({
             onLoad={(event) => {
               setPlaybackFailed(false);
               setStreamErrorCount(0);
+              setMjpegFrameLoaded(true);
               onImageLoad(event);
             }}
             onError={() => {
               setPlaybackFailed(true);
+              setMjpegFrameLoaded(false);
               setStreamErrorCount((count) => count + 1);
             }}
           />
+          {!mjpegFrameLoaded && (
+            <div className="absolute inset-0 flex h-full w-full flex-col items-center justify-center gap-2 bg-background/70 px-4 text-center">
+              <Loader2 className="h-7 w-7 animate-spin text-primary/60" />
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground/80">
+                Preparing live stream
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Waiting for the first analyzed frame from the backend worker.
+              </p>
+            </div>
+          )}
           {/* Zone polygon overlay only – detection boxes are already drawn by the backend pipeline */}
           {videoDims && zonePolygonPoints && (
             <svg

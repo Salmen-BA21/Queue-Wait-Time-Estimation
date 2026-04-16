@@ -65,6 +65,8 @@ Sprint 3 also introduced session-aware access control in the backend API. Manage
 \subsection{Camera Discovery and Stream Setup}
 The camera discovery step is used to find available cameras automatically and recover their stream information. This avoids hardcoding stream addresses and makes onboarding easier when new IP cameras are added.
 
+In the practical setup, the workstation and the IP camera were connected to the same local network through a router, which made the device reachable for discovery and RTSP validation. The test source used during this stage was a Digital Watchdog IP camera, allowing the connectivity workflow to be validated against a real camera feed.
+
 \subsection{API Layer and Data Contract}
 The API layer acts as the bridge between the backend services and the rest of the project. It provides structured inputs and outputs so the frontend can interact with the backend in a predictable way. The main groups of operations are:
 \begin{itemize}
