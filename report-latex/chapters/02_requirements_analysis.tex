@@ -153,10 +153,10 @@ At the system level, the use cases can be grouped into four interactions: config
 \section{Sprint Scope Overview}
 We organized the project into eight sprints so that the pipeline could be delivered step by step and checked at each stage. The sprint chapters that follow describe those implementation phases in detail, from perception and analytics to automation and evaluation.
 
-\section{Data Modeling}
-The data model combines runtime monitoring entities with persistence-oriented entities. Its role is to keep live telemetry, configuration data, and alert history aligned so that the system can support both immediate supervision and later analysis without the modules drifting apart.
+\section{UML Class Modeling}
+This section presents the conceptual structure of the system using UML class modeling. The objective is to make responsibilities, attributes, and relationships explicit before implementation details, while keeping alignment with persistence and runtime contracts.
 
-\subsection{Core Entities}
+\subsection{Core Domain Classes}
 The main objects are:
 \begin{itemize}
     \item \textbf{VideoFeed}: source identity, connectivity, runtime status, and configuration.
@@ -168,26 +168,26 @@ The main objects are:
 
 These entities mirror the runtime contract used by the backend so that live metrics, configuration data, and persisted records stay consistent across modules.
 
-The authentication layer adds its own persistence objects for manager accounts, refresh sessions, and audit events.
+The authentication layer adds its own classes for manager accounts, refresh sessions, and audit events.
 
 \begin{figure}[H]
     \centering
-    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for authentication and audit data model diagram}}
-    \caption{Authentication and audit data model used for manager accounts, refresh sessions, and audit logging.}
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for authentication and audit UML class diagram}}
+    \caption{Authentication and audit UML class diagram for manager accounts, refresh sessions, and audit logging.}
     \label{fig:auth_audit_data_model}
 \end{figure}
 
-These entities map directly to the runtime and persistence layers used by the application.
+These classes map directly to the runtime and persistence layers used by the application.
 
-\subsection{Data Lifecycle and Persistence Strategy}
+\subsection{Persistence Mapping and Data Lifecycle}
 Runtime metrics are generated continuously and distributed through live channels, while selected records are persisted for auditability and trend analysis. This dual-path strategy improves resilience because temporary integration failures do not imply complete data loss.
 
 SQLite persistence stores operational metrics, structured metadata, authentication records, and alert archives in a single source of truth. That supports operational continuity as well as post-run diagnosis.
 
 \begin{figure}[H]
     \centering
-    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for unified database schema diagram (single ERD)}}
-    \caption{Unified SQLite schema used for feed metadata, queue sessions, and alert archival.}
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for unified domain UML class diagram}}
+    \caption{Unified domain UML class diagram mapped to SQLite persistence for feed metadata, queue sessions, and alert archival.}
     \label{fig:database_schema}
 \end{figure}
 
@@ -239,7 +239,7 @@ The project also relied on a small set of development tools for editing, version
         Tool & Role in the project & Typical use \\ \hline
         VS Code & Main editor for the backend, frontend, and report sources. & Day-to-day implementation, review, and navigation. \\ \hline
         Git / GitHub & Version control and change history tracking. & Commit management, branching, and collaboration. \\ \hline
-        draw.io / Eraser & Diagram authoring for architecture and data models. & Use case, ERD, and system architecture diagrams. \\ \hline
+        draw.io / Eraser & Diagram authoring for architecture and UML models. & Use case, UML class, and system architecture diagrams. \\ \hline
         Docker / Docker Compose & Local service orchestration and reproducible setup. & Supporting services such as MediaMTX and n8n. \\ \hline
         MiKTeX / latexmk & LaTeX report compilation. & Build the final PDF report from the chapter sources. \\ \hline
     \end{tabularx}

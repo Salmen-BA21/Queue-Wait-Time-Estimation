@@ -34,6 +34,20 @@ cd report-latex
 latexmk -pdf main.tex
 ```
 
+For the sanitized mid-term copy that omits the Sprint 6 automation chapter and the webhook payload appendix example:
+
+```powershell
+cd report-latex
+.\compile_safe.ps1
+```
+
+Or compile it directly with:
+
+```powershell
+cd report-latex
+latexmk -g -pdf main_safe.tex
+```
+
 ## Next edits you should do first
 
 1. Update `titlepage.tex` with supervisors and institution formatting.
