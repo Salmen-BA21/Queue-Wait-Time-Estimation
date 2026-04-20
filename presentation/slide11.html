@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Key Takeaways</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<style type="text/tailwindcss">
+@layer utilities {
+.ppt-slide {
+@apply relative w-[1280px] min-h-[720px] mx-auto box-border
+}
+}
+</style>
+<style>body {
+    font-family: "Inter", sans-serif;
+    background: #f8fafc
+    }
+.title-font {
+    font-family: "Playfair Display", serif
+    }
+.mono-font {
+    font-family: "Inter", sans-serif
+    }</style>
+<style>.material-icons {
+    width: 1em
+    }</style><style>.material-icons {
+    direction: rtl
+    }</style></head>
+<body>
+<div class="ppt-slide min-h-[720px] flex flex-col" style="background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)">
+<div class="absolute top-6 right-8">
+<img src="https://z-cdn-media.chatglm.cn/files/27bab2a5-edd8-49f5-a243-49db5ae9887b.png?auth_key=1876703151-cd0ed8629fc94a9dbef303432bbb05cd-0-f8f55b383f1f9b7e91ed6b7fb3d25884" alt="SESAME" class="h-14 object-contain"/>
+</div>
+
+<div class="h-20 flex items-center justify-center border-b border-slate-200" style="flex-shrink: 0">
+<h1 class="title-font text-4xl font-bold text-slate-900 tracking-tight">Key Takeaways</h1>
+</div>
+
+<div class="flex-grow flex flex-col justify-center px-20 py-6">
+<div class="text-center mb-6">
+<div class="inline-block px-6 py-3 bg-blue-50 rounded-lg border border-blue-100">
+<p class="mono-font text-xl text-slate-700 font-medium">
+Delivering end-to-end queue intelligence from video to decision
+</p>
+</div>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-blue-200 p-6 mb-6">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-lg bg-blue-50 flex items-center justify-center">
+<i class="material-icons text-blue-600 text-2xl">videocam</i>
+</div>
+<div>
+<div class="text-sm text-slate-500 font-medium mb-1">INPUT</div>
+<div class="text-xl font-semibold text-slate-900">Camera Streams</div>
+</div>
+</div>
+<i class="material-icons text-blue-400 text-3xl">arrow_forward</i>
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-lg bg-cyan-50 flex items-center justify-center">
+<i class="material-icons text-cyan-600 text-2xl">person_search</i>
+</div>
+<div>
+<div class="text-sm text-slate-500 font-medium mb-1">PERCEPTION</div>
+<div class="text-xl font-semibold text-slate-900">Detection & Tracking</div>
+</div>
+</div>
+<i class="material-icons text-cyan-400 text-3xl">arrow_forward</i>
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-lg bg-purple-50 flex items-center justify-center">
+<i class="material-icons text-purple-600 text-2xl">analytics</i>
+</div>
+<div>
+<div class="text-sm text-slate-500 font-medium mb-1">ANALYTICS</div>
+<div class="text-xl font-semibold text-slate-900">Queue Metrics</div>
+</div>
+</div>
+<i class="material-icons text-purple-400 text-3xl">arrow_forward</i>
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-lg bg-emerald-50 flex items-center justify-center">
+<i class="material-icons text-emerald-600 text-2xl">dashboard</i>
+</div>
+<div>
+<div class="text-sm text-slate-500 font-medium mb-1">OUTPUT</div>
+<div class="text-xl font-semibold text-slate-900">Live Dashboard</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="grid grid-cols-2 gap-5">
+<div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+<div class="flex items-start gap-3">
+<div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+<i class="material-icons text-blue-600 text-xl">speed</i>
+</div>
+<div>
+<h3 class="text-lg font-semibold text-slate-900 mb-2">Real-Time Estimation</h3>
+<p class="text-slate-600 text-base">M/M/1 queuing model with <span class="font-semibold text-blue-700">λ &lt; μ</span> stability check</p>
+</div>
+</div>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+<div class="flex items-start gap-3">
+<div class="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0">
+<i class="material-icons text-emerald-600 text-xl">shield</i>
+</div>
+<div>
+<h3 class="text-lg font-semibold text-slate-900 mb-2">Fallback Logic</h3>
+<p class="text-slate-600 text-base">Stable: <span class="font-mono text-emerald-700">W = 1/(μ-λ)</span> • Unstable: <span class="font-mono text-emerald-700">W = L/μ</span></p>
+</div>
+</div>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+<div class="flex items-start gap-3">
+<div class="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center flex-shrink-0">
+<i class="material-icons text-purple-600 text-xl">api</i>
+</div>
+<div>
+<h3 class="text-lg font-semibold text-slate-900 mb-2">Complete API</h3>
+<p class="text-slate-600 text-base">REST configuration + WebSocket real-time events</p>
+</div>
+</div>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+<div class="flex items-start gap-3">
+<div class="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0">
+<i class="material-icons text-amber-600 text-xl">admin_panel_settings</i>
+</div>
+<div>
+<h3 class="text-lg font-semibold text-slate-900 mb-2">Role-Based Access</h3>
+<p class="text-slate-600 text-base">Admin & Manager with dedicated monitoring views</p>
+</div>
+</div>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+<div class="flex items-start gap-3">
+<div class="w-10 h-10 rounded-lg bg-cyan-50 flex items-center justify-center flex-shrink-0">
+<i class="material-icons text-cyan-600 text-xl">sync</i>
+</div>
+<div>
+<h3 class="text-lg font-semibold text-slate-900 mb-2">Live Monitoring</h3>
+<p class="text-slate-600 text-base">Heartbeat + stale data guard with polling fallback</p>
+</div>
+</div>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
+<div class="flex items-start gap-3">
+<div class="w-10 h-10 rounded-lg bg-rose-50 flex items-center justify-center flex-shrink-0">
+<i class="material-icons text-rose-600 text-xl">alt_route</i>
+</div>
+<div>
+<h3 class="text-lg font-semibold text-slate-900 mb-2">Delivery Resilience</h3>
+<p class="text-slate-600 text-base">WebRTC → MJPEG fallback for guaranteed video delivery</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="h-8 flex items-center justify-between px-16 border-t border-slate-200">
+<span class="text-sm text-slate-400 mono-font">Queue Wait-Time Estimation System</span>
+<span class="text-sm text-slate-400 mono-font">11</span>
+</div>
+</div>
+</body>
+</html>

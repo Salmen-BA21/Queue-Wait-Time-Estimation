@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Summer Internship Presentation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+    <style>
+        body {
+            font-family: "Inter", sans-serif;
+            background: #0f1419;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .presentation-container {
+            display: flex;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        .slide-viewer {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #0f1419;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .slide-frame {
+            width: 1280px;
+            height: 720px;
+            background: #162235;
+            border-radius: 8px;
+            box-shadow: 0 20px 60px rgba(55, 220, 242, 0.2);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .slide-frame iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #162235;
+            overflow: hidden;
+        }
+
+        /* Slide transition animations - fade only to avoid conflicts with iframe scaling */
+        .slide-frame iframe.slide-fade-out {
+            animation: slideFadeOut 0.6s ease forwards;
+        }
+
+        .slide-frame iframe.slide-fade-in {
+            animation: slideFadeIn 0.6s ease forwards;
+        }
+
+        @keyframes slideFadeOut {
+            from {
+                opacity: 1;
+            }
+            to {
+                opacity: 0;
+            }
+        }
+
+        @keyframes slideFadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .controls-bar {
+            background: linear-gradient(to right, #162235, #1a2845);
+            border-top: 1px solid rgba(55, 220, 242, 0.2);
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .nav-button {
+            background: linear-gradient(135deg, #37DCF2 0%, #00a8d8 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .nav-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(55, 220, 242, 0.4);
+        }
+
+        .nav-button:active {
+            transform: translateY(0);
+        }
+
+        .nav-button:disabled {
+            background: #555;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .slide-counter {
+            background: rgba(55, 220, 242, 0.1);
+            border: 1px solid rgba(55, 220, 242, 0.3);
+            color: #37DCF2;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 14px;
+            min-width: 100px;
+            text-align: center;
+        }
+
+        .progress-bar {
+            background: rgba(255, 255, 255, 0.1);
+            height: 3px;
+            border-radius: 2px;
+            overflow: hidden;
+            flex: 1;
+            margin: 0 20px;
+            max-width: 300px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(to right, #37DCF2, #00a8d8);
+            transition: width 0.3s ease;
+        }
+
+        .slide-thumbnails {
+            background: rgba(22, 34, 53, 0.8);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(55, 220, 242, 0.2);
+            padding: 15px 30px;
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            max-height: 120px;
+        }
+
+        .thumbnail {
+            min-width: 80px;
+            height: 90px;
+            background: rgba(55, 220, 242, 0.1);
+            border: 2px solid rgba(55, 220, 242, 0.3);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ccc;
+            font-weight: 600;
+        }
+
+        .thumbnail:hover {
+            border-color: #37DCF2;
+            background: rgba(55, 220, 242, 0.2);
+        }
+
+        .thumbnail.active {
+            border-color: #37DCF2;
+            background: linear-gradient(135deg, rgba(55, 220, 242, 0.3), rgba(55, 220, 242, 0.1));
+            color: #37DCF2;
+            box-shadow: 0 0 15px rgba(55, 220, 242, 0.3);
+        }
+
+        .title-bar {
+            background: linear-gradient(to right, #162235, #1a2845);
+            border-bottom: 1px solid rgba(55, 220, 242, 0.2);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .title {
+            color: #37DCF2;
+            font-size: 20px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .fullscreen-btn {
+            background: rgba(55, 220, 242, 0.1);
+            color: #37DCF2;
+            border: 1px solid rgba(55, 220, 242, 0.3);
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .fullscreen-btn:hover {
+            background: rgba(55, 220, 242, 0.2);
+            border-color: #37DCF2;
+        }
+
+        .keyboard-help {
+            background: rgba(55, 220, 242, 0.05);
+            color: #aaa;
+            font-size: 12px;
+            padding: 5px 15px;
+            border-radius: 4px;
+        }
+
+        .material-icons {
+            width: 1em;
+            height: 1em;
+            vertical-align: middle;
+        }
+
+        ::-webkit-scrollbar {
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(55, 220, 242, 0.1);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(55, 220, 242, 0.3);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(55, 220, 242, 0.5);
+        }
+
+        /* Fullscreen presentation-only mode */
+        .fullscreen-mode .title-bar,
+        .fullscreen-mode .controls-bar,
+        .fullscreen-mode .slide-thumbnails,
+        .fullscreen-mode .keyboard-help {
+            display: none !important;
+        }
+        .fullscreen-mode .slide-viewer {
+            height: 100vh;
+        }
+        .fullscreen-mode .slide-frame {
+            box-shadow: none;
+            background: #000;
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        .fullscreen-mode .presentation-container { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100vw; 
+            height: 100vh; 
+            overflow: hidden; 
+        }
+        body.fullscreen-mode, html.fullscreen-mode { 
+            height: 100vh; 
+            overflow: hidden; 
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation-container">
+        <!-- Title Bar -->
+        <div class="title-bar">
+            <div class="title">
+                <i class="material-icons">slideshow</i>
+                Summer Internship Presentation - DataDolt
+            </div>
+            <button class="fullscreen-btn" id="fullscreenBtn">
+                <i class="material-icons" style="font-size: 14px; vertical-align: middle;">fullscreen</i> Fullscreen
+            </button>
+        </div>
+
+        <!-- Main Slide Viewer -->
+        <div class="slide-viewer">
+            <div class="slide-frame">
+                <iframe id="slideFrame" src="slide1.html"></iframe>
+            </div>
+        </div>
+
+        <!-- Slide Thumbnails -->
+        <div class="slide-thumbnails" id="thumbnailContainer"></div>
+
+        <!-- Controls Bar -->
+        <div class="controls-bar">
+            <div class="control-group">
+                <button class="nav-button" id="prevBtn">
+                    <i class="material-icons">keyboard_arrow_left</i> Previous
+                </button>
+                <button class="nav-button" id="nextBtn">
+                    Next <i class="material-icons">keyboard_arrow_right</i>
+                </button>
+            </div>
+
+            <div class="control-group">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+                </div>
+                <div class="slide-counter">
+                    <span id="currentSlide">1</span> / <span id="totalSlides">12</span>
+                </div>
+                <div class="slide-counter" style="min-width:auto">
+                    Zoom: <span id="zoomPercent">100%</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="keyboard-help">
+                    <strong>Keyboard:</strong> ← → arrows | Space | Home/End
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const slideFiles = Array.from({ length: 12 }, (_, index) => `slide${index + 1}.html`);
+        const totalSlides = slideFiles.length;
+        let currentSlide = 1;
+        let isAnimating = false;
+        let direction = 'right'; // track animation direction
+
+        const slideFrame = document.getElementById('slideFrame');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const currentSlideSpan = document.getElementById('currentSlide');
+        const totalSlidesSpan = document.getElementById('totalSlides');
+        const progressFill = document.getElementById('progressFill');
+        const thumbnailContainer = document.getElementById('thumbnailContainer');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const zoomPercent = document.getElementById('zoomPercent');
+        let userZoom = 1; // 1.0 = 100%
+
+        // Initialize thumbnails
+        function initThumbnails() {
+            thumbnailContainer.innerHTML = '';
+            for (let i = 1; i <= totalSlides; i++) {
+                const thumbnail = document.createElement('div');
+                thumbnail.className = 'thumbnail' + (i === 1 ? ' active' : '');
+                thumbnail.textContent = `Slide ${i}`;
+                thumbnail.onclick = () => goToSlide(i);
+                thumbnailContainer.appendChild(thumbnail);
+            }
+        }
+
+        // Update display with animation
+        function updateDisplay() {
+            if (isAnimating) return;
+            isAnimating = true;
+
+            // Add fade-out animation
+            slideFrame.classList.remove('slide-fade-in', 'slide-fade-out');
+            slideFrame.classList.add('slide-fade-out');
+
+            // Wait for fade-out, then change slide
+            setTimeout(() => {
+                slideFrame.src = slideFiles[currentSlide - 1];
+                
+                // Add fade-in animation
+                slideFrame.classList.remove('slide-fade-out');
+                slideFrame.classList.add('slide-fade-in');
+
+                // Clean up animation classes after completion
+                setTimeout(() => {
+                    slideFrame.classList.remove('slide-fade-in');
+                    isAnimating = false;
+                }, 600);
+            }, 300);
+
+            currentSlideSpan.textContent = currentSlide;
+            totalSlidesSpan.textContent = totalSlides;
+            
+            // Update progress
+            const progress = (currentSlide / totalSlides) * 100;
+            progressFill.style.width = progress + '%';
+
+            // Update buttons
+            prevBtn.disabled = currentSlide === 1;
+            nextBtn.disabled = currentSlide === totalSlides;
+
+            // Update thumbnails
+            document.querySelectorAll('.thumbnail').forEach((thumb, index) => {
+                thumb.classList.toggle('active', index + 1 === currentSlide);
+            });
+
+            // Scroll thumbnail into view
+            const activeThumbnail = document.querySelector('.thumbnail.active');
+            if (activeThumbnail) {
+                activeThumbnail.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            }
+
+            // Fit after the new slide loads
+            slideFrame.addEventListener('load', () => {
+                fitSlideToFrame();
+                fitIframeToFrame();
+            }, { once: true });
+        }
+
+        // Navigation functions
+        function goToSlide(slideNum) {
+            if (slideNum >= 1 && slideNum <= totalSlides && !isAnimating) {
+                direction = slideNum > currentSlide ? 'right' : 'left';
+                currentSlide = slideNum;
+                updateDisplay();
+            }
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides && !isAnimating) {
+                direction = 'right';
+                currentSlide++;
+                updateDisplay();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 1 && !isAnimating) {
+                direction = 'left';
+                currentSlide--;
+                updateDisplay();
+            }
+        }
+
+        // Event listeners
+        nextBtn.addEventListener('click', nextSlide);
+        prevBtn.addEventListener('click', prevSlide);
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'ArrowRight':
+                case ' ':
+                    e.preventDefault();
+                    nextSlide();
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    prevSlide();
+                    break;
+                case 'Home':
+                    e.preventDefault();
+                    goToSlide(1);
+                    break;
+                case 'End':
+                    e.preventDefault();
+                    goToSlide(totalSlides);
+                    break;
+                case 'f':
+                case 'F':
+                    e.preventDefault();
+                    toggleFullscreen();
+                    break;
+                case '+':
+                case '=':
+                    e.preventDefault();
+                    zoomIn();
+                    break;
+                case '-':
+                case '_':
+                    e.preventDefault();
+                    zoomOut();
+                    break;
+                case '0':
+                    e.preventDefault();
+                    resetZoom();
+                    break;
+            }
+        });
+
+        // Fullscreen toggle
+        fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+        function toggleFullscreen() {
+            const elem = document.documentElement;
+            if (!document.fullscreenElement) {
+                elem.requestFullscreen().catch(() => {
+                    // Fallback for browsers that don't support fullscreen
+                    alert('Fullscreen not available in this browser');
+                });
+                // UI will be hidden via fullscreenchange listener
+            } else {
+                document.exitFullscreen();
+                // UI will be restored via fullscreenchange listener
+            }
+        }
+
+        // Initialize
+        // Scroll lock helpers (prevent wheel/touch scrolling in fullscreen)
+        const preventScroll = (e) => { e.preventDefault(); };
+        function lockScroll() {
+            document.addEventListener('wheel', preventScroll, { passive: false });
+            document.addEventListener('touchmove', preventScroll, { passive: false });
+        }
+        function unlockScroll() {
+            document.removeEventListener('wheel', preventScroll, { passive: false });
+            document.removeEventListener('touchmove', preventScroll, { passive: false });
+        }
+
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                // Entering fullscreen: hide all UI except the slide
+                document.body.classList.add('fullscreen-mode');
+                document.documentElement.classList.add('fullscreen-mode');
+                // Hide root scrollbars in fullscreen
+                document.documentElement.style.overflow = 'hidden';
+                document.body.style.overflow = 'hidden';
+                lockScroll();
+                fullscreenBtn.textContent = '⛶ Exit Fullscreen';
+                // Refit on fullscreen
+                fitSlideToFrame();
+                fitIframeToFrame();
+            } else {
+                // Exiting fullscreen: restore UI
+                document.body.classList.remove('fullscreen-mode');
+                document.documentElement.classList.remove('fullscreen-mode');
+                // Restore root scrollbars
+                document.documentElement.style.overflow = '';
+                document.body.style.overflow = '';
+                unlockScroll();
+                fullscreenBtn.innerHTML = '<i class="material-icons" style="font-size: 14px; vertical-align: middle;">fullscreen</i> Fullscreen';
+                // Refit when leaving fullscreen
+                fitSlideToFrame();
+                fitIframeToFrame();
+            }
+        });
+
+        // Resize observer to refit on window size changes
+        window.addEventListener('resize', () => {
+            fitSlideToFrame();
+            fitIframeToFrame();
+        });
+
+        // Fit the slide inside the iframe to the available space (no scrollbars)
+        function fitSlideToFrame() {
+            try {
+                const doc = slideFrame.contentDocument || slideFrame.contentWindow.document;
+                if (!doc) return;
+                const slide = doc.querySelector('.ppt-slide');
+                if (!slide) return;
+
+                // Remove margins and scrollbars inside the iframe
+                doc.documentElement.style.overflow = 'hidden';
+                doc.documentElement.style.height = '100%';
+                doc.body.style.overflow = 'hidden';
+                doc.body.style.margin = '0';
+                doc.body.style.height = '100%';
+
+                // Inject a helper stylesheet once
+                if (!doc.getElementById('ppt-fit-style')) {
+                    const style = doc.createElement('style');
+                    style.id = 'ppt-fit-style';
+                    style.textContent = `
+                        html, body { overflow: hidden !important; margin: 0 !important; height: 100% !important; }
+                        .ppt-slide { position: relative; width: 1280px !important; height: 720px !important; overflow: hidden !important; }
+                        ::-webkit-scrollbar { display: none; }
+                    `;
+                    doc.head.appendChild(style);
+                }
+                // Center slide content (no scaling here; scaling handled on iframe)
+                slide.style.position = 'absolute';
+                slide.style.top = '50%';
+                slide.style.left = '50%';
+                slide.style.transformOrigin = 'center center';
+                slide.style.transform = 'translate(-50%, -50%)';
+                slide.style.overflow = 'hidden';
+            } catch (e) {
+                // Ignore cross-origin or load timing issues
+            }
+        }
+
+        // Scale the iframe to center content and apply zoom
+        function fitIframeToFrame() {
+            const baseW = 1280;
+            const baseH = 720;
+            const frameRect = document.querySelector('.slide-frame').getBoundingClientRect();
+            let scale = Math.min(frameRect.width / baseW, frameRect.height / baseH) * userZoom;
+            scale = Math.max(0.5, Math.min(scale, 2));
+
+            slideFrame.style.position = 'absolute';
+            slideFrame.style.top = '50%';
+            slideFrame.style.left = '50%';
+            slideFrame.style.width = baseW + 'px';
+            slideFrame.style.height = baseH + 'px';
+            slideFrame.style.transformOrigin = 'center center';
+            slideFrame.style.transform = `translate(-50%, -50%) scale(${scale})`;
+
+            // Update zoom indicator
+            zoomPercent.textContent = Math.round(userZoom * 100) + '%';
+        }
+
+        // Zoom helpers
+        function setZoom(z) { userZoom = z; fitIframeToFrame(); }
+        function zoomIn() { setZoom(Math.min(userZoom + 0.1, 2)); }
+        function zoomOut() { setZoom(Math.max(userZoom - 0.1, 0.5)); }
+        function resetZoom() { setZoom(1); }
+
+        initThumbnails();
+        updateDisplay();
+    </script>
+</body>
+</html>
