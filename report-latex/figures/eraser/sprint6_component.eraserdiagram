@@ -2,22 +2,22 @@ cloud-architecture-diagram
 
 direction right
 
-Backend {
-  QueueRuntime [label: "Queue runtime", icon: python]
-  AlertRules [label: "Alert rules", icon: bell]
-  WebhookSender [label: "Webhook sender", icon: mail]
+Backend [color: blue] {
+  QueueRuntime [label: "Queue runtime", icon: python, color: blue]
+  AlertRules [label: "Alert rules", icon: bell, color: orange]
+  WebhookSender [label: "Webhook sender", icon: mail, color: red]
 }
 
-N8nFlow {
-  ReceiveWebhook [label: "Receive webhook", icon: cloud]
-  CheckSecret [label: "Check webhook secret", icon: lock]
-  CheckAlerts [label: "Check alerts", icon: bell]
-  RouteSeverity [label: "Route by severity", icon: gear]
-  FormatMessage [label: "Format message", icon: code]
+N8nFlow [color: orange] {
+  ReceiveWebhook [label: "Receive webhook", icon: cloud, color: blue]
+  CheckSecret [label: "Check webhook secret", icon: lock, color: green]
+  CheckAlerts [label: "Check alerts", icon: bell, color: orange]
+  RouteSeverity [label: "Route by severity", icon: gear, color: orange]
+  FormatMessage [label: "Format message", icon: code, color: green]
 }
 
-Telegram [label: "Telegram", icon: bell]
-ArchiveApi [label: "Alert archive API", icon: database]
+Telegram [label: "Telegram", icon: bell, color: red]
+ArchiveApi [label: "Alert archive API", icon: database, color: orange]
 
 QueueRuntime > AlertRules
 AlertRules > WebhookSender

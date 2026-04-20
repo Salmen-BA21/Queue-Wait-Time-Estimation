@@ -1,9 +1,16 @@
 \begin{titlepage}
+    \thispagestyle{empty}
+    \AddToShipoutPictureBG*{%
+      \AtPageLowerLeft{%
+        \includegraphics[width=\paperwidth,height=\paperheight]{\detokenize{figures/background report.png}}%
+      }%
+    }
     \centering
     % Top header: university logo (left) and school name (right)
     \begin{minipage}{\textwidth}
       \centering
-      \includegraphics[width=0.82\textwidth,keepaspectratio]{university_logo.png}
+      \includegraphics[width=\textwidth,keepaspectratio]{university_logo.png}
+      \vspace{-0.2cm}
     \end{minipage}%
 
     \vspace{0.8cm}

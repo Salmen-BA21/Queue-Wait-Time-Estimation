@@ -2,23 +2,23 @@ cloud-architecture-diagram
 
 direction right
 
-Sources {
-  LocalVideo [label: "Local file or webcam", icon: monitor]
-  RtspCamera [label: "RTSP camera", icon: server]
-  OnvifCamera [label: "ONVIF camera", icon: server]
+Sources [color: blue] {
+  LocalVideo [label: "Local file or webcam", icon: monitor, color: blue]
+  RtspCamera [label: "RTSP camera", icon: server, color: blue]
+  OnvifCamera [label: "ONVIF camera", icon: server, color: blue]
 }
 
-Backend {
-  Api [label: "Backend API", icon: python]
-  FeedManager [label: "Feed manager", icon: database]
-  Worker [label: "Worker runtime", icon: terminal]
-  WebSocketHub [label: "WebSocket hub", icon: globe]
-  MjpegStream [label: "MJPEG stream", icon: monitor]
-  WebRtcOffer [label: "WebRTC offer endpoint", icon: cloud]
+Backend [color: green] {
+  Api [label: "Backend API", icon: python, color: blue]
+  FeedManager [label: "Feed manager", icon: database, color: green]
+  Worker [label: "Worker runtime", icon: terminal, color: green]
+  WebSocketHub [label: "WebSocket hub", icon: globe, color: orange]
+  MjpegStream [label: "MJPEG stream", icon: monitor, color: orange]
+  WebRtcOffer [label: "WebRTC offer endpoint", icon: cloud, color: orange]
 }
 
-MediaServer [label: "Media server", icon: cloud]
-Dashboard [label: "Dashboard", icon: react]
+MediaServer [label: "Media server", icon: cloud, color: orange]
+Dashboard [label: "Dashboard", icon: react, color: red]
 
 LocalVideo > Worker
 RtspCamera > Api

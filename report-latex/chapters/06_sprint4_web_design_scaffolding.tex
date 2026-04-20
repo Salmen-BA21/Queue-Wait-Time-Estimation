@@ -36,7 +36,7 @@ The designed page set includes the landing page, dashboard, setup wizard, zone e
     \label{fig:sprint4_frontend_arch}
 \end{figure}
 
-The frontend scaffold separates pages, shared interface elements, workflow logic, and the parts that connect the interface to the backend so the dashboard can grow without becoming difficult to maintain:
+The frontend scaffold separates pages, shared interface elements, workflow logic, and the parts that connect the interface to the backend so the dashboard can grow without becoming difficult to maintain. That separation matters because the later monitoring work needs a stable shell rather than a one-off mockup:
 \begin{itemize}
     \item page layer: the main screens the user navigates through,
     \item component layer: reusable interface parts and panels,
@@ -44,19 +44,26 @@ The frontend scaffold separates pages, shared interface elements, workflow logic
     \item connection layer: the pieces that connect the frontend to the backend.
 \end{itemize}
 
+\subsection{Project Setup and Layout Skeleton}
+Sprint 4 started by turning the design specification into an actual application skeleton. The workspace setup established the application entry point, the navigation structure, and the shared layout that all later pages would reuse. Instead of trying to solve live data handling immediately, the sprint focused on making the page flow understandable from the first screen to the monitoring views.
+
+\subsection{Styling and Reusable Interface Rules}
+The visual system was defined once and then applied consistently across the dashboard. Spacing, typography, surface treatment, and semantic status colors were treated as reusable rules rather than per-page decisions. That approach made the layout feel coherent on the landing page, the setup wizard, the zone editor, and the analytics views, while keeping the interface easy to extend when new panels were added.
+
+\subsection{Page Skeletons}
+The first rendered pages were intentionally simple. They established where the dashboard summary, setup workflow, zone editing tools, analytics page, settings page, and heatmap view would live, even before the pages contained live backend data. By locking down those screen boundaries early, Sprint 5 could concentrate on data flow and live monitoring instead of redesigning the interface structure.
+
 \subsection{Design Rationale}
 Sprint 4 was intentionally scoped as a foundation sprint rather than a full UI release. The goal was to settle navigation, component boundaries, and interaction patterns before live data and transport logic arrived in Sprint 5. This made the rest of the frontend work easier to organize.
 
 \section{Implementation}
-Sprint 4 established the first frontend baseline:
-\begin{itemize}
-    \item initial project setup for the frontend workspace,
-    \item a consistent styling approach for the interface,
-    \item a basic page structure with navigation in place,
-    \item starter pages for the dashboard and setup workflow.
-\end{itemize}
+Sprint 4 established the first frontend baseline by turning the design language into a working shell for the application. The initial setup created the frontend workspace and the page routing needed for the later dashboard flow.
+
+The styling work centered on consistency rather than feature density. The sprint defined a shared visual baseline for cards, spacing, and page hierarchy so that each screen would feel like part of the same product instead of a collection of unrelated views.
+
+The page structure then anchored the main user journey. The dashboard, setup workflow, and supporting views were laid out so the interface could support onboarding first and live monitoring later without redesigning the navigation model.
 
 The tradeoff in this sprint was deliberate: structure and design consistency came before real-time behavior. That made Sprint 5 easier because the page layout and component boundaries were already in place.
 
 \section{Conclusion}
-Sprint 4 left the application with a clear page structure and a stable visual base. That reduced rework when live data arrived in Sprint 5.
+Sprint 4 left the application with a clear page structure and a stable visual base. It defined the dashboard shell, the design rules, and the page boundaries that later live features could reuse without rethinking the frontend organization.

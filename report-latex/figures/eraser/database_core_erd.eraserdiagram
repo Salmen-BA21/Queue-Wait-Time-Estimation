@@ -5,13 +5,13 @@ styleMode plain
 typeface clean
 notation crows-feet
 
-establishments [icon: database] {
+establishments [icon: database, color: blue] {
   id int pk
   name string not null unique
   created_at timestamp
 }
 
-caisses [icon: database] {
+caisses [icon: database, color: green] {
   id int pk
   name string not null
   establishment_id int fk not null
@@ -19,7 +19,7 @@ caisses [icon: database] {
   created_at timestamp
 }
 
-video_sessions [icon: database] {
+video_sessions [icon: database, color: orange] {
   id int pk
   video_source string not null
   establishment_id int fk
@@ -29,7 +29,7 @@ video_sessions [icon: database] {
   created_at timestamp
 }
 
-feed_configs [icon: database] {
+feed_configs [icon: database, color: red] {
   feed_id string pk
   name string not null
   source string not null
@@ -49,7 +49,7 @@ feed_configs [icon: database] {
   updated_at timestamp not null
 }
 
-alert_history [icon: database] {
+alert_history [icon: database, color: orange] {
   id int pk
   timestamp timestamp
   camera_id string

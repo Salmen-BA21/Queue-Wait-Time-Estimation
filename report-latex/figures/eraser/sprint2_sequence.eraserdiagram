@@ -2,13 +2,13 @@ sequence-diagram
 
 autoNumber on
 
-Analyzer [label: "Queue analyzer", icon: database]
-Rates [label: "Rate calculator", icon: code]
-Stability [label: "Stability check", icon: lock]
-WaitTime [label: "Wait time logic", icon: terminal]
-Metrics [label: "Metrics payload", icon: database]
-Dashboard [label: "Dashboard", icon: react]
-Webhook [label: "Webhook sender", icon: mail]
+Analyzer [label: "Queue analyzer", icon: database, color: blue]
+Rates [label: "Rate calculator", icon: code, color: blue]
+Stability [label: "Stability check", icon: lock, color: green]
+WaitTime [label: "Wait time logic", icon: terminal, color: green]
+Metrics [label: "Metrics payload", icon: database, color: orange]
+Dashboard [label: "Dashboard", icon: react, color: red]
+Webhook [label: "Webhook sender", icon: mail, color: red]
 
 Analyzer > Rates: compute arrival and service rates
 Rates > Stability: evaluate queue condition

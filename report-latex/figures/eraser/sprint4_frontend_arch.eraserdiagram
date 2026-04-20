@@ -2,22 +2,22 @@ cloud-architecture-diagram
 
 direction right
 
-Pages {
-  DashboardPage [label: "Dashboard page", icon: react]
-  ZoneEditorPage [label: "Zone editor page", icon: react]
-  AnalyticsPage [label: "Analytics page", icon: react]
-  SettingsPage [label: "Settings page", icon: react]
+Pages [color: blue] {
+  DashboardPage [label: "Dashboard page", icon: react, color: blue]
+  ZoneEditorPage [label: "Zone editor page", icon: react, color: green]
+  AnalyticsPage [label: "Analytics page", icon: react, color: orange]
+  SettingsPage [label: "Settings page", icon: react, color: red]
 }
 
-SharedLayer {
-  UiComponents [label: "Reusable UI components", icon: monitor]
-  DataHooks [label: "Data hooks", icon: gear]
-  ApiClient [label: "API client", icon: typescript]
-  QueryCache [label: "Query cache", icon: database]
+SharedLayer [color: green] {
+  UiComponents [label: "Reusable UI components", icon: monitor, color: green]
+  DataHooks [label: "Data hooks", icon: gear, color: orange]
+  ApiClient [label: "API client", icon: typescript, color: blue]
+  QueryCache [label: "Query cache", icon: database, color: orange]
 }
 
-BackendApi [label: "Backend API", icon: python]
-LiveSocket [label: "WebSocket stream", icon: globe]
+BackendApi [label: "Backend API", icon: python, color: red]
+LiveSocket [label: "WebSocket stream", icon: globe, color: orange]
 
 DashboardPage > UiComponents
 ZoneEditorPage > UiComponents

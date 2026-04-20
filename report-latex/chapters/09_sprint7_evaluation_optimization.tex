@@ -6,6 +6,8 @@
 \section{Introduction}
 This sprint served as the final validation step for the full stack. It checked whether perception, the API layer, the frontend, and the alerting path still worked together when the system was tested under retries, changing feeds, and higher throughput.
 
+The sprint also provided the project with its last integration checkpoint: the goal was to verify that the earlier implementation decisions held up when the components were exercised together instead of in isolation.
+
 \section{Sprint Backlog}
 Sprint 7 focused on the last round of verification and improvement work:
 \begin{itemize}
@@ -34,6 +36,8 @@ The optimization work was guided by the main operational requirements of the pro
 	\item webhook impact on the main-loop latency,
 	\item dashboard freshness when websocket quality degrades.
 \end{itemize}
+
+These targets intentionally mirror the behavior that an operator would notice first, so the evaluation reads as a system-level check rather than a narrow benchmark exercise.
 
 \section{Implementation}
 \subsection{Verification Coverage}

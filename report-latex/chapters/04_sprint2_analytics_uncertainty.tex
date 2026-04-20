@@ -47,6 +47,15 @@ Data flow starts from changes in tracked people. Those changes are grouped over 
 
 In practice, the processing order is simple: the analysis stage reads the current counts, checks whether the queue is stable, and then applies either the usual wait-time formula or a safer fallback before publishing the metrics.
 
+\subsection{Operational Scenarios}
+Sprint 2 is easiest to understand through the queue situations it must handle every time a new metric window is evaluated:
+\begin{enumerate}
+    \item \textbf{Stable queue:} arrivals stay below service, so the usual wait-time estimate is valid and can be forwarded to later layers.
+    \item \textbf{Growing backlog:} arrivals start to approach service, so the chapter keeps a stability flag and a fallback value instead of trusting a fragile instantaneous estimate.
+    \item \textbf{Empty or stalled queue:} no service events are available, so the output stays bounded and downstream logic can ignore the value rather than reacting to noise.
+\end{enumerate}
+These scenarios explain why the sprint reports both point estimates and a stability signal instead of returning a raw number with no operational context.
+
 \section{Implementation}
 \subsection{Queue Event Windows and Rate Estimation}
 The queue-analysis step uses short time windows to count arrivals and departures. Let $N_a$ and $N_d$ be the number of events observed in windows $T_a$ and $T_d$:
@@ -77,4 +86,4 @@ The final metric output includes:
 These values are then reused by logs, overlays, webhook payloads, and dashboard events.
 
 \section{Conclusion}
-Sprint 2 delivered the analytical core of the project. It transforms queue observations into rates, gives a practical wait-time estimate, and keeps a stability signal for the later parts of the system. That makes the next sprints easier to build and validate.
+Sprint 2 delivered the analytical core of the project. It transforms queue observations into rates, gives a practical wait-time estimate, and keeps a stability signal for the later parts of the system. The added operational scenarios make the formulas easier to interpret and keep the chapter aligned with the rest of the report.

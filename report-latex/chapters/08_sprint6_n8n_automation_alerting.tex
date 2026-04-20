@@ -6,6 +6,8 @@
 \section{Introduction}
 This sprint connected the queue metrics produced by the backend with n8n, so alerts could be forwarded in a controlled way. The main concern was not only to transmit the payload, but also to keep the process reliable, traceable, and easy to repeat during testing.
 
+This chapter sits at the boundary between analysis and operations, so its role is to preserve the structure of the runtime pipeline while handing alert delivery to a dedicated workflow engine. That separation keeps the perception loop responsive and makes the notification path easier to audit.
+
 \section{Sprint Backlog}
 Sprint 6 focused on the automation tasks needed to move alerts from the backend into n8n:
 \begin{itemize}

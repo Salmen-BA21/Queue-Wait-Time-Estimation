@@ -2,22 +2,22 @@ cloud-architecture-diagram
 
 direction right
 
-Manager [icon: user]
+Manager [icon: user, color: blue]
 
-Sprint1Actions {
-  ChooseSource [label: "Choose video source", icon: monitor]
-  DrawZone [label: "Draw queue zone", icon: code]
-  StartAnalysis [label: "Start queue analysis", icon: gear]
-  ViewLive [label: "View live video", icon: monitor]
-  ReviewQueue [label: "Review queue status", icon: database]
+Sprint1Actions [color: blue] {
+  ChooseSource [label: "Choose video source", icon: monitor, color: blue]
+  DrawZone [label: "Draw queue zone", icon: code, color: green]
+  StartAnalysis [label: "Start queue analysis", icon: gear, color: green]
+  ViewLive [label: "View live video", icon: monitor, color: red]
+  ReviewQueue [label: "Review queue status", icon: database, color: orange]
 }
 
-RuntimeFlow {
-  CaptureVideo [label: "Capture video", icon: monitor]
-  DetectPeople [label: "Detect people", icon: server]
-  TrackPeople [label: "Track people", icon: gear]
-  CheckZone [label: "Check zone membership", icon: code]
-  UpdateQueue [label: "Update queue state", icon: database]
+RuntimeFlow [color: green] {
+  CaptureVideo [label: "Capture video", icon: monitor, color: blue]
+  DetectPeople [label: "Detect people", icon: server, color: green]
+  TrackPeople [label: "Track people", icon: gear, color: green]
+  CheckZone [label: "Check zone membership", icon: code, color: orange]
+  UpdateQueue [label: "Update queue state", icon: database, color: orange]
 }
 
 Manager > ChooseSource, DrawZone, StartAnalysis, ViewLive, ReviewQueue

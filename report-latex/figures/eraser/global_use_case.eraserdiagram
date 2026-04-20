@@ -2,26 +2,26 @@ cloud-architecture-diagram
 
 direction right
 
-People {
-  Admin [label: "Administrator", icon: user]
-  Manager [icon: user]
+People [color: blue] {
+  Admin [label: "Administrator", icon: user, color: blue]
+  Manager [icon: user, color: blue]
 }
 
-MainActions {
-  ManageAccounts [label: "Manage accounts", icon: lock]
-  AddFeed [label: "Add video feed", icon: monitor]
-  SetZone [label: "Set queue zone", icon: code]
-  WatchQueue [label: "Monitor live queue", icon: monitor]
-  GetAlerts [label: "Receive alerts", icon: bell]
-  CheckTrends [label: "Check trends", icon: database]
+MainActions [color: green] {
+  ManageAccounts [label: "Manage accounts", icon: lock, color: blue]
+  AddFeed [label: "Add video feed", icon: monitor, color: green]
+  SetZone [label: "Set queue zone", icon: code, color: green]
+  WatchQueue [label: "Monitor live queue", icon: monitor, color: orange]
+  GetAlerts [label: "Receive alerts", icon: bell, color: red]
+  CheckTrends [label: "Check trends", icon: database, color: orange]
 }
 
-SystemParts {
-  Auth [label: "Auth service", icon: lock]
-  Runtime [label: "Runtime pipeline", icon: server]
-  Analytics [icon: gear]
-  Dashboard [icon: react]
-  Automation [label: "Alert automation", icon: mail]
+SystemParts [color: orange] {
+  Auth [label: "Auth service", icon: lock, color: blue]
+  Runtime [label: "Runtime pipeline", icon: server, color: green]
+  Analytics [icon: gear, color: orange]
+  Dashboard [icon: react, color: red]
+  Automation [label: "Alert automation", icon: mail, color: red]
 }
 
 Admin > ManageAccounts

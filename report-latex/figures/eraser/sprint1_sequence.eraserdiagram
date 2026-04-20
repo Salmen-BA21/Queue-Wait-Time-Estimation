@@ -2,12 +2,12 @@ sequence-diagram
 
 autoNumber on
 
-MainLoop [label: "Main loop", icon: gear]
-VideoSource [label: "Video source", icon: monitor]
-Detector [label: "Person detector", icon: server]
-Tracker [label: "Object tracker", icon: gear]
-ZoneCheck [label: "Zone check", icon: code]
-QueueLogic [label: "Queue analysis", icon: database]
+MainLoop [label: "Main loop", icon: gear, color: green]
+VideoSource [label: "Video source", icon: monitor, color: blue]
+Detector [label: "Person detector", icon: server, color: green]
+Tracker [label: "Object tracker", icon: gear, color: green]
+ZoneCheck [label: "Zone check", icon: code, color: orange]
+QueueLogic [label: "Queue analysis", icon: database, color: orange]
 
 loop [label: each frame] {
   MainLoop > VideoSource: read frame

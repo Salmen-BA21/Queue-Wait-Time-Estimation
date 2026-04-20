@@ -78,28 +78,7 @@ The API layer acts as the bridge between the backend services and the rest of th
 \end{itemize}
 
 \subsection{Live Video Delivery}
-To reduce viewing latency while still keeping a fallback path, Sprint 3 introduces a transport system that chooses the most suitable stream mode for each feed \cite{webrtc_w3c,ietf_rfc8830}.
-
-For each feed, the backend reports whether live viewing is available through WebRTC or through the fallback video stream. The frontend then uses that information to decide how to display the camera:
-\begin{itemize}
-    \item whether the feature is available,
-    \item whether it is ready for immediate use,
-    \item which viewing mode is active,
-    \item why a transport option may be unavailable.
-\end{itemize}
-
-When WebRTC is available, the backend forwards the browser offer to the media server and returns the response needed to start the stream \cite{mediamtx_docs}. Before doing that, it checks that the feed exists, is running, and can be used with the selected transport.
-
-Operational status semantics are explicit:
-\begin{itemize}
-    \item success when the offer is accepted and the response is returned,
-    \item not found when the feed does not exist,
-    \item conflict when the feed is not running or the transport is not ready,
-    \item invalid input when the stream request is malformed,
-    \item upstream or availability failure when the media service cannot answer.
-\end{itemize}
-
-The configuration stays flexible through environment settings such as the media URL, control URL, timeout, and feature flag. That keeps deployment adaptable without changing the application itself.
+To reduce viewing latency while still keeping a fallback path, Sprint 3 introduces a transport system that chooses the most suitable stream mode for each feed \cite{webrtc_w3c,ietf_rfc8830}. The backend tells the frontend whether live viewing is ready, whether WebRTC is available, and which fallback should be used when the higher-quality path cannot start. When WebRTC is available, the backend forwards the browser offer to the media server and returns the response needed to start the stream \cite{mediamtx_docs}. If the feed does not exist, is not running, or the media service cannot answer, the backend reports the condition clearly so the frontend can switch to the fallback view instead of failing silently. The configuration stays flexible through environment settings such as the media URL, control URL, timeout, and feature flag.
 
 \subsection{Runtime Control and Live Events}
 Runtime control sits inside the API orchestration layer. It keeps track of feed state, synchronizes persistence, manages the worker lifecycle, and dispatches events to the rest of the system. The live channel publishes updates such as snapshots, feed status changes, metric updates, alert notifications, and system warnings.

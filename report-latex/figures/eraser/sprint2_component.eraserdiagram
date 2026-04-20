@@ -2,15 +2,15 @@ cloud-architecture-diagram
 
 direction right
 
-QueueEvents [label: "Queue events", icon: database]
-QueueAnalyzer [label: "Queue analyzer", icon: gear]
-RateCalculator [label: "Rate calculator", icon: code]
-StabilityCheck [label: "Stability check", icon: lock]
-WaitTime [label: "Wait time calculator", icon: terminal]
-Metrics [label: "Metrics payload", icon: database]
-Dashboard [icon: react]
-Webhook [icon: mail]
-CsvLog [label: "CSV log", icon: database]
+QueueEvents [label: "Queue events", icon: database, color: blue]
+QueueAnalyzer [label: "Queue analyzer", icon: gear, color: green]
+RateCalculator [label: "Rate calculator", icon: code, color: green]
+StabilityCheck [label: "Stability check", icon: lock, color: green]
+WaitTime [label: "Wait time calculator", icon: terminal, color: orange]
+Metrics [label: "Metrics payload", icon: database, color: orange]
+Dashboard [icon: react, color: red]
+Webhook [icon: mail, color: red]
+CsvLog [label: "CSV log", icon: database, color: orange]
 
 QueueEvents > QueueAnalyzer
 QueueAnalyzer > RateCalculator

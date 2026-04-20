@@ -2,12 +2,12 @@ sequence-diagram
 
 autoNumber on
 
-Dashboard [label: "Dashboard", icon: react]
-Api [label: "Backend API", icon: python]
-Manager [label: "Feed manager", icon: database]
-Worker [label: "Worker runtime", icon: terminal]
-Socket [label: "WebSocket hub", icon: globe]
-MediaServer [label: "Media server", icon: cloud]
+Dashboard [label: "Dashboard", icon: react, color: blue]
+Api [label: "Backend API", icon: python, color: blue]
+Manager [label: "Feed manager", icon: database, color: green]
+Worker [label: "Worker runtime", icon: terminal, color: green]
+Socket [label: "WebSocket hub", icon: globe, color: orange]
+MediaServer [label: "Media server", icon: cloud, color: red]
 
 Dashboard > Api: request feed action
 Api > Manager: apply feed change

@@ -2,17 +2,17 @@ flow-chart
 
 direction down
 
-Start [label: "New frame events", shape: oval, icon: database]
-BuildEvents [label: "Build arrival and departure events", shape: rectangle, icon: gear]
-CalcRates [label: "Calculate arrival and service rates", shape: rectangle, icon: code]
-Stable [label: "Queue stable?", shape: diamond, icon: lock]
-WaitStable [label: "Use stable wait formula", shape: rectangle, icon: terminal]
-WaitFallback [label: "Use fallback wait formula", shape: rectangle, icon: terminal]
-BuildMetrics [label: "Create metrics payload", shape: rectangle, icon: database]
-SendDashboard [label: "Send to dashboard", shape: rectangle, icon: react]
-SendWebhook [label: "Send to webhook", shape: rectangle, icon: mail]
-SaveCsv [label: "Save to CSV", shape: rectangle, icon: database]
-End [shape: oval, icon: terminal]
+Start [label: "New frame events", shape: oval, icon: database, color: blue]
+BuildEvents [label: "Build arrival and departure events", shape: rectangle, icon: gear, color: green]
+CalcRates [label: "Calculate arrival and service rates", shape: rectangle, icon: code, color: green]
+Stable [label: "Queue stable?", shape: diamond, icon: lock, color: orange]
+WaitStable [label: "Use stable wait formula", shape: rectangle, icon: terminal, color: green]
+WaitFallback [label: "Use fallback wait formula", shape: rectangle, icon: terminal, color: orange]
+BuildMetrics [label: "Create metrics payload", shape: rectangle, icon: database, color: orange]
+SendDashboard [label: "Send to dashboard", shape: rectangle, icon: react, color: red]
+SendWebhook [label: "Send to webhook", shape: rectangle, icon: mail, color: red]
+SaveCsv [label: "Save to CSV", shape: rectangle, icon: database, color: orange]
+End [shape: oval, icon: terminal, color: red]
 
 Start > BuildEvents
 BuildEvents > CalcRates

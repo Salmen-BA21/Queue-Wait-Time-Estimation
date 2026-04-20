@@ -5,7 +5,7 @@ styleMode plain
 typeface clean
 notation crows-feet
 
-users [icon: user] {
+users [icon: user, color: blue] {
   id int pk
   email string not null unique
   display_name string not null
@@ -19,7 +19,7 @@ users [icon: user] {
   updated_at timestamp not null
 }
 
-auth_refresh_sessions [icon: lock] {
+auth_refresh_sessions [icon: lock, color: green] {
   id string pk
   user_id int fk not null
   token_hash string not null unique
@@ -31,7 +31,7 @@ auth_refresh_sessions [icon: lock] {
   user_agent text
 }
 
-auth_audit_log [icon: database] {
+auth_audit_log [icon: database, color: orange] {
   id int pk
   user_id int fk
   event_type string not null
