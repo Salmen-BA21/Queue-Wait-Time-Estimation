@@ -1,34 +1,49 @@
-﻿<mxfile host="app.diagrams.net" modified="2026-04-12T19:10:30.000Z" agent="GitHub Copilot" version="26.2.7" editor="draw.io">
-  <diagram id="sprint2-component" name="Sprint2 Component">
-    <mxGraphModel dx="1280" dy="720" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="900" math="0" shadow="0">
-      <root>
-        <mxCell id="0" />
-        <mxCell id="1" parent="0" />
-
-        <mxCell id="title" value="Sprint 2 Components - Queue Metrics" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" vertex="1" parent="1"><mxGeometry x="60" y="30" width="420" height="30" as="geometry" /></mxCell>
-
-        <mxCell id="c1" value="Queue events" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="80" y="180" width="150" height="60" as="geometry" /></mxCell>
-        <mxCell id="c2" value="Queue analyzer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="280" y="180" width="150" height="60" as="geometry" /></mxCell>
-        <mxCell id="c3" value="Rate calculator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="480" y="180" width="150" height="60" as="geometry" /></mxCell>
-        <mxCell id="c4" value="Stability check" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="680" y="180" width="150" height="60" as="geometry" /></mxCell>
-        <mxCell id="c5" value="Wait time calculator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="880" y="180" width="170" height="60" as="geometry" /></mxCell>
-        <mxCell id="c6" value="Metrics payload" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="1110" y="180" width="160" height="60" as="geometry" /></mxCell>
-
-        <mxCell id="o1" value="Dashboard" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="1330" y="110" width="130" height="60" as="geometry" /></mxCell>
-        <mxCell id="o2" value="Webhook" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="1330" y="190" width="130" height="60" as="geometry" /></mxCell>
-        <mxCell id="o3" value="CSV log" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="1330" y="270" width="130" height="60" as="geometry" /></mxCell>
-
-        <mxCell id="e1" edge="1" parent="1" source="c1" target="c2" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e2" edge="1" parent="1" source="c2" target="c3" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e3" edge="1" parent="1" source="c3" target="c4" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e4" edge="1" parent="1" source="c4" target="c5" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e5" edge="1" parent="1" source="c3" target="c6" style="endArrow=block;html=1;dashed=1;strokeColor=#82b366;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e6" edge="1" parent="1" source="c5" target="c6" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-
-        <mxCell id="e7" edge="1" parent="1" source="c6" target="o1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e8" edge="1" parent="1" source="c6" target="o2" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e9" edge="1" parent="1" source="c6" target="o3" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-      </root>
-    </mxGraphModel>
-  </diagram>
+﻿<mxfile host="65bd71144e">
+    <diagram id="sprint2-component" name="Sprint2 Component">
+        <mxGraphModel dx="522" dy="340" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="900" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="Sprint 2 Components - Analytical Modules" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="30" width="500" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="sys" value="Sprint 2 analytics subsystem" style="shape=component;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+                    <mxGeometry x="50" y="480" width="340" height="260" as="geometry"/>
+                </mxCell>
+                <mxCell id="m1" value="Queue analyzer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+                    <mxGeometry x="120" y="165" width="110" height="48" as="geometry"/>
+                </mxCell>
+                <mxCell id="m2" value="Rate calculator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+                    <mxGeometry x="260" y="165" width="110" height="48" as="geometry"/>
+                </mxCell>
+                <mxCell id="m3" value="Stability logic" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+                    <mxGeometry x="130" y="270" width="110" height="48" as="geometry"/>
+                </mxCell>
+                <mxCell id="m4" value="Wait-time logic" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+                    <mxGeometry x="260" y="245" width="110" height="48" as="geometry"/>
+                </mxCell>
+                <mxCell id="m5" value="Metrics publisher" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+                    <mxGeometry x="190" y="320" width="120" height="48" as="geometry"/>
+                </mxCell>
+                <mxCell id="ext1" value="Dashboard" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+                    <mxGeometry x="520" y="120" width="140" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="e1" style="endArrow=open;html=1;dashed=1;strokeColor=#666666;" parent="1" source="m1" target="m2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e2" style="endArrow=open;html=1;dashed=1;strokeColor=#666666;" parent="1" source="m2" target="m3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3" style="endArrow=open;html=1;dashed=1;strokeColor=#666666;" parent="1" source="m3" target="m4" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e4" style="endArrow=open;html=1;dashed=1;strokeColor=#666666;" parent="1" source="m4" target="m5" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e5" style="endArrow=block;html=1;strokeColor=#9673a6;" parent="1" source="m5" target="ext1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
 </mxfile>

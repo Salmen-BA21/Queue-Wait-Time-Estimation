@@ -3,15 +3,15 @@ sequence-diagram
 autoNumber on
 
 Analyzer [label: "Queue analyzer", icon: database, color: blue]
-Rates [label: "Rate calculator", icon: code, color: blue]
+Windowing [label: "Windowed rate calculation", icon: code, color: blue]
 Stability [label: "Stability check", icon: lock, color: green]
 WaitTime [label: "Wait time logic", icon: terminal, color: green]
 Metrics [label: "Metrics payload", icon: database, color: orange]
 Dashboard [label: "Dashboard", icon: react, color: red]
 Webhook [label: "Webhook sender", icon: mail, color: red]
 
-Analyzer > Rates: compute arrival and service rates
-Rates > Stability: evaluate queue condition
+Analyzer > Windowing: compute arrival and service windows
+Windowing > Stability: evaluate queue condition
 
 alt [label: queue is stable] {
   Stability > WaitTime: use stable wait formula
@@ -21,6 +21,6 @@ else [label: queue is not stable] {
 }
 
 WaitTime > Metrics: set wait time and stability flag
-Rates > Metrics: set arrival and service rates
+Windowing > Metrics: set arrival and service rates
 Metrics > Dashboard: publish metrics
 Metrics > Webhook: publish payload

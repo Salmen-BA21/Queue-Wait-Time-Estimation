@@ -2,29 +2,29 @@ cloud-architecture-diagram
 
 direction right
 
-Manager [icon: user, color: blue]
+Manager [label: "Manager setup", icon: user, color: blue]
 
 Sprint1Actions [color: blue] {
-  ChooseSource [label: "Choose video source", icon: monitor, color: blue]
-  DrawZone [label: "Draw queue zone", icon: code, color: green]
-  StartAnalysis [label: "Start queue analysis", icon: gear, color: green]
-  ViewLive [label: "View live video", icon: monitor, color: red]
-  ReviewQueue [label: "Review queue status", icon: database, color: orange]
+  ChooseSource [label: "Choose local, webcam, or live source", icon: monitor, color: blue]
+  DrawZone [label: "Draw queue polygon", icon: code, color: green]
+  TuneRuntime [label: "Adjust runtime settings", icon: gear, color: green]
+  ViewLive [label: "View detections and IDs", icon: monitor, color: red]
+  ReviewQueue [label: "Review queue-zone output", icon: database, color: orange]
 }
 
 RuntimeFlow [color: green] {
-  CaptureVideo [label: "Capture video", icon: monitor, color: blue]
+  CaptureVideo [label: "Capture video frames", icon: monitor, color: blue]
   DetectPeople [label: "Detect people", icon: server, color: green]
-  TrackPeople [label: "Track people", icon: gear, color: green]
-  CheckZone [label: "Check zone membership", icon: code, color: orange]
+  TrackPeople [label: "Track people across frames", icon: gear, color: green]
+  CheckZone [label: "Keep only people in zone", icon: code, color: orange]
   UpdateQueue [label: "Update queue state", icon: database, color: orange]
 }
 
-Manager > ChooseSource, DrawZone, StartAnalysis, ViewLive, ReviewQueue
+Manager > ChooseSource, DrawZone, TuneRuntime, ViewLive, ReviewQueue
 
 ChooseSource > CaptureVideo
 DrawZone > CheckZone
-StartAnalysis > DetectPeople
+TuneRuntime > DetectPeople
 ViewLive > UpdateQueue
 ReviewQueue > UpdateQueue
 

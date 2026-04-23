@@ -10,6 +10,7 @@ Sources [color: blue] {
 
 Backend [color: green] {
   Api [label: "Backend API", icon: python, color: blue]
+  Auth [label: "Session access control", icon: lock, color: green]
   FeedManager [label: "Feed manager", icon: database, color: green]
   Worker [label: "Worker runtime", icon: terminal, color: green]
   WebSocketHub [label: "WebSocket hub", icon: globe, color: orange]
@@ -25,7 +26,8 @@ RtspCamera > Api
 OnvifCamera > Api
 
 Dashboard > Api: setup and control
-Api > FeedManager
+Api > Auth
+Auth > FeedManager
 FeedManager > Worker
 Worker > WebSocketHub
 WebSocketHub > Dashboard: live events

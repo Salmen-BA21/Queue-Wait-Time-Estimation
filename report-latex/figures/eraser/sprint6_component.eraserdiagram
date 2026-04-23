@@ -14,6 +14,7 @@ N8nFlow [color: orange] {
   CheckAlerts [label: "Check alerts", icon: bell, color: orange]
   RouteSeverity [label: "Route by severity", icon: gear, color: orange]
   FormatMessage [label: "Format message", icon: code, color: green]
+  Cooldown [label: "Cooldown and deduplication", icon: gear, color: orange]
 }
 
 Telegram [label: "Telegram", icon: bell, color: red]
@@ -25,7 +26,8 @@ WebhookSender > ReceiveWebhook
 
 ReceiveWebhook > CheckSecret
 CheckSecret > CheckAlerts: valid
-CheckAlerts > RouteSeverity: alerts found
+CheckAlerts > Cooldown: alerts found
+Cooldown > RouteSeverity: allowed
 RouteSeverity > FormatMessage
 FormatMessage > Telegram
 FormatMessage --> ArchiveApi: save alert

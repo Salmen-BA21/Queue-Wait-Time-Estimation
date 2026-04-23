@@ -4,24 +4,37 @@ direction down
 
 UserAction [label: "User action on dashboard", shape: oval, icon: user, color: blue]
 ApiRequest [label: "Send API request", shape: rectangle, icon: python, color: blue]
+AuthCheck [label: "Validate session and role", shape: rectangle, icon: lock, color: green]
 UpdateRuntime [label: "Update feed state", shape: rectangle, icon: database, color: green]
 PushStatus [label: "Push status event", shape: rectangle, icon: globe, color: orange]
 UpdateState [label: "Update dashboard state", shape: rectangle, icon: gear, color: orange]
 RefreshUi [label: "Refresh cards and feed grid", shape: oval, icon: react, color: red]
 
 MetricsEvent [label: "Metrics event arrives", shape: rectangle, icon: database, color: orange]
+Heartbeat [label: "Heartbeat and stale-data guard", shape: rectangle, icon: shield, color: orange]
+FallbackPoll [label: "Fallback polling on disconnect", shape: rectangle, icon: refresh-cw, color: blue]
 AlertEvent [label: "Alert event arrives", shape: rectangle, icon: bell, color: red]
 UpdateKpi [label: "Update KPI values", shape: rectangle, icon: monitor, color: orange]
 UpdatePanels [label: "Update activity and attention", shape: rectangle, icon: bell, color: red]
+LiveReady [label: "Check live-view readiness", shape: rectangle, icon: video, color: blue]
+LiveStream [label: "Open live stream or fallback video", shape: rectangle, icon: video, color: green]
 
 UserAction > ApiRequest
 ApiRequest > UpdateRuntime
+ApiRequest > AuthCheck
+AuthCheck > UpdateRuntime
 UpdateRuntime > PushStatus
 PushStatus > UpdateState
 UpdateState > RefreshUi
 
 MetricsEvent > UpdateKpi
+MetricsEvent > Heartbeat
+Heartbeat > FallbackPoll
+FallbackPoll > RefreshUi
 UpdateKpi > RefreshUi
 
 AlertEvent > UpdatePanels
 UpdatePanels > RefreshUi
+
+LiveReady > LiveStream
+LiveStream > RefreshUi

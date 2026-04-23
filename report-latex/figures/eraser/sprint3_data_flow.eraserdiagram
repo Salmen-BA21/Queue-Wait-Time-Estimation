@@ -4,6 +4,7 @@ direction down
 
 StartSetup [label: "User starts feed setup", shape: oval, icon: user, color: blue]
 CallApi [label: "Send setup request", shape: rectangle, icon: python, color: blue]
+CheckRole [label: "Validate session and role", shape: rectangle, icon: lock, color: green]
 SaveFeed [label: "Save feed settings", shape: rectangle, icon: database, color: green]
 StartWorker [label: "Start worker", shape: rectangle, icon: terminal, color: green]
 EmitEvents [label: "Emit live events", shape: rectangle, icon: globe, color: orange]
@@ -16,7 +17,8 @@ UseWebRtc [label: "Show WebRTC video", shape: rectangle, icon: monitor, color: r
 UseMjpeg [label: "Use MJPEG fallback", shape: rectangle, icon: monitor, color: orange]
 
 StartSetup > CallApi
-CallApi > SaveFeed
+CallApi > CheckRole
+CheckRole > SaveFeed
 SaveFeed > StartWorker
 StartWorker > EmitEvents
 EmitEvents > RefreshDashboard

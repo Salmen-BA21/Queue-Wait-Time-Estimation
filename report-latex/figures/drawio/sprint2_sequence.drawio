@@ -1,33 +1,123 @@
-<mxfile host="app.diagrams.net" modified="2026-04-12T18:31:00.000Z" agent="GitHub Copilot" version="26.2.7" editor="draw.io">
-  <diagram id="sprint2-sequence" name="Sprint2 Sequence">
-    <mxGraphModel dx="1280" dy="720" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="980" math="0" shadow="0">
-      <root>
-        <mxCell id="0" />
-        <mxCell id="1" parent="0" />
-
-        <mxCell id="title" value="Sprint 2 Sequence - Queue Metrics Computation" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" vertex="1" parent="1"><mxGeometry x="70" y="30" width="640" height="30" as="geometry" /></mxCell>
-
-        <mxCell id="p1" value="Queue analyzer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="80" y="150" width="150" height="60" as="geometry" /></mxCell>
-        <mxCell id="p2" value="Rate calculator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="270" y="150" width="150" height="60" as="geometry" /></mxCell>
-        <mxCell id="p3" value="Stability check" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="460" y="150" width="150" height="60" as="geometry" /></mxCell>
-        <mxCell id="p4" value="Wait time logic" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="650" y="150" width="150" height="60" as="geometry" /></mxCell>
-        <mxCell id="p5" value="Metrics payload" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="840" y="150" width="150" height="60" as="geometry" /></mxCell>
-        <mxCell id="p6" value="Dashboard" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="1030" y="150" width="130" height="60" as="geometry" /></mxCell>
-        <mxCell id="p7" value="Webhook sender" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="1200" y="150" width="150" height="60" as="geometry" /></mxCell>
-
-        <mxCell id="e1" value="compute rates" edge="1" parent="1" source="p1" target="p2" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e2" value="evaluate condition" edge="1" parent="1" source="p2" target="p3" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;"><mxGeometry relative="1" as="geometry" /></mxCell>
-
-        <mxCell id="altbox" value="Alternative paths" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="430" y="260" width="420" height="170" as="geometry" /></mxCell>
-        <mxCell id="stable" value="If queue is stable&#xa;use stable wait formula" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="460" y="300" width="170" height="90" as="geometry" /></mxCell>
-        <mxCell id="fallback" value="If queue is not stable&#xa;use fallback formula" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="650" y="300" width="170" height="90" as="geometry" /></mxCell>
-
-        <mxCell id="e3" value="stable or fallback result" edge="1" parent="1" source="p3" target="p4" style="endArrow=block;html=1;dashed=1;edgeStyle=orthogonalEdgeStyle;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e4" value="set wait and stability" edge="1" parent="1" source="p4" target="p5" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e5" value="set arrival and service" edge="1" parent="1" source="p2" target="p5" style="endArrow=block;html=1;dashed=1;edgeStyle=orthogonalEdgeStyle;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e6" value="publish" edge="1" parent="1" source="p5" target="p6" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e7" value="publish" edge="1" parent="1" source="p5" target="p7" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;"><mxGeometry relative="1" as="geometry" /></mxCell>
-      </root>
-    </mxGraphModel>
-  </diagram>
+<mxfile host="65bd71144e" scale="1" border="1">
+    <diagram id="sprint2-sequence" name="Sprint 2 Sequence">
+        <mxGraphModel dx="522" dy="340" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="980" background="#ffffff" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="2" value="" style="group" parent="1" vertex="1" connectable="0">
+                    <mxGeometry x="70" y="30" width="1500" height="670" as="geometry"/>
+                </mxCell>
+                <mxCell id="title" value="Sprint 2 Sequence - Queue Metrics Computation" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" parent="2" vertex="1">
+                    <mxGeometry width="680" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="frame" value="loop [for each metric window]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;strokeWidth=3;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;" parent="2" vertex="1">
+                    <mxGeometry y="32" width="1500" height="610" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1" value="Queue analyzer" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="2" vertex="1">
+                    <mxGeometry x="35" y="72" width="120" height="300" as="geometry"/>
+                </mxCell>
+                <mxCell id="p1l" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="p1" vertex="1">
+                    <mxGeometry x="55" y="70" width="10" height="520" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2" value="Rate calculator" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="2" vertex="1">
+                    <mxGeometry x="220" y="72" width="120" height="300" as="geometry"/>
+                </mxCell>
+                <mxCell id="p2l" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="p2" vertex="1">
+                    <mxGeometry x="55" y="70" width="10" height="520" as="geometry"/>
+                </mxCell>
+                <mxCell id="p3" value="Stability check" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="2" vertex="1">
+                    <mxGeometry x="405" y="72" width="120" height="300" as="geometry"/>
+                </mxCell>
+                <mxCell id="p3l" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="p3" vertex="1">
+                    <mxGeometry x="55" y="70" width="10" height="520" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4" value="Wait time logic" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="2" vertex="1">
+                    <mxGeometry x="590" y="72" width="120" height="300" as="geometry"/>
+                </mxCell>
+                <mxCell id="p4l" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="p4" vertex="1">
+                    <mxGeometry x="55" y="70" width="10" height="520" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5" value="Metrics payload" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="2" vertex="1">
+                    <mxGeometry x="775" y="72" width="120" height="300" as="geometry"/>
+                </mxCell>
+                <mxCell id="p5l" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="p5" vertex="1">
+                    <mxGeometry x="55" y="70" width="10" height="520" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6" value="Dashboard" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="2" vertex="1">
+                    <mxGeometry x="960" y="72" width="110" height="300" as="geometry"/>
+                </mxCell>
+                <mxCell id="p6l" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="p6" vertex="1">
+                    <mxGeometry x="50" y="70" width="10" height="520" as="geometry"/>
+                </mxCell>
+                <mxCell id="p7" value="Webhook sender" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="2" vertex="1">
+                    <mxGeometry x="1110" y="72" width="120" height="300" as="geometry"/>
+                </mxCell>
+                <mxCell id="p7l" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="p7" vertex="1">
+                    <mxGeometry x="55" y="70" width="10" height="520" as="geometry"/>
+                </mxCell>
+                <mxCell id="p8" value="CSV logger" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="2" vertex="1">
+                    <mxGeometry x="1285" y="72" width="110" height="300" as="geometry"/>
+                </mxCell>
+                <mxCell id="p8l" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="p8" vertex="1">
+                    <mxGeometry x="50" y="70" width="10" height="520" as="geometry"/>
+                </mxCell>
+                <mxCell id="m1" value="collect window events" style="html=1;verticalAlign=bottom;endArrow=block;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="2" source="p1l" target="p2l" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="195" y="118" as="sourcePoint"/>
+                        <Array as="points">
+                            <mxPoint x="200" y="150"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="m2" value="evaluate queue condition" style="html=1;verticalAlign=bottom;endArrow=block;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="2" source="p2l" target="p3l" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="380" y="185" as="sourcePoint"/>
+                        <Array as="points">
+                            <mxPoint x="365" y="190"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="m3" value="choose wait formula" style="html=1;verticalAlign=bottom;endArrow=block;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="2" source="p3l" target="p4l" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="560" y="250" as="sourcePoint"/>
+                        <Array as="points">
+                            <mxPoint x="545" y="250"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="m4" value="build payload" style="html=1;verticalAlign=bottom;endArrow=block;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="2" source="p4l" target="p5l" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="740" y="315" as="sourcePoint"/>
+                        <Array as="points">
+                            <mxPoint x="730" y="320"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="m5" value="publish metrics" style="html=1;verticalAlign=bottom;endArrow=block;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="2" source="p5l" target="p6l" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="915" y="380" as="sourcePoint"/>
+                        <Array as="points">
+                            <mxPoint x="905" y="380"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="m6" value="send webhook payload" style="html=1;verticalAlign=bottom;endArrow=block;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="2" source="p5l" target="p7l" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1085" y="445" as="sourcePoint"/>
+                        <Array as="points">
+                            <mxPoint x="1085" y="445"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="m7" value="save CSV record" style="html=1;verticalAlign=bottom;endArrow=block;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="2" source="p5l" target="p8l" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="1255" y="510" as="sourcePoint"/>
+                        <Array as="points">
+                            <mxPoint x="1255" y="510"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
 </mxfile>
