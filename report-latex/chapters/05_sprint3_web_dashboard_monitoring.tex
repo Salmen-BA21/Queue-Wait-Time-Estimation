@@ -1,0 +1,221 @@
+\chapter{Sprint 3: Web Dashboard and Live Monitoring}
+\chaptertoc
+
+\clearpage
+
+\section{Introduction}
+Sprint 3 covered the full frontend delivery, from the initial design decisions and page structure to the live backend integration that made the dashboard operational. The sprint started by defining the visual direction and navigation model, then connected the interface to the backend services and runtime events so the dashboard could react to live data, transport changes, and feed lifecycle actions.
+
+This two-phase approach was intentional. Settling the design system and page skeleton first meant that the live integration work could focus on behavior and reliability instead of redesigning the interface at the same time.
+
+\section{Sprint Objectives}
+This sprint was organized around six outcomes spanning design and live integration:
+
+\textbf{Design and scaffolding objectives:}
+\begin{itemize}
+    \item define a coherent visual language for the dashboard,
+    \item prepare the main page layouts before live data integration,
+    \item build reusable UI structures that can support later features.
+\end{itemize}
+
+\textbf{Live integration objectives:}
+\begin{itemize}
+    \item make the dashboard consume the backend contract without ad hoc transformations,
+    \item keep the interface responsive when live transport is available, delayed, or interrupted,
+    \item validate that monitoring, feed management, and fallback behavior remain understandable for the operator.
+\end{itemize}
+
+\section{Sprint Backlog}
+The Sprint 3 backlog was organized as a table so both the design foundation and the live monitoring tasks remain traceable.
+
+\begin{table}[!htbp]
+    \centering
+    \footnotesize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{0.88}
+    \caption{Sprint 3 backlog}
+    \label{tab:sprint3_backlog}
+    \begin{tabularx}{\textwidth}{|l|X|l|X|}
+        \hline
+        User StoryID & UserStory & TaskID & Task \\ \hline
+        US3.1 & As a user, I want a consistent visual style so that the dashboard feels like one coherent product. & T3.1 & Define colors, typography, spacing, and reusable component rules. \\ \hline
+        US3.2 & As a manager, I want the main page layouts prepared so that onboarding, monitoring, editing, and analytics screens are available. & T3.2 & Prepare the landing page, dashboard, setup wizard, zone editor, analytics, and settings layouts. \\ \hline
+        US3.3 & As a developer, I want reusable frontend elements so that the interface can grow without duplication. & T3.3 & Set up the frontend project with shared components and page scaffolding. \\ \hline
+        US3.4 & As a user, I want the dashboard connected to backend responses so that the interface reflects live operational data. & T3.4 & Implement the API integration layer and typed request handling. \\ \hline
+        US3.5 & As a manager, I want to manage feeds from the interface so that feed lifecycle actions stay centralized. & T3.5 & Connect login state, protected routes, and feed control actions to the dashboard. \\ \hline
+        US3.6 & As a user, I want live updates without refreshing so that changes are visible immediately. & T3.6 & Add websocket-driven live state updates and dashboard orchestration. \\ \hline
+        US3.7 & As a user, I want a suitable video transport chosen automatically so that the feed remains usable when conditions change. & T3.7 & Add transport selection, fallback streaming, and reconnection logic. \\ \hline
+        US3.8 & As a user, I want the dashboard to stay usable during interruptions so that monitoring does not stop during transient failures. & T3.8 & Add fallback polling and stale-data guards. \\ \hline
+        US3.9 & As a developer, I want setup and onboarding flows validated so that the integration behaves correctly end to end. & T3.9 & Validate dashboard setup, feed onboarding, and error behavior with integration tests. \\ \hline
+    \end{tabularx}
+\end{table}
+
+\section{Design}
+
+\subsection{UI and UX Design}
+The project design specification introduces a ``Terminal Minimal'' style and a seven-page navigation model. The goal was to give the dashboard a clear and sober visual identity that fits a monitoring application. The design language emphasizes:
+\begin{itemize}
+    \item dark operational surfaces optimized for continuous monitoring,
+    \item strong semantic colors for status and alert levels,
+    \item card-based information density with consistent spacing and hierarchy,
+    \item explicit workflow guidance in setup and zone-editing screens.
+\end{itemize}
+
+The designed page set includes the landing page, dashboard, setup wizard, zone editor, analytics, settings, and heatmap views. These screens helped define what the frontend had to support before live data arrived.
+
+\subsection{Frontend Architecture}
+\begin{figure}[H]
+    \centering
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 3 frontend architecture diagram -- routing, components, and state boundaries}}
+    \caption{Frontend architecture for routing, components, and state boundaries.}
+    \label{fig:sprint3_frontend_arch}
+\end{figure}
+
+The frontend scaffold separates pages, shared interface elements, workflow logic, and the parts that connect the interface to the backend so the dashboard can grow without becoming difficult to maintain:
+\begin{itemize}
+    \item page layer: the main screens the user navigates through,
+    \item component layer: reusable interface parts and panels,
+    \item integration layer: the logic that handles data and user actions,
+    \item connection layer: the pieces that connect the frontend to the backend.
+\end{itemize}
+
+\subsection{Sequence Diagrams}
+\begin{figure}[H]
+    \centering
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 3 sequence diagram -- dashboard updates and alert surfacing}}
+    \caption{Sprint 3 sequence diagram for dashboard updates and alert surfacing.}
+    \label{fig:sprint3_sequence}
+\end{figure}
+
+Three main flows were implemented:
+\begin{enumerate}
+    \item \textbf{Feed lifecycle:} a dashboard action updates the feed state and the new status is sent back to the interface.
+    \item \textbf{Live metrics:} metric updates are received from the backend and reflected immediately on the dashboard.
+    \item \textbf{Alert surfacing:} alerts reach the interface and appear in the activity and attention areas.
+\end{enumerate}
+
+\subsection{Design Rationale}
+The design phase was intentionally scoped as a foundation step rather than a full UI release. The goal was to settle navigation, component boundaries, and interaction patterns before live data and transport logic arrived. A clean shell is a real deliverable when the integration work depends on it.
+
+\section{Implementation}
+
+\subsection{Project Setup and Layout Skeleton}
+The implementation started by turning the design specification into an actual application skeleton. The workspace setup established the application entry point, the navigation structure, and the shared layout that all pages reuse.
+
+The order of the pages was not arbitrary. The layout had to support a workflow that begins with onboarding, continues through configuration, and ends with live supervision. That is why the page skeleton was treated as an operational path rather than a list of unrelated screens.
+
+\subsection{Styling and Reusable Interface Rules}
+The visual system was defined once and then applied consistently across the dashboard. Spacing, typography, surface treatment, and semantic status colors were treated as reusable rules rather than per-page decisions. This reduced design drift: when a status card, a table, or a setup control appears in several places, it behaves like the same product element instead of being restyled each time.
+
+\subsection{API Integration}
+The frontend relies on a dedicated API layer that keeps the communication with the backend structured. It defines the main data types used by the dashboard and centralizes request handling so errors can be managed consistently. This layer acts as the contract boundary: it prevents the UI from depending directly on backend implementation details and makes it easier to reason about feed lists, dashboard summaries, and management actions as explicit typed responses.
+
+\subsection{Authentication and Role-Based Navigation}
+Sprint 3 connected the login and sign-up flows to the dashboard. The auth provider clears cached data when the session changes, protected routes redirect users according to their role, and administrators are taken to the manager administration page while managers are routed to the monitoring dashboard. This keeps the frontend aligned with the backend access rules and avoids exposing the wrong interface to the wrong user.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.65\textwidth]{\detokenize{LoginPage.png}}
+    \caption{Manager sign-in screen used to access the dashboard in Sprint 3.}
+    \label{fig:sprint3_login_page}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.65\textwidth]{\detokenize{SignupPage.png}}
+    \caption{Manager account creation screen introduced as part of the Sprint 3 authentication flow.}
+    \label{fig:sprint3_signup_page}
+\end{figure}
+
+\subsection{Dashboard State Orchestration}
+A dedicated dashboard state layer coordinates data fetching and updates. From the received feed data, the dashboard derives indicators such as online feeds, total people, average wait time, and attention counts, then exposes them to the widgets.
+
+The state layer also helps absorb temporary uncertainty. When a websocket event arrives late, the dashboard can keep displaying the last valid snapshot instead of dropping the screen into an empty state. That design choice improves usability during unstable network periods and keeps the monitoring surface trustworthy.
+
+\subsection{Live Update Reliability}
+The live-update layer includes:
+\begin{itemize}
+    \item reconnection delays,
+    \item a heartbeat check,
+    \item a guard against stale data,
+    \item fallback polling when live updates fail,
+    \item grouped updates to keep the interface responsive.
+\end{itemize}
+When the websocket connection drops, the dashboard falls back to periodic polling instead of freezing, so operators still have a usable view during transient issues.
+
+This fallback behavior was deliberately treated as a first-class feature rather than an error path. In a queue-monitoring context, the operator needs continuity more than perfect transport purity, so the UI must remain informative even when the preferred live path is temporarily unavailable.
+
+\subsection{Live Video Delivery}
+Live feed cards use a transport decision layer to choose the most suitable viewing mode. For each running feed, the frontend checks whether live viewing is ready. If the higher-quality live stream is available, it is used first; otherwise the dashboard falls back to the simpler video stream.
+
+The live-streaming flow is handled through the browser's live video connection support \cite{webrtc_w3c}:
+\begin{itemize}
+    \item create a connection for receiving video,
+    \item gather the network information needed for signaling,
+    \item send the browser offer to the backend,
+    \item apply the backend response and switch the feed card to live state.
+\end{itemize}
+
+Reconnection uses increasing delays between attempts. When the problem is not recoverable, the system stops retrying and switches to the fallback stream so the dashboard remains usable.
+
+When server-side annotations are active, the dashboard hides local overlays to avoid drawing the same boxes twice on the same video.
+
+\subsection{Dashboard UI Integration}
+The dashboard page brings together live feed controls, setup dialogs, source onboarding, KPI visualizations, and charts. The emphasis was on making those elements work together as one operational interface.
+
+The practical result is that a manager can move from onboarding to monitoring without leaving the dashboard context. That continuity mirrors the workflow described in the earlier requirements chapter.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{\detokenize{AdminDashboarUi.png}}
+    \caption{Administrator manager-administration screen for creating and maintaining manager accounts.}
+    \label{fig:sprint3_admin_dashboard}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{\detokenize{ManagerDashboardUi.png}}
+    \caption{Manager dashboard showing the live monitoring surface, feed summary cards, and recent activity panel.}
+    \label{fig:sprint3_manager_dashboard}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{\detokenize{FeedConfigUi.png}}
+    \caption{Feed setup screen used to prepare a local video source before zone tracing and model selection.}
+    \label{fig:sprint3_feed_config}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{\detokenize{ZoneTraceUi.png}}
+    \caption{Zone tracing screen used to define the queue polygon for the selected feed.}
+    \label{fig:sprint3_zone_trace}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{\detokenize{ModelSelectUi.png}}
+    \caption{Model selection screen used to choose the YOLO size before launching the feed.}
+    \label{fig:sprint3_model_select}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{\detokenize{ReviewPanelUi.png}}
+    \caption{Review and launch panel used to confirm the staged feed before creating the batch.}
+    \label{fig:sprint3_review_panel}
+\end{figure}
+
+\subsection{Integration Testing}
+Frontend integration behavior is validated through scenario-based tests that cover dashboard setup, live event handling, transport fallback, feed routing, and error behavior.
+
+The tests are useful not just for regression detection, but also for documenting what the sprint is supposed to guarantee. They show that the implementation is not finished when the screen renders; it is finished when the system still behaves correctly under reconnects, route changes, and fallback transitions.
+
+\section{Conclusion}
+By the end of Sprint 3, the dashboard could react to live state, switch transport modes, and stay usable when the live connection failed. That working interface completed the frontend delivery and prepared the project for alert automation and final evaluation.
+
+\section{Sprint Retrospective}
+This sprint confirmed that separating design foundation from live integration was the right approach. The most valuable outcome was not a single widget, but the orchestration layer that connects session state, feed actions, live metrics, and transport fallback into one predictable operator experience.
+
+The main tradeoff was complexity at the boundary between frontend and backend. More logic moved into the dashboard, but that logic was necessary to keep the system resilient when transport conditions changed. In the final review, this was considered acceptable because the result is easier to operate and easier to explain in the report.

@@ -1,0 +1,156 @@
+\chapter{Sprint 1: Perception and Queue Analytics}
+\chaptertoc
+
+\clearpage
+
+\section{Introduction}
+Sprint 1 built the full path from raw video to actionable queue indicators. It started by detecting people, tracking them across frames, and filtering observations to the queue zone. Once that perception baseline was reliable, the sprint moved to queue interpretation: estimating how fast people arrive, how quickly service handles them, and how long a new arrival should expect to wait.
+
+This combination was deliberate. Perception without analytics produces only a count; analytics without stable perception produces unreliable rates. By delivering both in one sprint, the project established a trustworthy metric pipeline that every later sprint could consume directly.
+
+\section{Sprint Objectives}
+This sprint was focused on two complementary groups of outcomes:
+
+\textbf{Perception objectives:}
+\begin{itemize}
+    \item detect people reliably in live and recorded video,
+    \item preserve identity continuity across frames,
+    \item filter detections to the configured queue zone,
+    \item deliver a stable perception baseline for analytics.
+\end{itemize}
+
+\textbf{Analytics objectives:}
+\begin{itemize}
+    \item estimate arrival and service rates from tracked events,
+    \item compute wait time in a way that remains meaningful during changing conditions,
+    \item protect the runtime from empty or unstable windows,
+    \item publish a metric contract that later layers can consume directly.
+\end{itemize}
+
+These objectives define the core of the system. If the perception layer is noisy or the analytics layer is fragile, every later metric and operational decision becomes harder to trust.
+
+\section{Sprint Backlog}
+The Sprint 1 backlog covers both perception and queue analysis tasks, organized so each user story traces from a stakeholder need to an implementation task.
+
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{0.88}
+\begin{longtable}{|p{0.11\textwidth}|p{0.37\textwidth}|p{0.08\textwidth}|p{0.36\textwidth}|}
+    \caption{Sprint 1 backlog}\label{tab:sprint1_backlog}\\
+    \hline
+    User StoryID & UserStory & TaskID & Task \\ \hline
+    \endfirsthead
+    \hline
+    User StoryID & UserStory & TaskID & Task \\ \hline
+    \endhead
+    US1.1 & As a monitoring operator, I want to detect people in the video stream so that queue observations start from a reliable signal. & T1.1 & Configure the detector to identify people in live and recorded video. \\ \hline
+    US1.2 & As a monitoring operator, I want to keep the same person identifiable across frames so that counts remain consistent. & T1.2 & Integrate tracking to preserve identity across consecutive frames. \\ \hline
+    US1.3 & As a manager, I want to restrict counting to queue zones so that irrelevant movement does not affect the queue state. & T1.3 & Define queue zones as polygons and filter detections by zone. \\ \hline
+    US1.4 & As a developer, I want capture, detection, tracking, and display to work together so that the perception loop stays continuous. & T1.4 & Connect capture, detection, tracking, zone filtering, and display into one flow. \\ \hline
+    US1.5 & As a developer, I want basic runtime settings so that the pipeline can be adapted without code changes. & T1.5 & Expose runtime settings for frame handling and visualization. \\ \hline
+    US1.6 & As a manager, I want queue rates estimated from tracked people so that the dashboard can interpret flow intensity. & T1.6 & Group tracked events into short windows and compute arrival and service rates. \\ \hline
+    US1.7 & As a manager, I want wait time computed for stable and unstable cases so that the result remains useful in real conditions. & T1.7 & Apply the stable wait-time formula and fallback behavior. \\ \hline
+    US1.8 & As a developer, I want the calculations protected from empty windows so that division-by-zero and noise do not break the runtime. & T1.8 & Add guards for empty windows, low counts, and bounded fallback output. \\ \hline
+    US1.9 & As a downstream consumer, I want a clear metric output so that later layers can reuse the values without reprocessing them. & T1.9 & Publish rate estimates, wait time, people-in-zone, and stability status. \\ \hline
+\end{longtable}
+
+\section{Sprint Analysis}
+
+\subsection{Runtime Scenarios}
+Sprint 1 is best understood as a runtime pipeline that converts each frame into queue metrics. The scenarios below describe the conditions that the activity and sequence diagrams have to cover.
+
+Four key scenarios are addressed in Sprint 1:
+\begin{enumerate}
+    \item \textbf{Person entry into queue zone:} when a person enters the queue area, the system treats that person as a possible arrival.
+    \item \textbf{Consistency across frames:} when the same person appears in consecutive frames, the system keeps the identification stable and avoids double counting.
+    \item \textbf{Zone filtering under mixed scenes:} people outside the queue area are ignored so the queue state stays focused on the relevant part of the scene.
+    \item \textbf{Queue stability under varying load:} when arrivals stay below service, the usual wait-time estimate is valid; when arrivals exceed service, the system reports a stability flag and uses a fallback value.
+\end{enumerate}
+
+\section{Design}
+
+\subsection{Activity Diagram}
+\begin{figure}[H]
+    \centering
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 1 activity diagram -- frame ingestion to queue metrics output}}
+    \caption{Sprint 1 activity flow from frame ingestion to queue metrics output.}
+    \label{fig:sprint1_activity}
+\end{figure}
+
+The activity starts from a video source, whether it is a local file or a live camera stream. The system then detects people, keeps track of them, checks whether they are inside the queue area, and passes the filtered result to the queue analysis stage, which computes arrival rate, service rate, wait time, and stability classification.
+
+\subsection{Sequence Diagram}
+\begin{figure}[H]
+    \centering
+    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 1 sequence diagram -- video ingestion to queue metric publication}}
+    \caption{Sprint 1 sequence diagram from video ingestion to queue metric publication.}
+    \label{fig:sprint1_sequence}
+\end{figure}
+
+In practice, each frame moves through source handling, detection, tracking, zone checking, rate estimation, and metric publication. That ordered flow is what lets Sprint 1 deliver both a perception baseline and an analytical output in one pass.
+
+\subsection{Operational Scenarios}
+The queue analysis is easiest to understand through the situations it must handle every time a new metric window is evaluated:
+\begin{enumerate}
+    \item \textbf{Stable queue:} arrivals stay below service, so the usual wait-time estimate is valid and can be forwarded to later layers.
+    \item \textbf{Growing backlog:} arrivals start to approach service, so the system keeps a stability flag and a fallback value instead of trusting a fragile instantaneous estimate.
+    \item \textbf{Empty or stalled queue:} no service events are available, so the output stays bounded and downstream logic can ignore the value rather than reacting to noise.
+\end{enumerate}
+These scenarios explain why the sprint reports both point estimates and a stability signal instead of returning a raw number with no operational context.
+
+\section{Implementation}
+
+\subsection{Detection Layer}
+The detection layer focuses on finding people in each frame while keeping the process adjustable for different machines. It is tuned to balance speed and accuracy, so the system stays responsive without losing the main detections that matter for the queue.
+
+\subsection{Tracking Layer}
+The tracking layer keeps the same person identifiable from one frame to the next. This is what makes arrival and departure counts more reliable than simply reading detections in a single frame \cite{bytetrack2022}.
+
+\subsection{Zone-Aware Filtering}
+Zone logic defines the queue area as a polygon on the frame and keeps only the people inside it. This avoids counting unrelated movement elsewhere in the scene and makes the measurement more relevant to the waiting line.
+
+\subsection{Main Loop Integration}
+The pipeline integration is handled in the runtime orchestration layer. The runtime supports:
+\begin{itemize}
+    \item handling local files, webcams, and live camera streams,
+    \item adjusting how often frames are processed so the system stays responsive,
+    \item showing detections, IDs, the queue zone, and metrics on screen,
+    \item running without a visible interface when needed for later integration.
+\end{itemize}
+
+\subsection{Queue Event Windows and Rate Estimation}
+The queue-analysis step uses short time windows to count arrivals and departures. Let $N_a$ and $N_d$ be the number of events observed in windows $T_a$ and $T_d$:
+\[
+\lambda = \frac{N_a}{T_a}, \qquad \mu = \frac{N_d}{T_d}
+\]
+From these counts, the system estimates the arrival rate and the service rate. To avoid unstable values at the beginning of a run, the implementation waits until enough events have been observed before returning non-zero rates.
+
+\subsection{Wait-Time Logic and Stability Handling}
+The queue is considered stable when arrivals stay below service and service is actually observed:
+\[
+\texttt{queue\_stable} = (\lambda < \mu) \land (\mu > 0)
+\]
+When that condition is met, the normal wait-time formula is used. Otherwise, the system falls back to a more conservative estimate based on the current occupancy:
+\begin{itemize}
+    \item stable queue: $W = \frac{1}{\mu-\lambda}$,
+    \item unstable but service observed: fallback $W = \frac{L}{\mu}$, where $L$ is the number of people in the zone.
+\end{itemize}
+We use the M/M/1 sojourn-time expression because the project models each monitored lane as a single service channel with one effective queue, which matches the cashier-style setting studied in the report. This formula is also easy to interpret during a defense: it depends directly on the measured arrival and service rates, it gives a closed-form estimate without needing a large historical dataset, and it stays aligned with the real-time pipeline used by the tracker. Other models were less appropriate here: M/M/c would assume multiple parallel servers, which is not the default lane setup, and Little's Law is useful for validation but does not directly produce a forward wait-time estimate from the instantaneous rates alone.
+When no service events are observed, the implementation returns a zero fallback so that downstream components do not use an unreliable value.
+
+\subsection{Runtime Metric Contract}
+The final metric output includes:
+\begin{itemize}
+    \item point estimates ($\lambda$, $\mu$, $W$),
+    \item people-in-zone occupancy,
+    \item stability flag for safe downstream interpretation.
+\end{itemize}
+These values are then reused by logs, overlays, webhook payloads, and dashboard events \cite{opencv_docs,gross_queueing}.
+
+\section{Conclusion}
+Sprint 1 delivered the full path from raw video to operational queue indicators. People can be detected, followed across frames, counted inside the queue area, and the resulting events are turned into arrival rates, service rates, wait-time estimates, and stability classifications. That gives the next sprint a trustworthy analytical contract to build on for camera integration and API services.
+
+\section{Sprint Retrospective}
+The main achievement of this sprint was connecting perception to interpretation in one delivery. The tracker and zone logic reduce false continuity problems, while the queue model provides both formulas and guardrails. A mathematically correct wait-time result is not enough if the input window is empty or the queue is unstable, so the implementation had to treat safety and interpretability as equal concerns alongside detection accuracy.
+
+The value of this sprint is that it gives the rest of the system a trustworthy metric layer. Once the queue state is expressed through rates, stability, and fallback behavior, the dashboard and automation work can operate on structured signals instead of raw counts.

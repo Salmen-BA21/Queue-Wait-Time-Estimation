@@ -7,13 +7,13 @@
                 <mxCell id="2" value="" style="group" parent="1" vertex="1" connectable="0">
                     <mxGeometry x="70" y="30" width="1320" height="700" as="geometry"/>
                 </mxCell>
-                <mxCell id="title" value="Sprint 3 Sequence - Feed Lifecycle and Live Updates" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" parent="2" vertex="1">
+                <mxCell id="title" value="Sprint 3 Sequence - Dashboard Updates and Alert Surfacing" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" parent="2" vertex="1">
                     <mxGeometry width="720" height="20" as="geometry"/>
                 </mxCell>
                 <mxCell id="frame" value="loop [for each feed action]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;strokeWidth=3;fontStyle=1;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;" parent="2" vertex="1">
                     <mxGeometry y="32" width="1110" height="668" as="geometry"/>
                 </mxCell>
-                <mxCell id="p1" value="Frontend user" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="2" vertex="1">
+                <mxCell id="p1" value="Dashboard operator" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="2" vertex="1">
                     <mxGeometry x="40" y="72" width="120" height="300" as="geometry"/>
                 </mxCell>
                 <mxCell id="p1l" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="p1" vertex="1">

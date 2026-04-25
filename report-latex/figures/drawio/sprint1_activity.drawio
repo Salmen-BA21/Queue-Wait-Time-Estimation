@@ -31,10 +31,10 @@
                 <mxCell id="n7" value="Keep only people in zone" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="2" vertex="1">
                     <mxGeometry x="26.249999999999996" y="416.2068965517242" width="157.5" height="36.724137931034484" as="geometry"/>
                 </mxCell>
-                <mxCell id="n8" value="Render queue-zone detections" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="2" vertex="1">
+                <mxCell id="n8" value="Estimate rates and wait time" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="2" vertex="1">
                     <mxGeometry x="26.249999999999996" y="471.29310344827593" width="157.5" height="36.724137931034484" as="geometry"/>
                 </mxCell>
-                <mxCell id="n9" value="Display live perception output" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="2" vertex="1">
+                <mxCell id="n9" value="Publish queue metrics" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="2" vertex="1">
                     <mxGeometry x="26.249999999999996" y="526.3793103448277" width="157.5" height="36.724137931034484" as="geometry"/>
                 </mxCell>
                 <mxCell id="n10" value="More frames?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="2" vertex="1">

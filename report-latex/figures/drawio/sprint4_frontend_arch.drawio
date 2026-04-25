@@ -1,39 +1,35 @@
-﻿<mxfile host="app.diagrams.net" modified="2026-04-12T19:20:10.000Z" agent="GitHub Copilot" version="26.2.7" editor="draw.io">
-  <diagram id="sprint4-frontend-arch" name="Sprint4 Frontend Architecture">
-    <mxGraphModel dx="1280" dy="720" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2000" pageHeight="1000" math="0" shadow="0">
+<mxfile host="app.diagrams.net" modified="2026-04-24T00:00:00.000Z" agent="GitHub Copilot" version="26.2.7" editor="draw.io">
+  <diagram id="sprint4-automation" name="Sprint4 Workflow">
+    <mxGraphModel dx="1280" dy="720" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1100" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
 
-        <mxCell id="title" value="Sprint 4 Frontend Architecture" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" vertex="1" parent="1"><mxGeometry x="60" y="30" width="360" height="30" as="geometry" /></mxCell>
+        <mxCell id="title" value="Sprint 4 Workflow - Backend Alerts to Telegram" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" vertex="1" parent="1"><mxGeometry x="60" y="30" width="640" height="30" as="geometry" /></mxCell>
 
-        <mxCell id="p1" value="Dashboard page" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="80" y="120" width="150" height="60" as="geometry" /></mxCell>
-        <mxCell id="p2" value="Zone editor page" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="80" y="210" width="150" height="60" as="geometry" /></mxCell>
-        <mxCell id="p3" value="Analytics page" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="80" y="300" width="150" height="60" as="geometry" /></mxCell>
-        <mxCell id="p4" value="Settings page" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="80" y="390" width="150" height="60" as="geometry" /></mxCell>
+        <mxCell id="b1" value="Runtime metrics collector" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="80" y="160" width="190" height="60" as="geometry" /></mxCell>
+        <mxCell id="b2" value="Alert evaluator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="320" y="160" width="160" height="60" as="geometry" /></mxCell>
+        <mxCell id="b3" value="Webhook serializer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="520" y="160" width="170" height="60" as="geometry" /></mxCell>
+        <mxCell id="b4" value="Delivery client" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="730" y="160" width="150" height="60" as="geometry" /></mxCell>
 
-        <mxCell id="s1" value="Reusable UI components" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="360" y="120" width="200" height="60" as="geometry" /></mxCell>
-        <mxCell id="s2" value="Data hooks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="360" y="240" width="200" height="60" as="geometry" /></mxCell>
-        <mxCell id="s3" value="API client" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="650" y="210" width="150" height="60" as="geometry" /></mxCell>
-        <mxCell id="s4" value="Query cache" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="650" y="300" width="150" height="60" as="geometry" /></mxCell>
+        <mxCell id="n1" value="n8n webhook" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="980" y="110" width="160" height="60" as="geometry" /></mxCell>
+        <mxCell id="n2" value="Validate webhook secret" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="980" y="200" width="180" height="60" as="geometry" /></mxCell>
+        <mxCell id="n3" value="Alert gate and cooldown" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="980" y="290" width="190" height="60" as="geometry" /></mxCell>
+        <mxCell id="n4" value="Acknowledge only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="1220" y="290" width="170" height="60" as="geometry" /></mxCell>
+        <mxCell id="n5" value="Format Telegram message" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="980" y="390" width="190" height="60" as="geometry" /></mxCell>
+        <mxCell id="n6" value="Telegram delivery" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="1220" y="390" width="170" height="60" as="geometry" /></mxCell>
+        <mxCell id="n7" value="Archive alert payload" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="1220" y="500" width="170" height="60" as="geometry" /></mxCell>
 
-        <mxCell id="b1" value="Backend API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="920" y="210" width="150" height="60" as="geometry" /></mxCell>
-        <mxCell id="b2" value="WebSocket stream" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="920" y="300" width="150" height="60" as="geometry" /></mxCell>
-
-        <mxCell id="e1" edge="1" parent="1" source="p1" target="s1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e2" edge="1" parent="1" source="p2" target="s1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e3" edge="1" parent="1" source="p3" target="s1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e4" edge="1" parent="1" source="p4" target="s1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-
-        <mxCell id="e5" edge="1" parent="1" source="p1" target="s2" style="endArrow=block;html=1;dashed=1;strokeColor=#6c8ebf;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e6" edge="1" parent="1" source="p2" target="s2" style="endArrow=block;html=1;dashed=1;strokeColor=#6c8ebf;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e7" edge="1" parent="1" source="p3" target="s2" style="endArrow=block;html=1;dashed=1;strokeColor=#6c8ebf;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e8" edge="1" parent="1" source="p4" target="s2" style="endArrow=block;html=1;dashed=1;strokeColor=#6c8ebf;"><mxGeometry relative="1" as="geometry" /></mxCell>
-
-        <mxCell id="e9" value="cache read/write" edge="1" parent="1" source="s2" target="s4" style="endArrow=both;html=1;edgeStyle=orthogonalEdgeStyle;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e10" edge="1" parent="1" source="s2" target="s3" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e11" edge="1" parent="1" source="s3" target="b1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e12" value="live updates" edge="1" parent="1" source="b2" target="s2" style="endArrow=block;html=1;dashed=1;strokeColor=#b85450;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="b1" target="b2" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="b2" target="b3" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="b3" target="b4" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="b4" target="n1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="n1" target="n2" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="n2" target="n3" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="n3" target="n4" style="endArrow=block;html=1;dashed=1;strokeColor=#b85450;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="n3" target="n5" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="n5" target="n6" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e10" edge="1" parent="1" source="n3" target="n7" style="endArrow=block;html=1;dashed=1;strokeColor=#82b366;"><mxGeometry relative="1" as="geometry" /></mxCell>
       </root>
     </mxGraphModel>
   </diagram>

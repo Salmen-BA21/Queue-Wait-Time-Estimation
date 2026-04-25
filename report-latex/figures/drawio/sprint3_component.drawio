@@ -1,41 +1,64 @@
-﻿<mxfile host="app.diagrams.net" modified="2026-04-12T19:10:50.000Z" agent="GitHub Copilot" version="26.2.7" editor="draw.io">
-  <diagram id="sprint3-component" name="Sprint3 Component">
-    <mxGraphModel dx="1280" dy="720" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2100" pageHeight="1000" math="0" shadow="0">
-      <root>
-        <mxCell id="0" />
-        <mxCell id="1" parent="0" />
-
-        <mxCell id="title" value="Sprint 3 Components - Multi Feed Runtime" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" vertex="1" parent="1"><mxGeometry x="60" y="30" width="470" height="30" as="geometry" /></mxCell>
-
-        <mxCell id="s1" value="Local file or webcam" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="80" y="140" width="170" height="60" as="geometry" /></mxCell>
-        <mxCell id="s2" value="RTSP camera" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="80" y="230" width="170" height="60" as="geometry" /></mxCell>
-        <mxCell id="s3" value="ONVIF camera" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="80" y="320" width="170" height="60" as="geometry" /></mxCell>
-
-        <mxCell id="b1" value="Backend API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="420" y="140" width="160" height="60" as="geometry" /></mxCell>
-        <mxCell id="b2" value="Feed manager" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="620" y="140" width="160" height="60" as="geometry" /></mxCell>
-        <mxCell id="b3" value="Worker runtime" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="820" y="140" width="160" height="60" as="geometry" /></mxCell>
-        <mxCell id="b4" value="WebSocket hub" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="1020" y="140" width="160" height="60" as="geometry" /></mxCell>
-        <mxCell id="b5" value="MJPEG stream" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="820" y="260" width="160" height="60" as="geometry" /></mxCell>
-        <mxCell id="b6" value="WebRTC offer endpoint" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="420" y="260" width="190" height="60" as="geometry" /></mxCell>
-
-        <mxCell id="m1" value="Media server" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="650" y="370" width="150" height="60" as="geometry" /></mxCell>
-        <mxCell id="d1" value="Dashboard" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="1260" y="170" width="150" height="60" as="geometry" /></mxCell>
-
-        <mxCell id="e1" edge="1" parent="1" source="s1" target="b3" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e2" edge="1" parent="1" source="s2" target="b1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e3" edge="1" parent="1" source="s3" target="b1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-
-        <mxCell id="e4" value="setup and control" edge="1" parent="1" source="d1" target="b1" style="endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e5" edge="1" parent="1" source="b1" target="b2" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e6" edge="1" parent="1" source="b2" target="b3" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e7" edge="1" parent="1" source="b3" target="b4" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e8" value="live events" edge="1" parent="1" source="b4" target="d1" style="endArrow=block;html=1;"><mxGeometry relative="1" as="geometry" /></mxCell>
-
-        <mxCell id="e9" value="start WebRTC" edge="1" parent="1" source="d1" target="b6" style="endArrow=block;html=1;dashed=1;strokeColor=#9673a6;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e10" value="SDP exchange" edge="1" parent="1" source="b6" target="m1" style="endArrow=both;html=1;dashed=1;strokeColor=#b85450;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e11" edge="1" parent="1" source="b3" target="b5" style="endArrow=block;html=1;dashed=1;strokeColor=#82b366;"><mxGeometry relative="1" as="geometry" /></mxCell>
-        <mxCell id="e12" value="fallback video" edge="1" parent="1" source="b5" target="d1" style="endArrow=block;html=1;dashed=1;strokeColor=#d6b656;"><mxGeometry relative="1" as="geometry" /></mxCell>
-      </root>
-    </mxGraphModel>
-  </diagram>
+<mxfile host="65bd71144e">
+    <diagram id="sprint3-component" name="Sprint3 Component">
+        <mxGraphModel dx="2988" dy="578" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2100" pageHeight="1000" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="Sprint 3 Components - Dashboard Architecture and Live Monitoring" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="30" width="620" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="pageLayer" value="Page layer\nLanding, dashboard, setup, analytics" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+                    <mxGeometry x="90" y="140" width="220" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="sharedUi" value="Shared UI components\nCards, grids, dialogs, panels" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="90" y="270" width="220" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="stateLayer" value="Dashboard state orchestration\nDerived metrics and live attention" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="360" y="205" width="250" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="integration" value="API integration layer\nTyped requests and query cache" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="660" y="140" width="230" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="liveLayer" value="Live update manager\nWebSocket, polling, fallback" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
+                    <mxGeometry x="660" y="270" width="230" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="authLayer" value="Auth and role routing\nProtected pages and redirects" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" parent="1" vertex="1">
+                    <mxGeometry x="-200" y="260" width="250" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="backendApi" value="Backend API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+                    <mxGeometry x="980" y="140" width="170" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="wsHub" value="WebSocket hub" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="980" y="250" width="170" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="transport" value="Media transport and fallback" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="980" y="360" width="170" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="e1" style="endArrow=block;html=1;" parent="1" source="pageLayer" target="sharedUi" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e2" style="endArrow=block;html=1;" parent="1" source="sharedUi" target="stateLayer" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3" style="endArrow=block;html=1;dashed=1;strokeColor=#666666;" parent="1" source="authLayer" target="pageLayer" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e4" style="endArrow=block;html=1;" parent="1" source="stateLayer" target="integration" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e5" style="endArrow=block;html=1;" parent="1" source="stateLayer" target="liveLayer" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e6" style="endArrow=block;html=1;" parent="1" source="integration" target="backendApi" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e7" style="endArrow=block;html=1;" parent="1" source="liveLayer" target="wsHub" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e8" style="endArrow=block;html=1;dashed=1;strokeColor=#9673a6;" parent="1" source="liveLayer" target="transport" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
 </mxfile>

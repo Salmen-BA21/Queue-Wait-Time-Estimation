@@ -1,46 +1,46 @@
-﻿<mxfile host="65bd71144e">
+<mxfile host="65bd71144e">
     <diagram id="sprint2-component" name="Sprint2 Component">
-        <mxGraphModel dx="522" dy="340" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="900" math="0" shadow="0">
+        <mxGraphModel dx="683" dy="445" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="900" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
-                <mxCell id="title" value="Sprint 2 Components - Analytical Modules" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" parent="1" vertex="1">
-                    <mxGeometry x="60" y="30" width="500" height="30" as="geometry"/>
+                <mxCell id="title" value="Sprint 2 Components - Camera Integration and Backend Services" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="30" width="620" height="30" as="geometry"/>
                 </mxCell>
-                <mxCell id="sys" value="Sprint 2 analytics subsystem" style="shape=component;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontStyle=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
-                    <mxGeometry x="50" y="480" width="340" height="260" as="geometry"/>
+                <mxCell id="sys" value="Backend service layer" style="shape=component;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;fontStyle=1;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="470" width="400" height="300" as="geometry"/>
                 </mxCell>
-                <mxCell id="m1" value="Queue analyzer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
-                    <mxGeometry x="120" y="165" width="110" height="48" as="geometry"/>
+                <mxCell id="m1" value="RTSP and ONVIF onboarding" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+                    <mxGeometry x="90" y="160" width="190" height="52" as="geometry"/>
                 </mxCell>
-                <mxCell id="m2" value="Rate calculator" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
-                    <mxGeometry x="260" y="165" width="110" height="48" as="geometry"/>
+                <mxCell id="m2" value="Feed manager" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="330" y="160" width="150" height="52" as="geometry"/>
                 </mxCell>
-                <mxCell id="m3" value="Stability logic" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
-                    <mxGeometry x="130" y="270" width="110" height="48" as="geometry"/>
+                <mxCell id="m3" value="Live transport control" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="120" y="250" width="190" height="52" as="geometry"/>
                 </mxCell>
-                <mxCell id="m4" value="Wait-time logic" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
-                    <mxGeometry x="260" y="245" width="110" height="48" as="geometry"/>
+                <mxCell id="m4" value="API diagnostics" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="330" y="250" width="150" height="52" as="geometry"/>
                 </mxCell>
-                <mxCell id="m5" value="Metrics publisher" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
-                    <mxGeometry x="190" y="320" width="120" height="48" as="geometry"/>
+                <mxCell id="m5" value="Persistence and recovery" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
+                    <mxGeometry x="225" y="340" width="190" height="52" as="geometry"/>
                 </mxCell>
-                <mxCell id="ext1" value="Dashboard" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
-                    <mxGeometry x="520" y="120" width="140" height="50" as="geometry"/>
+                <mxCell id="ext1" value="Dashboard and WebSocket clients" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+                    <mxGeometry x="580" y="332" width="220" height="60" as="geometry"/>
                 </mxCell>
-                <mxCell id="e1" style="endArrow=open;html=1;dashed=1;strokeColor=#666666;" parent="1" source="m1" target="m2" edge="1">
+                <mxCell id="e1" style="endArrow=block;html=1;dashed=1;strokeColor=#666666;" parent="1" source="m1" target="m2" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="e2" style="endArrow=open;html=1;dashed=1;strokeColor=#666666;" parent="1" source="m2" target="m3" edge="1">
+                <mxCell id="e2" style="endArrow=block;html=1;dashed=1;strokeColor=#666666;" parent="1" source="m2" target="m3" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="e3" style="endArrow=open;html=1;dashed=1;strokeColor=#666666;" parent="1" source="m3" target="m4" edge="1">
+                <mxCell id="e3" style="endArrow=block;html=1;dashed=1;strokeColor=#666666;" parent="1" source="m3" target="m4" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="e4" style="endArrow=open;html=1;dashed=1;strokeColor=#666666;" parent="1" source="m4" target="m5" edge="1">
+                <mxCell id="e4" style="endArrow=block;html=1;dashed=1;strokeColor=#666666;" parent="1" source="m4" target="m5" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="e5" style="endArrow=block;html=1;strokeColor=#9673a6;" parent="1" source="m5" target="ext1" edge="1">
+                <mxCell id="e5" value="status and live updates" style="endArrow=block;html=1;strokeColor=#9673a6;" parent="1" source="m5" target="ext1" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
             </root>

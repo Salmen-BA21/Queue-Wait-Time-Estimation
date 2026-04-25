@@ -1,0 +1,147 @@
+\chapter{Sprint 4: Automation, Evaluation, and Optimization}
+\chaptertoc
+
+\clearpage
+
+\section{Introduction}
+Sprint 4 closed the project by connecting the queue metrics to external notification workflows and then verifying that the full system held together under realistic conditions. The sprint had two complementary goals: first, route alerts from the backend through n8n to Telegram so that operational staff could be notified automatically; second, run a structured evaluation pass to confirm that perception, the API, the dashboard, and the alerting path still worked correctly when exercised together.
+
+This chapter sits at the boundary between analysis and operations. Its role is to preserve the structure of the runtime pipeline while handing alert delivery to a dedicated workflow engine, and then to validate the result.
+
+\section{Sprint Objectives}
+This sprint was organized around automation and evaluation outcomes:
+
+\textbf{Automation objectives:}
+\begin{itemize}
+    \item define a stable webhook payload and validate it before dispatch,
+    \item add retry-based webhook delivery with logging for failures and successes,
+    \item connect runtime threshold detection to alert triggering,
+    \item configure n8n routing for authorization, cooldown, formatting, and delivery.
+\end{itemize}
+
+\textbf{Evaluation objectives:}
+\begin{itemize}
+    \item bring backend and frontend automated tests together into one verification pass,
+    \item confirm feed lifecycle behavior, stream continuity, and API contracts,
+    \item improve runtime throughput and responsiveness,
+    \item strengthen failure handling for network drops, stale data, and worker exits.
+\end{itemize}
+
+\section{Sprint Backlog}
+The Sprint 4 backlog covers both the automation tasks and the evaluation work needed to finalize the project.
+
+\begin{table}[!htbp]
+    \centering
+    \footnotesize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{0.88}
+    \caption{Sprint 4 backlog}
+    \label{tab:sprint4_backlog}
+    \begin{tabularx}{\textwidth}{|l|X|l|X|}
+        \hline
+        User StoryID & UserStory & TaskID & Task \\ \hline
+        US4.1 & As a manager, I want alert payloads dispatched to n8n so that operational staff can be notified automatically. & T4.1 & Define the webhook payload schema and validate it before dispatch. \\ \hline
+        US4.2 & As a developer, I want webhook delivery to be reliable so that notifications are not silently lost. & T4.2 & Add retry logic, timeout handling, and logging for webhook delivery. \\ \hline
+        US4.3 & As a manager, I want alerts routed through Telegram so that I receive notifications on a familiar channel. & T4.3 & Create and configure the Telegram bot, store its credential in n8n, and configure the workflow. \\ \hline
+        US4.4 & As a developer, I want the n8n workflow validated with repeatable test scripts. & T4.4 & Prepare PowerShell scripts for single-alert, multi-feed, and execution polling scenarios. \\ \hline
+        US4.5 & As a developer, I want the full system verified under realistic conditions so that integration issues are caught before delivery. & T4.5 & Run backend and frontend tests together and confirm lifecycle, streaming, and API contracts. \\ \hline
+        US4.6 & As a developer, I want runtime throughput improved so that the processing loop stays responsive. & T4.6 & Apply runtime tuning: configurable image size, frame stride, async dispatch, and playback pacing. \\ \hline
+        US4.7 & As a developer, I want fault tolerance strengthened so that the system recovers from transient failures. & T4.7 & Improve feed worker supervision, frame handoff continuity, and websocket reconnection. \\ \hline
+    \end{tabularx}
+\end{table}
+
+\section{Design}
+
+\subsection{Alert Workflow Diagram}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{\detokenize{n8n_workflow.png}}
+    \caption{Actual Sprint 4 n8n workflow automation diagram used to route queue alerts through cooldown checks, archival, and Telegram delivery.}
+    \label{fig:sprint4_workflow}
+\end{figure}
+
+The automation chain is made up of the runtime metrics collector, the webhook serializer, the HTTP delivery client, the n8n workflow, and the final notification channel. When an alert needs to be preserved for later review, it is sent back to the backend through a dedicated archive endpoint. The workflow checks the webhook secret, applies the cooldown gate, formats the alert, and either acknowledges the payload or forwards it to Telegram.
+
+\subsection{Verification Plan}
+Validation followed a layered strategy that covered the system from the backend to the dashboard:
+\begin{itemize}
+    \item \textbf{Backend unit/integration tests:} queue analytics logic, API endpoints, runtime streaming behavior, and webhook payload handling.
+    \item \textbf{Frontend integration tests:} dashboard setup flow, websocket event handling, media fallback behavior, and API error handling.
+    \item \textbf{Scenario tests:} n8n send/acknowledge flows, unauthorized access paths, and multi-feed alert scenarios.
+\end{itemize}
+
+\subsection{Performance Targets}
+The optimization work was guided by the main operational requirements of the project:
+\begin{itemize}
+    \item processing responsiveness, especially loop cadence and processed-frame throughput,
+    \item stream continuity when a feed changes state,
+    \item webhook impact on the main-loop latency,
+    \item dashboard freshness when websocket quality degrades.
+\end{itemize}
+
+These targets intentionally mirror the behavior that an operator would notice first, so the evaluation reads as a system-level check rather than a narrow benchmark exercise.
+
+\section{Implementation}
+
+\subsection{Alert Payload Structure}
+The webhook schema is centered on \texttt{QueuePayload}, which keeps the information needed by n8n in one structure. It carries:
+\begin{itemize}
+    \item source metadata (timestamp, frame, source, feed ID),
+    \item queue metrics ($\lambda$, $\mu$, wait time, stability),
+    \item alert flags and severity fields.
+\end{itemize}
+Before anything is sent, the payload is validated so malformed records do not leave the backend.
+
+\subsection{Delivery Reliability}
+To reduce the risk of missed notifications, the delivery client uses a timeout, a retry policy, an optional shared-secret header, and logging for both successes and failures. Historical payloads remain in SQLite, which gives the system one place to recover past events if needed.
+
+\subsection{Telegram Bot Setup}
+Before the workflow could send operational alerts, a Telegram bot was created and connected to the project as the final notification channel. Its API token was added to n8n as a credential instead of being hardcoded, which kept the workflow portable and prevented secret exposure in the exported JSON. Once the credential was available, the Telegram node could use it after the webhook validation and cooldown checks passed.
+
+\subsection{Alert Dispatch in the Runtime Loop}
+Inside the main loop, alert sending is moved to \texttt{AsyncWebhookDispatcher} so the perception pipeline keeps running without waiting on the network. This makes it possible to send periodic metric updates and immediate alerts, while a deduplication window limits repeated notifications for the same situation.
+
+\subsection{n8n Workflow Routing and Telegram Delivery}
+The n8n alert workflow follows a simple path \cite{n8n_docs}:
+\begin{itemize}
+    \item webhook reception and secret validation,
+    \item alert detection and cooldown gating,
+    \item alert history archival via backend API,
+    \item message formatting and Telegram send node,
+    \item explicit acknowledge/reject branches.
+\end{itemize}
+Keeping the no-alert, alert-suppressed, and alert-delivered branches separate makes the behavior easier to audit later.
+
+\subsection{Workflow Validation}
+Workflow validation was supported by PowerShell scripts for single-alert checks, automated execution polling, and multi-feed scenarios. These scripts made it possible to replay webhook submissions and confirm that each branch behaved as expected during sprint verification.
+
+\subsection{Verification Coverage}
+The test suite covers API transport behavior, runtime stream handling, webhook delivery, dashboard integration, live-state synchronization, API error cases, and transport fallback behavior. Taken together, these tests check the API envelope, the event contract, stream handoff, and the setup workflow.
+
+\subsection{Runtime Tuning}
+The main tuning actions applied across the runtime loop and configuration layers included:
+\begin{itemize}
+    \item configurable detector image size and frame stride,
+    \item explicit control over the inference device and its diagnostics,
+    \item asynchronous webhook dispatch so the processing loop stayed responsive,
+    \item real-time playback pacing for file-based sources.
+\end{itemize}
+
+\subsection{Fault-Tolerance Improvements}
+Runtime resilience was improved at several levels:
+\begin{itemize}
+    \item feed worker supervision and exit recovery in \texttt{FeedRegistry},
+    \item capture-to-worker frame handoff continuity in \texttt{FeedFrameStreamManager},
+    \item websocket reconnect and fallback behavior on the frontend side.
+\end{itemize}
+
+\subsection{Overall Outcome}
+By the end of the sprint, the system had reached a stable integration point where perception, analytics, the API runtime, the dashboard, and n8n automation operated as one pipeline. What remains is mainly deployment hardening and longer-term benchmarking, not missing core functionality.
+
+\section{Conclusion}
+Sprint 4 closed the project with operational alert routing and structured testing. The automation path now delivers alerts from the backend to Telegram through n8n, while the evaluation pass confirmed that the full stack holds together under realistic conditions. At this stage, the platform is strong enough for demonstration and academic evaluation, while the remaining work is mainly about deployment hardening and longer-term benchmarking.
+
+\section{Sprint Retrospective}
+This final sprint showed that the most important delivery was not any individual feature but the end-to-end integration. The automation work gave the system its last operational channel, and the evaluation work gave it a structured confirmation that the earlier sprints held up when tested together.
+
+The main lesson is that alerting and verification are not secondary tasks. Without reliable dispatch and structured testing, the earlier perception and dashboard work would remain incomplete from an operational perspective.

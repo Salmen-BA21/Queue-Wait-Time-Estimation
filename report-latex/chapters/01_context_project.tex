@@ -15,7 +15,7 @@ This end-of-studies project was carried out with DataDoIt, a data-driven sustain
 
 The collaboration provided a concrete setting for work centered on data collection, real-time monitoring, and automated analytics, and these concerns directly shaped the design and scope of the project.
 
-\begin{table}[H]
+\begin{table}[!htbp]
     \centering
     \caption{Collaboration perimeter with DataDoIt}
     \label{tab:datadoit_perimeter}
@@ -58,7 +58,7 @@ Existing operational practices and basic counting tools present recurring limita
 
 As a consequence, interventions (staff reallocation, lane opening, escalation) can be delayed or triggered on incomplete signals. The problem is therefore both analytical and integration-related: it is not enough to produce robust indicators; they also need to be delivered through actionable channels.
 
-\begin{table}[H]
+\begin{table}[!htbp]
     \centering
     \caption{From operational pain points to system-level requirements}
     \label{tab:painpoint_to_requirement}
@@ -75,24 +75,39 @@ As a consequence, interventions (staff reallocation, lane opening, escalation) c
 \subsection{Study of Existing Approaches}
 Recent computer-vision frameworks provide strong building blocks for person perception, notably YOLO-based detection and tracking algorithms such as ByteTrack \cite{ultralytics_docs,bytetrack2022}. Queueing theory, in parallel, offers formal models for service-system behavior, including interpretable relationships between arrival rate, service rate, and expected waiting time \cite{gross_queueing}.
 
-In practice, many deployments remain incomplete. Some focus only on counting and ignore identity continuity; others provide visualization without defining stability clearly; and others stop at analytics without connecting to alert delivery. The result is often a set of disconnected tools instead of one coherent architecture.
+In practice, several commercial and open-source solutions address parts of the queue management problem. They can be grouped into three families: queue management platforms, sensor-based analytics, and vision-based monitoring frameworks.
 
-\begin{table}[H]
+\subsubsection{Queue Management Platforms}
+Platforms such as Waitwhile \cite{waitwhile2026} and Qminder \cite{qminder2026} focus on active queue management. They let customers join virtual queues through kiosks, QR codes, or web links, and they notify staff through SMS or dashboards. Their strength is customer-facing experience: reduced perceived waiting, appointment scheduling, and service routing. However, they require explicit customer interaction (check-in) and do not observe the physical queue directly. They cannot estimate wait time from the scene itself, and they do not detect congestion unless a customer has already registered.
+
+\subsubsection{Sensor-Based Analytics}
+RetailNext \cite{retailnext2026} and Xovis \cite{xovis2026} represent the sensor-based analytics family. RetailNext uses ceiling-mounted AI sensors to track foot traffic, measure conversion rates, and optimize staffing in retail environments. Xovis uses 3D optical sensors for precise people flow and queue length measurement, particularly in airports and large retail spaces. Both provide high-accuracy occupancy and dwell-time data, but they require proprietary hardware installations and are primarily designed for large-scale enterprise deployments. They observe the queue passively but do not typically integrate with external automation workflows or provide open APIs for custom alert routing.
+
+\subsubsection{Vision-Based Monitoring Frameworks}
+Open-source tools built on YOLO detection and tracking, such as those provided by Ultralytics \cite{ultralytics_yolo2026} and Roboflow \cite{roboflow_queue}, offer the computer-vision building blocks needed for queue monitoring: person detection, tracking, and zone-based counting. These frameworks are flexible and can be adapted to specific use cases. However, they typically stop at detection and counting. They do not include queue-theoretic estimation of wait time, stability classification, or integration with notification workflows. The gap between raw detection output and actionable operational metrics is left to the developer.
+
+\subsubsection{Positioning of the Proposed Solution}
+The following table positions the proposed solution against these existing approach families.
+
+\begin{table}[!htbp]
     \centering
-    \small
-    \setlength{\tabcolsep}{4pt}
-    \renewcommand{\arraystretch}{0.92}
-    \caption{Positioning of the proposed solution against common approach families}
+    \footnotesize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{0.88}
+    \caption{Positioning of the proposed solution against existing approaches}
     \label{tab:approach_positioning}
-    \begin{tabularx}{\textwidth}{|l|X|X|}
+    \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{0.34\textwidth}|>{\raggedright\arraybackslash}p{0.31\textwidth}|>{\raggedright\arraybackslash}p{0.31\textwidth}|}
         \hline
         Approach family & Strengths & Typical limitation \\ \hline
+        Queue management platforms (Waitwhile, Qminder) & Customer-facing experience, virtual queues, appointment scheduling. & Require explicit check-in; do not observe physical queues or estimate wait time from the scene. \\ \hline
+        Sensor-based analytics (RetailNext, Xovis) & High-accuracy occupancy and flow data from dedicated 3D sensors. & Proprietary hardware; limited custom automation; enterprise-scale pricing. \\ \hline
+        Vision-based detection frameworks (Ultralytics, Roboflow) & Flexible open-source detection and tracking building blocks. & Stop at counting; no queue-theoretic estimation, stability classification, or alert integration. \\ \hline
         Manual or occupancy-only monitoring & Easy to deploy and interpret. & Weak predictive value and high subjectivity. \\ \hline
-        Vision detection without persistent tracking & Fast frame-level counting. & No persistent identities, so arrival and departure logic can drift. \\ \hline
-        Analytical queue models without vision coupling & Strong mathematical interpretability. & Needs reliable event extraction from real scenes. \\ \hline
-        Proposed integrated pipeline & Links perception, queue analytics, monitoring, and automation. & Requires careful integration and validation. \\ \hline
+        Proposed integrated pipeline & Links perception, queue analytics, stability handling, web monitoring, and automation in one modular architecture. & Requires careful integration and validation across multiple technical domains. \\ \hline
     \end{tabularx}
 \end{table}
+
+The proposed solution fills the gap between these families by combining open-source vision-based detection with queue-theoretic analytics, a web monitoring dashboard, and automated alert routing, all in one modular pipeline that does not require proprietary hardware or explicit customer interaction.
 
 \subsection{Proposed Solution}
 The proposed system combines perception, analytics, and integration in one modular pipeline:
@@ -120,11 +135,11 @@ The project objectives are to:
 
 To keep the implementation traceable, the objectives are mapped to delivery modules and observable outputs.
 
-\begin{table}[H]
+\begin{table}[!htbp]
     \centering
-    \small
-    \setlength{\tabcolsep}{4pt}
-    \renewcommand{\arraystretch}{0.92}
+    \footnotesize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{0.88}
     \caption{Objective-to-module traceability}
     \label{tab:objective_traceability}
     \begin{tabularx}{\textwidth}{|l|X|l|X|}
@@ -162,7 +177,7 @@ An Agile approach was selected to deliver functional increments quickly while re
 Iterative delivery made it possible to validate contracts progressively: first perception outputs, then analytical reliability, then API/runtime integration, then web usability, and finally workflow automation and hardening.
 
 \subsection{SCRUM}
-Development followed sprint-based Scrum planning with iterative validation. For report readability and implementation traceability, work is grouped into three logical modules.
+Development followed sprint-based Scrum planning with iterative validation. For report readability and implementation traceability, the work is presented as four consolidated sprint chapters that are grouped into three logical modules.
 
 The Scrum methodology is illustrated in Figure~\ref{fig:scrum_methodology}.
 
@@ -173,44 +188,62 @@ The Scrum methodology is illustrated in Figure~\ref{fig:scrum_methodology}.
     \label{fig:scrum_methodology}
 \end{figure}
 
-\subsubsection{Module A: Backend Core (Sprints 1-3)}
-This module established the vision and analytics backbone:
+\subsubsection{Module A: Backend Core (Sprints 1--2)}
+This module established the vision, analytics, and backend service backbone:
 \begin{itemize}
-    \item Sprint 1: detection, tracking, and zone filtering foundation,
-    \item Sprint 2: Queue Metrics and Stability Handling,
-    \item Sprint 3: camera connectivity and backend API exposure.
+    \item Sprint 1: detection, tracking, zone filtering, queue metrics, and stability handling,
+    \item Sprint 2: camera connectivity, backend API exposure, and live transport.
 \end{itemize}
 
-\subsubsection{Module B: Web Experience (Sprints 4-5)}
+\subsubsection{Module B: Web Experience (Sprint 3)}
 This module focused on the web supervision experience:
 \begin{itemize}
-    \item Sprint 4: web design system and frontend scaffolding,
-    \item Sprint 5: frontend integration with live backend metrics.
+    \item Sprint 3: web design system, frontend scaffolding, live backend integration, and dashboard monitoring.
 \end{itemize}
 
-\subsubsection{Module C: Automation and Finalization (Sprints 6-8)}
-This module covered integration hardening and closure:
+\subsubsection{Module C: Automation and Finalization (Sprint 4)}
+This module covered automation, evaluation, and project closure:
 \begin{itemize}
-    \item Sprint 6: n8n automation and Telegram alerting,
-    \item Sprint 7: evaluation and optimization,
-    \item Sprint 8: report finalization and project consolidation.
+    \item Sprint 4: n8n automation, Telegram alerting, evaluation, optimization, and project consolidation.
 \end{itemize}
 
-\begin{table}[H]
+\begin{table}[!htbp]
     \centering
-    \small
-    \setlength{\tabcolsep}{4pt}
-    \renewcommand{\arraystretch}{0.92}
+    \footnotesize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{0.88}
     \caption{Scrum module mapping used in this report}
     \label{tab:scrum_module_mapping}
     \begin{tabularx}{\textwidth}{|l|l|X|X|}
         \hline
         Module & Sprints & Main focus & Validation perspective \\ \hline
-        Module A: Backend Core & 1 to 3 & Vision pipeline, queue analytics, camera connectivity, API services & Perception correctness and metric contracts. \\ \hline
-        Module B: Web Experience & 4 to 5 & Frontend design system, dashboard scaffolding, live integration & Usability and live-rendering stability. \\ \hline
-        Module C: Automation and Finalization & 6 to 8 & n8n alerting, optimization, validation, and reporting & End-to-end operability and delivery readiness. \\ \hline
+        Module A: Backend Core & 1 to 2 & Perception pipeline, queue analytics, camera connectivity, API services, live transport & Perception correctness, metric contracts, and API reliability. \\ \hline
+        Module B: Web Experience & 3 & Frontend design system, dashboard scaffolding, live integration, monitoring workflows & Usability, live-rendering stability, and role-based navigation. \\ \hline
+        Module C: Automation and Finalization & 4 & n8n alerting, Telegram notifications, evaluation, optimization, and fault tolerance & End-to-end operability and delivery readiness. \\ \hline
     \end{tabularx}
 \end{table}
+
+\subsection{Sprint Planning}
+The project followed a sprint-based Scrum structure to keep the work incremental and traceable from requirements to implementation. Each sprint focused on a coherent part of the system, and the overall plan was adjusted as the internship progressed.
+
+\begin{table}[!htbp]
+    \centering
+    \footnotesize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.08}
+    \caption{Sprint planning used in the report}
+    \label{tab:sprint_planning}
+    \begin{tabularx}{\textwidth}{|l|>{\raggedright\arraybackslash}X|c|c|c|}
+        \hline
+        Sprint & Objectives & Start Date & End Date & User Story IDs \\ \hline
+        Sprint 1 & \shortstack[l]{\textbullet\ Perception and queue analytics\\\textbullet\ Detection, tracking, and zone filtering\\\textbullet\ Wait-time estimation and stability handling} & 16/02/2026 & 14/03/2026 & US1.1--US1.9 \\ \hline
+        Sprint 2 & \shortstack[l]{\textbullet\ Camera connectivity and discovery\\\textbullet\ Backend API exposure\\\textbullet\ Live transport and feed management} & 15/03/2026 & 11/04/2026 & US2.1--US2.4 \\ \hline
+        Sprint 3 & \shortstack[l]{\textbullet\ Web design system and frontend scaffolding\\\textbullet\ Live backend integration\\\textbullet\ Dashboard monitoring and role-based navigation} & 12/04/2026 & 09/05/2026 & US3.1--US3.9 \\ \hline
+        Sprint 4 & \shortstack[l]{\textbullet\ n8n automation and Telegram alerting\\\textbullet\ Testing and verification\\\textbullet\ Runtime tuning and fault tolerance} & 10/05/2026 & 06/06/2026 & US4.1--US4.7 \\ \hline
+    \end{tabularx}
+\end{table}
+
+The detailed user stories for each sprint are presented in the backlog tables in Chapters 3 to 6.
 
 \section{Conclusion}
 This chapter set the project context, formalized the addressed operational problem, and justified the selected delivery strategy. Chapter 2 builds on this baseline by defining the requirements, architecture constraints, and analysis artifacts used to guide implementation decisions.
