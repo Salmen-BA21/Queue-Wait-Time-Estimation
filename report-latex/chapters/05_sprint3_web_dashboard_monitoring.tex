@@ -63,26 +63,10 @@ The project design specification introduces a ``Terminal Minimal'' style and a s
 
 The designed page set includes the landing page, dashboard, setup wizard, zone editor, analytics, settings, and heatmap views. These screens helped define what the frontend had to support before live data arrived.
 
-\subsection{Frontend Architecture}
-\begin{figure}[H]
-    \centering
-    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 3 frontend architecture diagram -- routing, components, and state boundaries}}
-    \caption{Frontend architecture for routing, components, and state boundaries.}
-    \label{fig:sprint3_frontend_arch}
-\end{figure}
-
-The frontend scaffold separates pages, shared interface elements, workflow logic, and the parts that connect the interface to the backend so the dashboard can grow without becoming difficult to maintain:
-\begin{itemize}
-    \item page layer: the main screens the user navigates through,
-    \item component layer: reusable interface parts and panels,
-    \item integration layer: the logic that handles data and user actions,
-    \item connection layer: the pieces that connect the frontend to the backend.
-\end{itemize}
-
 \subsection{Sequence Diagrams}
 \begin{figure}[H]
     \centering
-    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 3 sequence diagram -- dashboard updates and alert surfacing}}
+    \includegraphics[width=0.95\textwidth]{\detokenize{chapter5_sequence.pdf}}
     \caption{Sprint 3 sequence diagram for dashboard updates and alert surfacing.}
     \label{fig:sprint3_sequence}
 \end{figure}
@@ -130,7 +114,7 @@ Sprint 3 connected the login and sign-up flows to the dashboard. The auth provid
 \subsection{Dashboard State Orchestration}
 A dedicated dashboard state layer coordinates data fetching and updates. From the received feed data, the dashboard derives indicators such as online feeds, total people, average wait time, and attention counts, then exposes them to the widgets.
 
-The state layer also helps absorb temporary uncertainty. When a websocket event arrives late, the dashboard can keep displaying the last valid snapshot instead of dropping the screen into an empty state. That design choice improves usability during unstable network periods and keeps the monitoring surface trustworthy.
+The state layer also helps absorb transient data gaps. When a websocket event arrives late, the dashboard can keep displaying the last valid snapshot instead of dropping the screen into an empty state. That design choice improves usability during unstable network periods and keeps the monitoring surface trustworthy.
 
 \subsection{Live Update Reliability}
 The live-update layer includes:

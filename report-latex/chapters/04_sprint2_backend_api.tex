@@ -39,20 +39,10 @@ The Sprint 2 backlog was organized as a table so the connectivity work can be tr
 
 \section{Design}
 
-\subsection{Component Diagram}
-\begin{figure}[H]
-    \centering
-    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 2 component diagram -- camera integration and backend services}}
-    \caption{Sprint 2 components for camera integration and backend services.}
-    \label{fig:sprint2_component}
-\end{figure}
-
-The design keeps camera integration, data handling, runtime control, and live event delivery separate so each part can evolve without forcing changes on the others.
-
 \subsection{Sequence Diagrams}
 \begin{figure}[H]
     \centering
-    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for Sprint 2 sequence diagram -- feed orchestration and live event distribution}}
+    \includegraphics[width=0.95\textwidth]{\detokenize{chapter4_sequence.pdf}}
     \caption{Sprint 2 sequence diagram for feed orchestration and live event distribution.}
     \label{fig:sprint2_sequence}
 \end{figure}
@@ -96,6 +86,9 @@ To reduce viewing latency while still keeping a fallback path, Sprint 2 introduc
 Runtime control sits inside the API orchestration layer. It keeps track of feed state, synchronizes persistence, manages the worker lifecycle, and dispatches events to the rest of the system. The live channel publishes updates such as snapshots, feed status changes, metric updates, alert notifications, and system warnings.
 
 For the video surface, the system keeps a shared fallback stream so that viewing does not break when the runtime mode changes.
+
+\subsection{Backend Persistence Architecture}
+The backend persistence architecture is implemented in SQLite, with a schema that preserves establishments, checkout counters, feed configurations, video sessions, alerts, users, refresh sessions, and auth audit records. This storage design supports both operational recovery and historical analysis, while the runtime layer uses it to restore stale sessions and preserve manager metadata across restarts.
 
 \subsection{Persistence and Recovery}
 The persistence layer stores feed configuration, metadata, video sessions, and archived alerts in SQLite. When the backend starts, it reloads saved feeds and safely resets any stale running sessions so the system begins from a consistent state.

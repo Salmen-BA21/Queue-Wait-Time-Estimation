@@ -74,7 +74,7 @@ These requirements define the minimum end-to-end behavior expected from the plat
         FR-05 & Classify stable/unstable queue states with fallback wait-time logic. & High & Validate stability branches and fallback behavior. \\ \hline
         FR-06 & Expose feed control and live updates through API and websocket channels. & High & Validate endpoint and runtime behavior in API tests. \\ \hline
         FR-07 & Dispatch alert payloads to automation workflows. & Medium & Validate webhook dispatch and n8n branching. \\ \hline
-        FR-08 & Persist operational metrics and metadata for analysis and auditing. & Medium & Validate SQLite persistence in runtime and database checks. \\ \hline
+        FR-08 & Persist operational metrics and metadata for analysis and auditing. & Medium & Validate persistence behavior in runtime and database checks. \\ \hline
         FR-09 & Support manager registration, sign-in, refresh, and logout through secure cookies. & High & Validate register, login, refresh, logout, and session checks. \\ \hline
         FR-10 & Protect administrative and operational APIs with role-based access control and audit logging. & High & Validate unauthorized access paths and audit events. \\ \hline
     \end{tabularx}
@@ -127,7 +127,7 @@ The global use case diagram gives a high-level view of how the administrator and
 
 \begin{figure}[H]
     \centering
-    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for global use case diagram}}
+    \includegraphics[width=0.95\textwidth]{\detokenize{global_use_case.pdf}}
     \caption{Global use case diagram of the queue wait-time estimation system.}
     \label{fig:global_use_case}
 \end{figure}
@@ -152,44 +152,6 @@ At the system level, the use cases can be grouped into four interactions: config
 
 \section{Sprint Scope Overview}
 We organized the project into four consolidated sprints so that the pipeline could be delivered step by step and checked at each stage. The sprint chapters that follow describe those implementation phases in detail, from perception and queue analytics to frontend integration and automation.
-
-\section{UML Class Modeling}
-This section presents the conceptual structure of the system using UML class modeling. The objective is to make responsibilities, attributes, and relationships explicit before implementation details, while keeping alignment with persistence and runtime contracts.
-
-\subsection{Core Domain Classes}
-The main objects are:
-\begin{itemize}
-    \item \textbf{VideoFeed}: source identity, connectivity, runtime status, and configuration.
-    \item \textbf{FeedTransportCapabilities}: per-feed readiness flags for WebRTC and MJPEG routing.
-    \item \textbf{QueueMetrics}: timestamped indicators (people in zone, $\lambda$, $\mu$, $W$, stability).
-    \item \textbf{Alert}: severity, threshold context, and notification payload.
-    \item \textbf{Establishment} and \textbf{Cashier}: business metadata used to organize feeds.
-\end{itemize}
-
-These entities mirror the runtime contract used by the backend so that live metrics, configuration data, and persisted records stay consistent across modules.
-
-The authentication layer adds its own classes for manager accounts, refresh sessions, and audit events.
-
-\begin{figure}[H]
-    \centering
-    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for authentication and audit UML class diagram}}
-    \caption{Authentication and audit UML class diagram for manager accounts, refresh sessions, and audit logging.}
-    \label{fig:auth_audit_data_model}
-\end{figure}
-
-These classes map directly to the runtime and persistence layers used by the application.
-
-\subsection{Persistence Mapping and Data Lifecycle}
-Runtime metrics are generated continuously and distributed through live channels, while selected records are persisted for auditability and trend analysis. This dual-path strategy improves resilience because temporary integration failures do not imply complete data loss.
-
-SQLite persistence stores operational metrics, structured metadata, authentication records, and alert archives in a single source of truth. That supports operational continuity as well as post-run diagnosis.
-
-\begin{figure}[H]
-    \centering
-    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for unified domain UML class diagram}}
-    \caption{Unified domain UML class diagram mapped to SQLite persistence for feed metadata, queue sessions, and alert archival.}
-    \label{fig:database_schema}
-\end{figure}
 
 \section{Project Environment}
 
@@ -258,7 +220,7 @@ The technology stack follows the main stages of the system and is summarized in 
         \hline
         Layer & Main technologies & Role in the project \\ \hline
         Vision pipeline & YOLO26, ByteTrack, and OpenCV \cite{ultralytics_docs,bytetrack2022,opencv_docs} & Detects people, tracks them across frames, and prepares the visual input for queue analysis. \\ \hline
-        Queue analytics & NumPy, Pandas, SciPy, and M/M/1 modeling \cite{gross_queueing} & Computes arrival rate, service rate, wait time, and uncertainty indicators. \\ \hline
+        Queue analytics & NumPy, Pandas, SciPy, and M/M/1 modeling \cite{gross_queueing} & Computes arrival rate, service rate, and wait time. \\ \hline
         Backend API & FastAPI and Pydantic v2 & Exposes typed endpoints, validates payloads, and coordinates the backend services. \\ \hline
         Live transport & WebRTC, MediaMTX WHEP gateway, and MJPEG fallback \cite{webrtc_w3c,mediamtx_docs} & Delivers low-latency video streaming while keeping a simpler HTTP fallback available. \\ \hline
         Frontend & React, TypeScript, Vite, and Tailwind CSS & Implements the dashboard, user interactions, and responsive presentation layer. \\ \hline
@@ -275,7 +237,7 @@ This selection keeps the implementation modular from perception through automati
 We describe the architecture as four stages that match the flow of data through the system:
 \begin{figure}[H]
     \centering
-    \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering Placeholder for overall system architecture diagram}}
+    \includegraphics[width=0.95\textwidth]{\detokenize{chapter2_architecture.pdf}}
     \caption{Overall system architecture from video acquisition to alert delivery.}
     \label{fig:overall_architecture}
 \end{figure}
@@ -294,7 +256,7 @@ The backend exposes REST and websocket interfaces for feed lifecycle control and
 
 Feed-level orchestration lets each camera be started, stopped, or refreshed independently. If one feed fails, the others keep running, and the dashboard still receives a predictable event stream.
 
-We treat persistence and integration as core responsibilities rather than add-ons: SQLite-backed state preserves operational context, while webhook delivery turns queue events into external notifications.
+We treat persistence and integration as core responsibilities rather than add-ons: a durable backend state store preserves operational context, while webhook delivery turns queue events into external notifications.
 
 \subsection{Frontend Architecture}
 The frontend is built as a component-based interface with typed API integration, feed-oriented dashboard composition, and websocket-driven synchronization. Data access is isolated in hooks and client utilities, while pages and reusable components focus on presentation and interaction.
