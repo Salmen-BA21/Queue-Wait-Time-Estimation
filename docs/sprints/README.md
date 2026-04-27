@@ -1,26 +1,20 @@
 # Sprint Documentation
 
-This folder contains sprint-oriented documentation for planning and execution tracking.
+This folder contains sprint-oriented documentation for planning and execution tracking, aligned with the final project structure.
 
-## Sprint Model (Defined from Existing Work)
+## Sprint Model (Consolidated)
 
-- **Sprint 0:** Project setup and documentation foundation
-- **Sprint 1:** Environment setup, first tests, and core detection pipeline
-- **Sprint 2:** GUI workflow, zone selection, and multi-video support
-- **Sprint 3:** Queue-rate modeling and wait-time estimation
-- **Sprint 4:** Legacy uncertainty exploration (historical)
-- **Sprint 5:** n8n webhook integration, payloads, and threshold detection
-- **Sprint 6:** Telegram alerts, persistence checks, and inline actions (planned)
-- **Sprint 7:** Dashboard hardening and system supervision improvements (mostly done)
-- **Sprint 8:** Comprehensive scenario testing and evaluation (partial)
-- **Sprint 9:** Final report, architecture packaging, and presentation (planned)
+- **Sprint 1: Perception & Analytics** – Environment setup, core detection pipeline, multi-video GUI, and queue-rate modeling.
+- **Sprint 2: Backend API & Core Integration** – BFF API development, Auth/RBAC implementation, and RTSP/ONVIF camera support.
+- **Sprint 3: Web Dashboard & Monitoring** – React frontend implementation, real-time dashboard UI, and metrics visualization.
+- **Sprint 4: Automation & Evaluation** – n8n webhook integration, Telegram alerts, and final system evaluation.
 
 ## Key Files
 
-- `SPRINT4_SUMMARY.md` – Sprint 4 completion summary
-- `SPRINT5_SETUP.md` – Sprint 5 setup and integration guide
-- `SPRINT_MAPPING.md` – Mapping from legacy phase labels to sprint labels
+- `SPRINT_MAPPING.md` – Mapping from legacy labels to the consolidated 4-sprint model.
+- `SPRINT5_SETUP.md` – (Legacy Reference) Integration guide for webhook and n8n components (now part of Sprint 4).
 
 ## Notes
 
-Legacy phase files are archived in `docs/archive/phases/` for backward traceability. New updates should use sprint terminology.
+All "Uncertainty Quantification" features have been removed from the final project scope to focus on system reliability and real-time monitoring.
+

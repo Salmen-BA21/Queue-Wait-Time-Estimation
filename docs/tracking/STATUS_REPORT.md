@@ -240,11 +240,9 @@ Test scripts created:
 - `test_main_gui.py` - Validates main window initialization (PASSES)
 
 ## Next Steps
-1. **Test full GUI workflow**: Select video → Configure → Define zone → Run analysis
-2. **Verify subprocess launch**: Analysis execution from GUI step 3
-3. **Test with various videos**: Ensure robustness with different resolutions
-4. **Add uncertainty quantification**: Confidence intervals for queue metrics
-5. **Performance optimization**: Profile and optimize detection/tracking pipeline
+1. **Consolidated System Evaluation**: Run full-stack integration tests (Backend + Frontend + n8n).
+2. **Deployment Hardening**: Finalize Docker Compose and environment isolation.
+3. **Report Finalization**: Package all 4 sprint chapters with final evaluation results.
 
 ## Running the System
 

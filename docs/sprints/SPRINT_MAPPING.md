@@ -1,21 +1,23 @@
-# Legacy Phase → Sprint Mapping
+# Legacy → Consolidated Sprint Mapping
 
-To preserve history while standardizing terminology, use the following direct mapping:
+To ensure continuity, use this mapping to understand how previous phases and sprints align with the final 4-sprint structure.
 
-| Legacy Label | Sprint Label | Scope |
+| Legacy Label | New Sprint | Scope |
 |---|---|---|
-| Phase 0 | Sprint 0 | Project setup and documentation foundation |
-| Phase 1 | Sprint 1 | Environment + core detection and queue logic |
-| Phase 2 | Sprint 2 | GUI workflow and multi-video zone handling |
-| Phase 3 | Sprint 3 | Rate estimation and wait-time modeling |
-| Phase 4 | Sprint 4 | Uncertainty quantification |
-| Phase 5 | Sprint 5 | n8n webhook integration and alert detection |
-| Phase 6 | Sprint 6 | Telegram alerts and persistence logic |
-| Phase 7 | Sprint 7 | Dashboard/supervision enhancements |
-| Phase 8 | Sprint 8 | Final testing and evaluation |
-| Phase 9 | Sprint 9 | Reporting and presentation |
+| Sprint 0 | Sprint 1 | Project setup and documentation foundation |
+| Sprint 1 | Sprint 1 | Environment + core detection and queue logic |
+| Sprint 2 | Sprint 1 | GUI workflow and multi-video zone handling |
+| Sprint 3 | Sprint 1 | Rate estimation and wait-time modeling |
+| Sprint 4 | (Removed) | **Uncertainty quantification (Discarded)** |
+| Sprint 5 | Sprint 4 | n8n webhook integration and alert detection |
+| Sprint 6 | Sprint 4 | Telegram alerts and persistence logic |
+| Sprint 7 | Sprint 3 | Dashboard/supervision enhancements |
+| Sprint 8 | Sprint 4 | Final testing and evaluation |
+| Sprint 10 | Sprint 3 | Web Application UI/UX Design |
+| Sprint 11 | Sprint 3 | Web Application Frontend Implementation |
 
 ## Usage Rule
 
-- For all new documentation, use **Sprint** labels.
-- Legacy files may still contain **Phase** labels and should be interpreted using this mapping.
+- Use the **Consolidated Sprint (1-4)** labels for all final reporting and auditing.
+- Uncertainty Quantification is no longer part of the project deliverables.
+

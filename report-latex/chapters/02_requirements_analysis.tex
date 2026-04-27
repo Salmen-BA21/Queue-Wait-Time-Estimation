@@ -4,9 +4,9 @@
 
 
 \section{Introduction}
-This chapter turns the project objective into the requirements that guided the implementation. We identify the actors, list the functions and quality constraints they need, and show how those requirements are spread across the implementation plan.
+This chapter turns the project objective into the requirements that guided the implementation. It identifies the actors, lists the functions and quality constraints they need, and shows how those requirements are spread across the implementation plan.
 
-Rather than treating the requirements as an isolated checklist, we connect them to the queue-monitoring pipeline used throughout the project: video ingestion, person detection and tracking, queue-metric estimation, dashboard delivery, authentication, and alert automation. That link matters because the later chapters follow the same path from requirement to implementation, including the access layer used for manager onboarding and administrator governance.
+The requirements are tied to the queue-monitoring pipeline used throughout the project: video ingestion, person detection and tracking, queue-metric estimation, dashboard delivery, authentication, and alert automation. This connection matters because the later chapters follow the same path from requirement to implementation, including the access layer used for manager onboarding and administrator governance.
 
 \section{Requirements Specification}
 
@@ -22,7 +22,7 @@ The actors of the system are:
 This split makes the functional scope easier to explain and validate, because access-control flows and operational monitoring flows can be tested separately.
 
 \subsection{Authentication and Access Governance}
-The platform also includes a lightweight identity layer so that the dashboard is not open to anonymous use. Managers can register, sign in, refresh their session, and log out, while administrators manage manager accounts and audit the resulting actions. The detailed backend and frontend implementation is described in the sprint chapters, but the requirements are captured here because access boundaries are part of the core system behavior.
+The platform also includes a lightweight identity layer so that the dashboard is not open to anonymous use. Managers can register, sign in, refresh their session, and log out, while administrators manage manager accounts and review the resulting actions. The detailed backend and frontend implementation appears in the sprint chapters, but the requirements are captured here because access boundaries are part of the core system behavior.
 
 \begin{table}[!htbp]
     \centering
@@ -81,7 +81,7 @@ These requirements define the minimum end-to-end behavior expected from the plat
 \end{table}
 
 \subsection{Non-functional Requirements}
-In addition to functional behavior, the platform must satisfy quality constraints that keep it usable in a live monitoring environment. Because the project combines computer vision, analytics, a web dashboard, and automation workflows, performance and reliability are as important as correctness. For this project, the main quality constraints are:
+In addition to functional behavior, the platform must satisfy quality constraints that keep it usable in a live monitoring environment. Because the project combines computer vision, analytics, a web dashboard, and automation workflows, performance and reliability matter as much as correctness. For this project, the main quality constraints are:
 \begin{itemize}
     \item \textbf{Performance}: maintain real-time behavior and low alert latency.
     \item \textbf{Scalability}: support multiple feeds and independent feed lifecycle control.
@@ -113,7 +113,7 @@ We treat these quality attributes as engineering contracts rather than only desi
 \end{table}
 
 \section{Product Backlog}
-The product backlog was prioritized according to business value and technical dependency. To keep the implementation easy to follow, we grouped the items into three domains that mirror the system architecture: backend processing, web supervision, and automation.
+The product backlog was prioritized according to business value and technical dependency. To keep the implementation easy to follow, the items were grouped into three domains that mirror the system architecture: backend processing, web supervision, and automation.
 \begin{itemize}
     \item \textbf{Backend domain}: perception pipeline, queue analytics, API and stream interfaces.
     \item \textbf{Web domain}: dashboard UX, live monitoring integration, zone editing workflows.
@@ -201,7 +201,7 @@ The project also relied on a small set of development tools for editing, version
         Tool & Role in the project & Typical use \\ \hline
         VS Code & Main editor for the backend, frontend, and report sources. & Day-to-day implementation, review, and navigation. \\ \hline
         Git / GitHub & Version control and change history tracking. & Commit management, branching, and collaboration. \\ \hline
-        draw.io / Eraser & Diagram authoring for architecture and UML models. & Use case, UML class, and system architecture diagrams. \\ \hline
+        draw.io  & Diagram authoring for architecture and UML models. & Use case, UML class, and system architecture diagrams. \\ \hline
         Docker / Docker Compose & Local service orchestration and reproducible setup. & Supporting services such as MediaMTX and n8n. \\ \hline
     \end{tabularx}
 \end{table}

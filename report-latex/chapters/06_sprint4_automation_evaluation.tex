@@ -4,9 +4,9 @@
 \clearpage
 
 \section{Introduction}
-Sprint 4 closed the project by connecting the queue metrics to external notification workflows and then verifying that the full system held together under realistic conditions. The sprint had two complementary goals: first, route alerts from the backend through n8n to Telegram so that operational staff could be notified automatically; second, run a structured evaluation pass to confirm that perception, the API, the dashboard, and the alerting path still worked correctly when exercised together.
+Sprint 4 closed the project by connecting the queue metrics to external notification workflows and then checking that the full system still held together under realistic conditions. The sprint had two goals: route alerts from the backend through n8n to Telegram so operational staff could be notified automatically, and run a structured evaluation pass to confirm that perception, the API, the dashboard, and the alerting path still worked correctly when exercised together.
 
-This chapter sits at the boundary between analysis and operations. Its role is to preserve the structure of the runtime pipeline while handing alert delivery to a dedicated workflow engine, and then to validate the result.
+This chapter sits at the boundary between analysis and operations. Its role is to keep the runtime pipeline intact while handing alert delivery to a dedicated workflow engine, and then to validate the result.
 
 \section{Sprint Objectives}
 This sprint was organized around automation and evaluation outcomes:
@@ -60,7 +60,7 @@ The Sprint 4 backlog covers both the automation tasks and the evaluation work ne
     \label{fig:sprint4_workflow}
 \end{figure}
 
-The automation chain is made up of the runtime metrics collector, the webhook serializer, the HTTP delivery client, the n8n workflow, and the final notification channel. When an alert needs to be preserved for later review, it is sent back to the backend through a dedicated archive endpoint. The workflow checks the webhook secret, applies the cooldown gate, formats the alert, and either acknowledges the payload or forwards it to Telegram.
+The automation chain includes the runtime metrics collector, the webhook serializer, the HTTP delivery client, the n8n workflow, and the final notification channel. When an alert needs to be preserved for later review, it goes back to the backend through a dedicated archive endpoint. The workflow checks the webhook secret, applies the cooldown gate, formats the alert, and either acknowledges the payload or forwards it to Telegram.
 
 \subsection{Verification Plan}
 Validation followed a layered strategy that covered the system from the backend to the dashboard:
@@ -139,9 +139,9 @@ Runtime resilience was improved at several levels:
 By the end of the sprint, the system had reached a stable integration point where perception, analytics, the API runtime, the dashboard, and n8n automation operated as one pipeline. What remains is mainly deployment hardening and longer-term benchmarking, not missing core functionality.
 
 \section{Conclusion}
-Sprint 4 closed the project with operational alert routing and structured testing. The automation path now delivers alerts from the backend to Telegram through n8n, while the evaluation pass confirmed that the full stack holds together under realistic conditions. At this stage, the platform is strong enough for demonstration and academic evaluation, while the remaining work is mainly about deployment hardening and longer-term benchmarking.
+Sprint 4 closed the project with operational alert routing and structured testing. The automation path now delivers alerts from the backend to Telegram through n8n, while the evaluation pass confirmed that the full stack still works under realistic conditions. At this stage, the platform is ready for demonstration and academic evaluation, while the remaining work is mainly deployment hardening and longer-term benchmarking.
 
 \section{Sprint Retrospective}
-This final sprint showed that the most important delivery was not any individual feature but the end-to-end integration. The automation work gave the system its last operational channel, and the evaluation work gave it a structured confirmation that the earlier sprints held up when tested together.
+This final sprint showed that the most important delivery was not any individual feature but the end-to-end integration. The automation work gave the system its last operational channel, and the evaluation work confirmed that the earlier sprints still held up when tested together.
 
 The main lesson is that alerting and verification are not secondary tasks. Without reliable dispatch and structured testing, the earlier perception and dashboard work would remain incomplete from an operational perspective.

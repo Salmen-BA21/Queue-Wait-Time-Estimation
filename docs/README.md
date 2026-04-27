@@ -12,17 +12,17 @@ Web application UI/UX design documentation:
 
 ### 🔹 `/sprints/` (primary)
 Sprint-specific planning and execution documentation:
-- **README.md** – Sprint model and usage notes
-- **SPRINT_MAPPING.md** – Legacy phase-to-sprint mapping
-- **SPRINT4_SUMMARY.md** – Historical summary of legacy uncertainty work
-- **SPRINT5_SETUP.md** – n8n integration setup guide
+- **README.md** – Consolidated 4-sprint model and usage notes
+- **SPRINT_MAPPING.md** – Legacy-to-consolidated mapping
+- **SPRINT1_SUMMARY.md** to **SPRINT4_SUMMARY.md** – Summaries for the consolidated sprints
 
 ### 🔹 `/tracking/`
 Project progress and status tracking:
-- **PROGRESS.md** – Overall project progress report with sprint completion status
+- **PROGRESS.md** – Overall project progress report (Consolidated 4-sprint model)
 - **STATUS_REPORT.md** – Status updates on specific issues/fixes
-- **WEB_APP_GUI_PARITY_PLAN.md** – Remaining work to bring the web app to full desktop GUI feature parity
+- **AUDIT_PLAN_4_SPRINTS.md** – Backlog-to-code parity audit plan
 - **MJPEG_STREAMING_MIGRATION.md** – Snapshot polling to MJPEG streaming migration details
+
 	- Includes March 31 updates for GPU device selection, source-FPS playback pacing, and smoothness tuning defaults.
 
 ### 🔹 Root docs in `/docs/`

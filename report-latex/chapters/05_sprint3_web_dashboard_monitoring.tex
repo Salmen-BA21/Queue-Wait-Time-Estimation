@@ -4,7 +4,7 @@
 \clearpage
 
 \section{Introduction}
-Sprint 3 covered the full frontend delivery, from the initial design decisions and page structure to the live backend integration that made the dashboard operational. The sprint started by defining the visual direction and navigation model, then connected the interface to the backend services and runtime events so the dashboard could react to live data, transport changes, and feed lifecycle actions.
+Sprint 3 covered the frontend work from the first design decisions and page structure to the live backend integration that made the dashboard operational. The sprint started by defining the visual direction and navigation model, then connected the interface to backend services and runtime events so the dashboard could react to live data, transport changes, and feed lifecycle actions.
 
 This two-phase approach was intentional. Settling the design system and page skeleton first meant that the live integration work could focus on behavior and reliability instead of redesigning the interface at the same time.
 
@@ -53,7 +53,7 @@ The Sprint 3 backlog was organized as a table so both the design foundation and 
 \section{Design}
 
 \subsection{UI and UX Design}
-The project design specification introduces a ``Terminal Minimal'' style and a seven-page navigation model. The goal was to give the dashboard a clear and sober visual identity that fits a monitoring application. The design language emphasizes:
+The project design specification introduces a ``Terminal Minimal'' style and a seven-page navigation model. The goal was to give the dashboard a simple visual identity that fits a monitoring application. The design language emphasizes:
 \begin{itemize}
     \item dark operational surfaces optimized for continuous monitoring,
     \item strong semantic colors for status and alert levels,
@@ -79,12 +79,12 @@ Three main flows were implemented:
 \end{enumerate}
 
 \subsection{Design Rationale}
-The design phase was intentionally scoped as a foundation step rather than a full UI release. The goal was to settle navigation, component boundaries, and interaction patterns before live data and transport logic arrived. A clean shell is a real deliverable when the integration work depends on it.
+The design phase was kept as a foundation step rather than a full UI release. The goal was to settle navigation, component boundaries, and interaction patterns before live data and transport logic arrived. A clean shell was a useful deliverable because the integration work depended on it.
 
 \section{Implementation}
 
 \subsection{Project Setup and Layout Skeleton}
-The implementation started by turning the design specification into an actual application skeleton. The workspace setup established the application entry point, the navigation structure, and the shared layout that all pages reuse.
+The implementation started by turning the design specification into an application skeleton. The workspace setup established the application entry point, the navigation structure, and the shared layout that all pages reuse.
 
 The order of the pages was not arbitrary. The layout had to support a workflow that begins with onboarding, continues through configuration, and ends with live supervision. That is why the page skeleton was treated as an operational path rather than a list of unrelated screens.
 
@@ -127,7 +127,7 @@ The live-update layer includes:
 \end{itemize}
 When the websocket connection drops, the dashboard falls back to periodic polling instead of freezing, so operators still have a usable view during transient issues.
 
-This fallback behavior was deliberately treated as a first-class feature rather than an error path. In a queue-monitoring context, the operator needs continuity more than perfect transport purity, so the UI must remain informative even when the preferred live path is temporarily unavailable.
+This fallback behavior was treated as a first-class feature rather than an error path. In a queue-monitoring context, the operator needs continuity more than perfect transport purity, so the UI must remain informative even when the preferred live path is temporarily unavailable.
 
 \subsection{Live Video Delivery}
 Live feed cards use a transport decision layer to choose the most suitable viewing mode. For each running feed, the frontend checks whether live viewing is ready. If the higher-quality live stream is available, it is used first; otherwise the dashboard falls back to the simpler video stream.
@@ -197,9 +197,9 @@ Frontend integration behavior is validated through scenario-based tests that cov
 The tests are useful not just for regression detection, but also for documenting what the sprint is supposed to guarantee. They show that the implementation is not finished when the screen renders; it is finished when the system still behaves correctly under reconnects, route changes, and fallback transitions.
 
 \section{Conclusion}
-By the end of Sprint 3, the dashboard could react to live state, switch transport modes, and stay usable when the live connection failed. That working interface completed the frontend delivery and prepared the project for alert automation and final evaluation.
+By the end of Sprint 3, the dashboard could react to live state, switch transport modes, and stay usable when the live connection failed. That completed the frontend delivery and prepared the project for alert automation and final evaluation.
 
 \section{Sprint Retrospective}
-This sprint confirmed that separating design foundation from live integration was the right approach. The most valuable outcome was not a single widget, but the orchestration layer that connects session state, feed actions, live metrics, and transport fallback into one predictable operator experience.
+This sprint confirmed that separating the design foundation from live integration was the right approach. The most useful outcome was the orchestration layer that connects session state, feed actions, live metrics, and transport fallback into one predictable operator experience.
 
 The main tradeoff was complexity at the boundary between frontend and backend. More logic moved into the dashboard, but that logic was necessary to keep the system resilient when transport conditions changed. In the final review, this was considered acceptable because the result is easier to operate and easier to explain in the report.
