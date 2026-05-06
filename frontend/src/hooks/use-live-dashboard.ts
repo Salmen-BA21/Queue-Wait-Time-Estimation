@@ -21,6 +21,13 @@ import {
   useDashboardWebsocket,
 } from "@/hooks/use-dashboard-websocket";
 
+const statisticsQueryKeys = [
+  ["statistics-overview"],
+  ["statistics-zones"],
+  ["statistics-time"],
+  ["statistics-alerts"],
+] as const;
+
 function toRelativeTime(isoTimestamp: string): string {
   const deltaMs = Date.now() - new Date(isoTimestamp).getTime();
   const minutes = Math.max(0, Math.round(deltaMs / 60000));
@@ -42,6 +49,12 @@ export function useLiveDashboard() {
   const queryClient = useQueryClient();
   const [activity, setActivity] = useState<ActivityItem[]>([]);
 
+  const invalidateStatisticsQueries = () => {
+    for (const queryKey of statisticsQueryKeys) {
+      void queryClient.invalidateQueries({ queryKey });
+    }
+  };
+
   useDashboardWebsocket({ queryClient, setActivity });
 
   const feedsQuery = useQuery({
@@ -60,6 +73,7 @@ export function useLiveDashboard() {
     onSuccess: (feed) => {
       queryClient.setQueryData<VideoFeed[]>(feedsQueryKey, (current = []) => upsertFeed(current, feed));
       void queryClient.invalidateQueries({ queryKey: systemHealthQueryKey });
+      invalidateStatisticsQueries();
       pushActivity(setActivity, {
         id: `local-create-${feed.feed_id}`,
         message: `${feed.name} was added to the surveillance grid.`,
@@ -74,6 +88,7 @@ export function useLiveDashboard() {
       updateZone(feedId, zone),
     onSuccess: (feed) => {
       queryClient.setQueryData<VideoFeed[]>(feedsQueryKey, (current = []) => upsertFeed(current, feed));
+      invalidateStatisticsQueries();
       pushActivity(setActivity, {
         id: `zone-update-${feed.feed_id}`,
         message: `Zone updated for ${feed.name}.`,
@@ -95,6 +110,7 @@ export function useLiveDashboard() {
     }),
     onSuccess: (feed) => {
       queryClient.setQueryData<VideoFeed[]>(feedsQueryKey, (current = []) => upsertFeed(current, feed));
+      invalidateStatisticsQueries();
       pushActivity(setActivity, {
         id: `threshold-update-${feed.feed_id}`,
         message: `Queue thresholds updated for ${feed.name}.`,
@@ -151,6 +167,7 @@ export function useLiveDashboard() {
     onSuccess: ({ feed_id: feedId }) => {
       queryClient.setQueryData<VideoFeed[]>(feedsQueryKey, (current = []) => removeFeed(current, feedId));
       void queryClient.invalidateQueries({ queryKey: systemHealthQueryKey });
+      invalidateStatisticsQueries();
       pushActivity(setActivity, {
         id: `delete-${feedId}-${Date.now()}`,
         message: "A feed was removed from the surveillance wall.",

@@ -14,6 +14,12 @@ import {
 
 export const feedsQueryKey = ["feeds"] as const;
 export const systemHealthQueryKey = ["system-health"] as const;
+const statisticsQueryKeys = [
+  ["statistics-overview"],
+  ["statistics-zones"],
+  ["statistics-time"],
+  ["statistics-alerts"],
+] as const;
 
 const SOCKET_RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000, 30000] as const;
 const METRICS_FLUSH_INTERVAL_MS = 250;
@@ -310,6 +316,9 @@ export function useDashboardWebsocket({
         }
 
         void queryClient.invalidateQueries({ queryKey: systemHealthQueryKey });
+        for (const queryKey of statisticsQueryKeys) {
+          void queryClient.invalidateQueries({ queryKey });
+        }
         return;
       }
 

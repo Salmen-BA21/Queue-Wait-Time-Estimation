@@ -7,7 +7,7 @@ import mimetypes
 import os
 import sqlite3
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Literal
 from urllib.parse import quote, urlparse, urlunparse
@@ -20,6 +20,7 @@ from fastapi import (
     File,
     Header,
     HTTPException,
+    Query,
     Request,
     Response,
     UploadFile,
@@ -77,6 +78,11 @@ from src.api.models import (
     RegisterRequest,
     ResetManagerPasswordRequest,
     SessionStatusResponse,
+    StatisticsDateRange,
+    StatisticsOverviewResponse,
+    TimeSeriesStatisticsItem,
+    ZoneStatisticsItem,
+    AlertDistributionItem,
     UpdateManagerStatusRequest,
     WebhookIntegrationStatus,
     WebhookIntegrationTestResult,
@@ -109,10 +115,14 @@ from src.database import (
     get_refresh_session_by_token_hash,
     get_caisse_by_id,
     get_caisses_by_establishment,
+    get_alert_distribution_statistics,
+    get_overview_statistics,
     get_establishment_by_id,
     get_establishments,
+    get_time_based_statistics,
     get_user_by_email,
     get_user_by_id,
+    get_zone_statistics,
     init_db,
     list_users_by_role,
     record_failed_login_attempt,
@@ -642,6 +652,11 @@ def build_caisse_model(record: dict) -> Caisse:
     payload["zone"] = coerce_zone_polygon(payload.pop("zone_points", None))
     payload.pop("zone_points_json", None)
     return Caisse.model_validate(payload)
+
+
+def build_statistics_date_range(from_date: date | None, to_date: date | None) -> StatisticsDateRange:
+    """Convert query parameters into a normalized date range model."""
+    return StatisticsDateRange(from_date=from_date, to_date=to_date)
 
 
 def build_onvif_device_model(record: dict) -> ONVIFDevice:
@@ -1232,6 +1247,95 @@ async def archive_queue_alerts(request: QueueAlertArchiveRequest) -> ApiResponse
             timestamp=request.timestamp,
         ),
         message="Alert payload archived successfully.",
+    )
+
+
+@app.get("/api/statistics/overview", response_model=ApiResponse[StatisticsOverviewResponse])
+async def get_statistics_overview(
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[StatisticsOverviewResponse]:
+    owner_user_id = resolve_feed_owner_scope(current_user)
+    stats = await asyncio.to_thread(
+        get_overview_statistics,
+        from_date=from_date.isoformat() if from_date else None,
+        to_date=to_date.isoformat() if to_date else None,
+        owner_user_id=owner_user_id,
+    )
+    return ApiResponse(
+        data=StatisticsOverviewResponse(
+            date_range=build_statistics_date_range(from_date, to_date),
+            avg_wait_time=float(stats.get("avg_wait_time", 0) or 0),
+            peak_queue_length=int(stats.get("peak_queue_length", 0) or 0),
+            stability_score=float(stats.get("stability_score", 0) or 0),
+            total_alerts=int(stats.get("total_alerts", 0) or 0),
+            critical_alerts=int(stats.get("critical_alerts", 0) or 0),
+            warning_alerts=int(stats.get("warning_alerts", 0) or 0),
+            avg_people_in_zone=float(stats.get("avg_people_in_zone", 0) or 0),
+            avg_service_rate=float(stats.get("avg_service_rate", 0) or 0),
+            avg_arrival_rate=float(stats.get("avg_arrival_rate", 0) or 0),
+        ),
+        message="Statistics overview loaded successfully.",
+    )
+
+
+@app.get("/api/statistics/by-zone", response_model=ApiResponse[list[ZoneStatisticsItem]])
+async def get_statistics_by_zone(
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[list[ZoneStatisticsItem]]:
+    owner_user_id = resolve_feed_owner_scope(current_user)
+    rows = await asyncio.to_thread(
+        get_zone_statistics,
+        from_date=from_date.isoformat() if from_date else None,
+        to_date=to_date.isoformat() if to_date else None,
+        owner_user_id=owner_user_id,
+    )
+    return ApiResponse(
+        data=[ZoneStatisticsItem.model_validate(row) for row in rows],
+        message="Zone statistics loaded successfully.",
+    )
+
+
+@app.get("/api/statistics/by-time", response_model=ApiResponse[list[TimeSeriesStatisticsItem]])
+async def get_statistics_by_time(
+    period: Literal["hourly", "daily", "weekly"] = Query(default="daily"),
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[list[TimeSeriesStatisticsItem]]:
+    owner_user_id = resolve_feed_owner_scope(current_user)
+    rows = await asyncio.to_thread(
+        get_time_based_statistics,
+        period=period,
+        from_date=from_date.isoformat() if from_date else None,
+        to_date=to_date.isoformat() if to_date else None,
+        owner_user_id=owner_user_id,
+    )
+    return ApiResponse(
+        data=[TimeSeriesStatisticsItem.model_validate(row) for row in rows],
+        message="Time-based statistics loaded successfully.",
+    )
+
+
+@app.get("/api/statistics/alerts", response_model=ApiResponse[list[AlertDistributionItem]])
+async def get_statistics_alerts(
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
+) -> ApiResponse[list[AlertDistributionItem]]:
+    owner_user_id = resolve_feed_owner_scope(current_user)
+    rows = await asyncio.to_thread(
+        get_alert_distribution_statistics,
+        from_date=from_date.isoformat() if from_date else None,
+        to_date=to_date.isoformat() if to_date else None,
+        owner_user_id=owner_user_id,
+    )
+    return ApiResponse(
+        data=[AlertDistributionItem.model_validate(row) for row in rows],
+        message="Alert analytics loaded successfully.",
     )
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Generic, Literal, TypeVar
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -170,6 +170,66 @@ class QueueAlertArchiveResponse(BaseModel):
     camera_id: str
     zone_id: str
     timestamp: datetime
+
+
+class StatisticsDateRange(BaseModel):
+    """Inclusive date range used to filter analytics queries."""
+
+    from_date: date | None = None
+    to_date: date | None = None
+
+
+class StatisticsOverviewResponse(BaseModel):
+    """Aggregate dashboard metrics derived from archived alerts."""
+
+    date_range: StatisticsDateRange
+    avg_wait_time: float = Field(ge=0.0)
+    peak_queue_length: int = Field(ge=0)
+    stability_score: float = Field(ge=0.0)
+    total_alerts: int = Field(ge=0)
+    critical_alerts: int = Field(ge=0)
+    warning_alerts: int = Field(ge=0)
+    avg_people_in_zone: float = Field(ge=0.0)
+    avg_service_rate: float = Field(ge=0.0)
+    avg_arrival_rate: float = Field(ge=0.0)
+
+
+class ZoneStatisticsItem(BaseModel):
+    """Aggregate queue metrics for one camera/zone combination."""
+
+    camera_id: str | None = None
+    zone_id: str | None = None
+    total_alerts: int = Field(ge=0)
+    avg_wait_time: float = Field(ge=0.0)
+    max_wait_time: float = Field(ge=0.0)
+    min_wait_time: float = Field(ge=0.0)
+    avg_people_in_zone: float = Field(ge=0.0)
+    peak_queue_length: int = Field(ge=0)
+    avg_service_rate: float = Field(ge=0.0)
+    stability_score: float = Field(ge=0.0)
+    critical_alerts: int = Field(ge=0)
+    warning_alerts: int = Field(ge=0)
+
+
+class TimeSeriesStatisticsItem(BaseModel):
+    """Single aggregated data point for the time-series chart."""
+
+    period: str
+    alert_count: int = Field(ge=0)
+    avg_wait_time: float = Field(ge=0.0)
+    peak_queue_length: int = Field(ge=0)
+    stability_score: float = Field(ge=0.0)
+    avg_service_rate: float = Field(ge=0.0)
+    avg_arrival_rate: float = Field(ge=0.0)
+
+
+class AlertDistributionItem(BaseModel):
+    """Frequency distribution of alert types and severities."""
+
+    alert_type: str
+    severity: str
+    count: int = Field(ge=0)
+    percentage: float = Field(ge=0.0)
 
 
 class WebhookIntegrationStatus(BaseModel):

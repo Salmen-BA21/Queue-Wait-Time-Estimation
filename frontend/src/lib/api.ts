@@ -144,6 +144,61 @@ export interface QueueAlert {
   timestamp: string;
 }
 
+export interface StatisticsDateRange {
+  from_date: string | null;
+  to_date: string | null;
+}
+
+export interface StatisticsOverview {
+  date_range: StatisticsDateRange;
+  avg_wait_time: number;
+  peak_queue_length: number;
+  stability_score: number;
+  total_alerts: number;
+  critical_alerts: number;
+  warning_alerts: number;
+  avg_people_in_zone: number;
+  avg_service_rate: number;
+  avg_arrival_rate: number;
+}
+
+export interface ZoneStatisticsItem {
+  camera_id: string | null;
+  zone_id: string | null;
+  total_alerts: number;
+  avg_wait_time: number;
+  max_wait_time: number;
+  min_wait_time: number;
+  avg_people_in_zone: number;
+  peak_queue_length: number;
+  avg_service_rate: number;
+  stability_score: number;
+  critical_alerts: number;
+  warning_alerts: number;
+}
+
+export interface TimeSeriesStatisticsItem {
+  period: string;
+  alert_count: number;
+  avg_wait_time: number;
+  peak_queue_length: number;
+  stability_score: number;
+  avg_service_rate: number;
+  avg_arrival_rate: number;
+}
+
+export interface AlertDistributionItem {
+  alert_type: string;
+  severity: string;
+  count: number;
+  percentage: number;
+}
+
+export interface StatisticsFilters {
+  from?: string | null;
+  to?: string | null;
+}
+
 export interface VideoFeed {
   feed_id: string;
   name: string;
@@ -162,6 +217,17 @@ export interface VideoFeed {
   last_error: string | null;
   last_warning: string | null;
   last_warning_code: string | null;
+}
+
+function buildStatisticsQuery(filters?: StatisticsFilters): string {
+  const params = new URLSearchParams();
+  if (filters?.from) {
+    params.set("from", filters.from);
+  }
+  if (filters?.to) {
+    params.set("to", filters.to);
+  }
+  return params.toString();
 }
 
 export interface QueueThresholdUpdateInput {
@@ -559,6 +625,31 @@ export function listFeeds(): Promise<VideoFeed[]> {
 
 export function getSystemHealth(): Promise<SystemHealth> {
   return fetchApi<SystemHealth>("/api/system/health");
+}
+
+export function getStatisticsOverview(filters?: StatisticsFilters): Promise<StatisticsOverview> {
+  const query = buildStatisticsQuery(filters);
+  return fetchApi<StatisticsOverview>(query ? `/api/statistics/overview?${query}` : "/api/statistics/overview");
+}
+
+export function getZoneStatistics(filters?: StatisticsFilters): Promise<ZoneStatisticsItem[]> {
+  const query = buildStatisticsQuery(filters);
+  return fetchApi<ZoneStatisticsItem[]>(query ? `/api/statistics/by-zone?${query}` : "/api/statistics/by-zone");
+}
+
+export function getTimeBasedStatistics(
+  period: "hourly" | "daily" | "weekly" = "daily",
+  filters?: StatisticsFilters,
+): Promise<TimeSeriesStatisticsItem[]> {
+  const query = buildStatisticsQuery(filters);
+  const baseQuery = `period=${encodeURIComponent(period)}`;
+  const fullQuery = query ? `${baseQuery}&${query}` : baseQuery;
+  return fetchApi<TimeSeriesStatisticsItem[]>(`/api/statistics/by-time?${fullQuery}`);
+}
+
+export function getAlertDistributionStatistics(filters?: StatisticsFilters): Promise<AlertDistributionItem[]> {
+  const query = buildStatisticsQuery(filters);
+  return fetchApi<AlertDistributionItem[]>(query ? `/api/statistics/alerts?${query}` : "/api/statistics/alerts");
 }
 
 export function createFeed(input: CreateFeedInput): Promise<VideoFeed> {

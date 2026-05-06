@@ -586,6 +586,126 @@ class TestQueueVisionApi(unittest.TestCase):
             start_response = manager_client.post(f"/api/feeds/{legacy_feed_id}/start")
             self.assertEqual(start_response.status_code, 200)
 
+    def test_manager_statistics_follow_current_dashboard_feed_scope(self) -> None:
+        suffix = str(int(datetime.now().timestamp() * 1_000_000))
+        manager_a_email = f"manager.stats.a.{suffix}@queuevision.local"
+        manager_b_email = f"manager.stats.b.{suffix}@queuevision.local"
+
+        with TestClient(app) as anonymous_client, TestClient(app) as manager_a_client, TestClient(app) as manager_b_client:
+            manager_a_register = manager_a_client.post(
+                "/api/auth/register",
+                json={
+                    "email": manager_a_email,
+                    "display_name": "Manager Stats A",
+                    "password": "ManagerPass123",
+                },
+            )
+            self.assertEqual(manager_a_register.status_code, 201)
+
+            manager_b_register = manager_b_client.post(
+                "/api/auth/register",
+                json={
+                    "email": manager_b_email,
+                    "display_name": "Manager Stats B",
+                    "password": "ManagerPass123",
+                },
+            )
+            self.assertEqual(manager_b_register.status_code, 201)
+
+            manager_a_feed = manager_a_client.post(
+                "/api/feeds",
+                json={
+                    "name": "Manager A Stats Feed",
+                    "source": "rtsp://192.168.1.230/live/main",
+                },
+            )
+            self.assertEqual(manager_a_feed.status_code, 201)
+            manager_a_feed_id = manager_a_feed.json()["data"]["feed_id"]
+
+            manager_b_feed = manager_b_client.post(
+                "/api/feeds",
+                json={
+                    "name": "Manager B Stats Feed",
+                    "source": "rtsp://192.168.1.231/live/main",
+                },
+            )
+            self.assertEqual(manager_b_feed.status_code, 201)
+            manager_b_feed_id = manager_b_feed.json()["data"]["feed_id"]
+
+            legacy_feed = anonymous_client.post(
+                "/api/feeds",
+                json={
+                    "name": "Legacy Shared Stats Feed",
+                    "source": "rtsp://192.168.1.232/live/main",
+                },
+            )
+            self.assertEqual(legacy_feed.status_code, 201)
+            legacy_feed_id = legacy_feed.json()["data"]["feed_id"]
+
+            orphan_camera_id = "orphan-camera-not-in-feed-configs"
+
+            def archive_for_camera(camera_id: str, zone_id: str, wait_time: float) -> None:
+                response = anonymous_client.post(
+                    "/api/alerts/archive",
+                    json={
+                        "timestamp": "2026-05-06T12:00:00.000Z",
+                        "camera_id": camera_id,
+                        "zone_id": zone_id,
+                        "metrics": {
+                            "people_in_zone": 5,
+                            "arrival_rate": 0.12,
+                            "service_rate": 0.15,
+                            "wait_time_seconds": wait_time,
+                            "queue_stable": True,
+                        },
+                        "alerts": [
+                            {
+                                "type": "WAIT_TIME_WARNING",
+                                "severity": "warning",
+                                "message": "Wait time warning",
+                                "value": wait_time,
+                                "threshold": 60,
+                            }
+                        ],
+                        "raw_detection_count": 5,
+                        "fps": 24.0,
+                    },
+                )
+                self.assertEqual(response.status_code, 200)
+
+            archive_for_camera(manager_a_feed_id, "zone-a", 42.0)
+            archive_for_camera(manager_b_feed_id, "zone-b", 84.0)
+            archive_for_camera(legacy_feed_id, "zone-legacy", 36.0)
+            archive_for_camera(orphan_camera_id, "zone-orphan", 99.0)
+
+            manager_a_zone_stats = manager_a_client.get("/api/statistics/by-zone")
+            self.assertEqual(manager_a_zone_stats.status_code, 200)
+            manager_a_rows = manager_a_zone_stats.json()["data"]
+            manager_a_camera_ids = {row["camera_id"] for row in manager_a_rows}
+
+            self.assertIn(manager_a_feed_id, manager_a_camera_ids)
+            self.assertIn(legacy_feed_id, manager_a_camera_ids)
+            self.assertNotIn(manager_b_feed_id, manager_a_camera_ids)
+            self.assertNotIn(orphan_camera_id, manager_a_camera_ids)
+
+            manager_a_overview = manager_a_client.get("/api/statistics/overview")
+            self.assertEqual(manager_a_overview.status_code, 200)
+            self.assertEqual(manager_a_overview.json()["data"]["total_alerts"], 2)
+
+            delete_response = manager_a_client.delete(f"/api/feeds/{manager_a_feed_id}")
+            self.assertEqual(delete_response.status_code, 200)
+
+            post_delete_zone_stats = manager_a_client.get("/api/statistics/by-zone")
+            self.assertEqual(post_delete_zone_stats.status_code, 200)
+            post_delete_rows = post_delete_zone_stats.json()["data"]
+            post_delete_camera_ids = {row["camera_id"] for row in post_delete_rows}
+            self.assertNotIn(manager_a_feed_id, post_delete_camera_ids)
+            self.assertIn(legacy_feed_id, post_delete_camera_ids)
+
+            post_delete_overview = manager_a_client.get("/api/statistics/overview")
+            self.assertEqual(post_delete_overview.status_code, 200)
+            self.assertEqual(post_delete_overview.json()["data"]["total_alerts"], 1)
+
     def test_start_feed_preserves_rtsp_runtime_options(self) -> None:
         response = self.client.post(
             "/api/feeds",
