@@ -79,8 +79,6 @@ describe("Analytics", () => {
       peak_queue_length: 21,
       stability_score: 84,
       total_alerts: 12,
-      critical_alerts: 4,
-      warning_alerts: 8,
       avg_people_in_zone: 8.4,
       avg_service_rate: 0.22,
       avg_arrival_rate: 0.18,
@@ -98,8 +96,6 @@ describe("Analytics", () => {
         peak_queue_length: 18,
         avg_service_rate: 0.2,
         stability_score: 78,
-        critical_alerts: 2,
-        warning_alerts: 4,
       },
     ]);
 
@@ -121,12 +117,6 @@ describe("Analytics", () => {
         severity: "warning",
         count: 8,
         percentage: 66.67,
-      },
-      {
-        alert_type: "WAIT_TIME_CRITICAL",
-        severity: "critical",
-        count: 4,
-        percentage: 33.33,
       },
     ]);
 
@@ -291,8 +281,6 @@ describe("Analytics", () => {
       peak_queue_length: 0,
       stability_score: 0,
       total_alerts: 0,
-      critical_alerts: 0,
-      warning_alerts: 0,
       avg_people_in_zone: 0,
       avg_service_rate: 0,
       avg_arrival_rate: 0,

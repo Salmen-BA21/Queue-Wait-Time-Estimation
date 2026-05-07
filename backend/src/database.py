@@ -907,8 +907,6 @@ def get_overview_statistics(
                 COALESCE(MAX(people_in_zone), 0) AS peak_queue_length,
                 COALESCE(ROUND(100.0 * AVG(CASE WHEN queue_stable = 1 THEN 1.0 ELSE 0.0 END), 2), 0) AS stability_score,
                 COUNT(*) AS total_alerts,
-                COALESCE(SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END), 0) AS critical_alerts,
-                COALESCE(SUM(CASE WHEN severity = 'warning' THEN 1 ELSE 0 END), 0) AS warning_alerts,
                 COALESCE(ROUND(AVG(people_in_zone), 2), 0) AS avg_people_in_zone,
                 COALESCE(ROUND(AVG(service_rate), 3), 0) AS avg_service_rate,
                 COALESCE(ROUND(AVG(arrival_rate), 3), 0) AS avg_arrival_rate
@@ -951,9 +949,7 @@ def get_zone_statistics(
                 COALESCE(ROUND(AVG(people_in_zone), 2), 0) AS avg_people_in_zone,
                 COALESCE(MAX(people_in_zone), 0) AS peak_queue_length,
                 COALESCE(ROUND(AVG(service_rate), 3), 0) AS avg_service_rate,
-                COALESCE(ROUND(100.0 * AVG(CASE WHEN queue_stable = 1 THEN 1.0 ELSE 0.0 END), 2), 0) AS stability_score,
-                COALESCE(SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END), 0) AS critical_alerts,
-                COALESCE(SUM(CASE WHEN severity = 'warning' THEN 1 ELSE 0 END), 0) AS warning_alerts
+                COALESCE(ROUND(100.0 * AVG(CASE WHEN queue_stable = 1 THEN 1.0 ELSE 0.0 END), 2), 0) AS stability_score
             FROM alert_history
             {where_clause}
             GROUP BY camera_id, zone_id

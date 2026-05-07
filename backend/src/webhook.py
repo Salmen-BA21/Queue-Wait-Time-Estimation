@@ -38,7 +38,7 @@ class QueuePayload:
     # Alerts and thresholds
     alert_triggered: bool = False
     alert_reason: str = ""  # e.g., "queue_exceeded_threshold"
-    alert_severity: str = "info"  # "info", "warning", "critical"
+    alert_severity: str = "warning"  # "warning"
     
     # Additional metadata
     system_uptime_sec: float = 0.0
@@ -99,7 +99,7 @@ EXAMPLE_PAYLOAD = {
     "queue_stable": True,
     "alert_triggered": False,
     "alert_reason": "",
-    "alert_severity": "info",
+    "alert_severity": "warning",
     "system_uptime_sec": 3600.5,
     "confidence_scores": [0.95, 0.93, 0.96, 0.94],
     "establishment_name": "Downtown Store",

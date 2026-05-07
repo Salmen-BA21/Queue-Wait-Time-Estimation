@@ -187,8 +187,6 @@ class StatisticsOverviewResponse(BaseModel):
     peak_queue_length: int = Field(ge=0)
     stability_score: float = Field(ge=0.0)
     total_alerts: int = Field(ge=0)
-    critical_alerts: int = Field(ge=0)
-    warning_alerts: int = Field(ge=0)
     avg_people_in_zone: float = Field(ge=0.0)
     avg_service_rate: float = Field(ge=0.0)
     avg_arrival_rate: float = Field(ge=0.0)
@@ -207,8 +205,6 @@ class ZoneStatisticsItem(BaseModel):
     peak_queue_length: int = Field(ge=0)
     avg_service_rate: float = Field(ge=0.0)
     stability_score: float = Field(ge=0.0)
-    critical_alerts: int = Field(ge=0)
-    warning_alerts: int = Field(ge=0)
 
 
 class TimeSeriesStatisticsItem(BaseModel):

@@ -21,7 +21,7 @@ def test_queue_payload_includes_feed_id_and_validates():
         feed_id="cashier_1",
         alert_triggered=True,
         alert_reason="TEST_ALERT",
-        alert_severity="critical",
+        alert_severity="warning",
         confidence_scores=[0.92, 0.95],
     )
 

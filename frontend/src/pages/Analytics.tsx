@@ -33,7 +33,6 @@ import {
 } from "@/lib/api";
 
 const severityColors: Record<string, string> = {
-  critical: "hsl(0 84% 60%)",
   warning: "hsl(38 92% 50%)",
   info: "hsl(187 82% 53%)",
 };
@@ -91,8 +90,6 @@ function buildMockAnalytics(feeds: VideoFeed[], period: "hourly" | "daily" | "we
     const peakQueueLength = Math.max(1, Math.round(baseQueue + queueJitter + index));
     const avgPeopleInZone = round(basePeople + peopleJitter + index * 0.2);
     const totalAlerts = isActive ? Math.max(2, Math.round(avgWaitTime / 12)) : Math.max(0, Math.round(avgWaitTime / 20) - 1);
-    const criticalAlerts = isActive ? Math.max(1, Math.floor(totalAlerts / 3)) : 0;
-    const warningAlerts = Math.max(0, totalAlerts - criticalAlerts);
     const avgServiceRate = round(clamp(isActive ? 0.18 + ((feedSeed >> 4) % 6) * 0.01 : 0.24 + ((feedSeed >> 4) % 4) * 0.01, 0.08, 0.5), 2);
     const avgArrivalRate = round(clamp(avgServiceRate - (isActive ? 0.03 : 0.06) + ((feedSeed >> 2) % 3) * 0.005, 0.04, 0.48), 2);
     const stabilityScore = round(clamp(100 - avgWaitTime * (isActive ? 0.45 : 0.28) + (isActive ? -2 : 10), 35, 98));
@@ -109,14 +106,10 @@ function buildMockAnalytics(feeds: VideoFeed[], period: "hourly" | "daily" | "we
       avg_service_rate: avgServiceRate,
       avg_arrival_rate: avgArrivalRate,
       stability_score: stabilityScore,
-      critical_alerts: criticalAlerts,
-      warning_alerts: warningAlerts,
     };
   });
 
   const totalAlerts = zoneStatistics.reduce((sum, item) => sum + item.total_alerts, 0);
-  const criticalAlerts = zoneStatistics.reduce((sum, item) => sum + item.critical_alerts, 0);
-  const warningAlerts = zoneStatistics.reduce((sum, item) => sum + item.warning_alerts, 0);
   const avgWaitTime = zoneStatistics.length
     ? round(zoneStatistics.reduce((sum, item) => sum + item.avg_wait_time, 0) / zoneStatistics.length)
     : 0;
@@ -140,8 +133,6 @@ function buildMockAnalytics(feeds: VideoFeed[], period: "hourly" | "daily" | "we
     peak_queue_length: peakQueueLength,
     stability_score: stabilityScore,
     total_alerts: totalAlerts,
-    critical_alerts: criticalAlerts,
-    warning_alerts: warningAlerts,
     avg_people_in_zone: avgPeopleInZone,
     avg_service_rate: avgServiceRate,
     avg_arrival_rate: avgArrivalRate,
@@ -180,16 +171,10 @@ function buildMockAnalytics(feeds: VideoFeed[], period: "hourly" | "daily" | "we
 
   const alertDistribution: AlertDistributionItem[] = [
     {
-      alert_type: "WAIT_TIME_WARNING",
+      alert_type: "QUEUE_WARNING",
       severity: "warning",
-      count: warningAlerts,
-      percentage: totalAlerts > 0 ? round((warningAlerts / totalAlerts) * 100, 2) : 0,
-    },
-    {
-      alert_type: "WAIT_TIME_CRITICAL",
-      severity: "critical",
-      count: criticalAlerts,
-      percentage: totalAlerts > 0 ? round((criticalAlerts / totalAlerts) * 100, 2) : 0,
+      count: totalAlerts,
+      percentage: totalAlerts > 0 ? 100 : 0,
     },
   ].filter((entry) => entry.count > 0);
 
@@ -285,7 +270,7 @@ export default function Analytics() {
     return Array.from(grouped.entries())
       .map(([name, value]) => ({ name, value }))
       .sort((left, right) => {
-        const order = ["critical", "warning", "info"];
+        const order = ["warning", "info"];
         return order.indexOf(left.name) - order.indexOf(right.name);
       });
   }, [alertDistribution]);
@@ -465,7 +450,7 @@ export default function Analytics() {
             subtitle={
               isLoading || !overview
                 ? undefined
-                : `${overview.critical_alerts} critical · ${overview.warning_alerts} warning`
+                : `${overview.total_alerts} warning alert${overview.total_alerts === 1 ? "" : "s"}`
             }
           />
         </div>
