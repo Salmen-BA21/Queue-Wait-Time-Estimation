@@ -50,7 +50,6 @@ from src.detector import PersonDetector
 from src.queue_analyzer import QueueAnalyzer, QueueMetrics
 from src.threshold_detector import QueueThresholdDetector, ThresholdConfig
 from src.tracker import ObjectTracker
-from src.utils.drawing import create_annotators, draw_detections, draw_metrics_overlay
 from src.utils.logging_setup import setup_logging
 from src.video_capture import VideoStream, open_video_source
 from src.webhook_client import WebhookClient
@@ -543,7 +542,6 @@ def run(cfg: AppConfig) -> None:
                 queue_length_warning=cfg.queue_length_warning,
             )
         )
-        annotators = create_annotators()
         webhook_client = WebhookClient(N8N_WEBHOOK_URL, webhook_secret=N8N_WEBHOOK_SECRET) if cfg.webhook_enabled else None
         webhook_dispatcher = AsyncWebhookDispatcher(webhook_client) if webhook_client else None
         event_writer = DashboardEventWriter(cfg.events_file)
@@ -668,9 +666,7 @@ def run(cfg: AppConfig) -> None:
 
                 # 5. Draw + 6. Show
                 if not cfg.headless:
-                    rendered_display_frame = draw_detections(frame.copy(), detections, annotators, labels)
-                    rendered_display_frame = zone_mgr.annotate(rendered_display_frame)
-                    rendered_display_frame = draw_metrics_overlay(rendered_display_frame, _metrics_dict(metrics))
+                    rendered_display_frame = zone_mgr.annotate(frame.copy())
 
                     # Resize frame if scale != 1.0
                     if cfg.resize_scale != 1.0:
@@ -706,9 +702,7 @@ def run(cfg: AppConfig) -> None:
                         render_frame = rendered_display_frame
                     else:
                         render_frame = frame.copy()
-                        render_frame = draw_detections(render_frame, detections, annotators, labels)
                         render_frame = zone_mgr.annotate(render_frame)
-                        render_frame = draw_metrics_overlay(render_frame, _metrics_dict(metrics))
 
                         if cfg.resize_scale != 1.0:
                             render_frame = cv2.resize(

@@ -134,7 +134,7 @@ function FeedTransportSurface({
     setMjpegFrameLoaded(false);
     previousStatusRef.current = feed.status;
     lastForcedReconnectAtRef.current = 0;
-  }, [feed.feed_id, feed.preview_path]);
+  }, [feed.feed_id, feed.preview_path, feed.status]);
 
   const transportActive = uiStatus !== "offline" && !isStopping;
   const hasWorkerMetrics = Boolean(feed.latest_metrics);
@@ -330,46 +330,26 @@ function FeedTransportSurface({
             playsInline
             onLoadedMetadata={onVideoLoad}
           />
-          {/* Keep zone overlay visible. Suppress browser detection boxes only when annotated WebRTC already contains backend-drawn boxes. */}
-          {videoDims && (zonePolygonPoints || (uiStatus === "online" && detections?.length && !shouldSuppressClientDetectionsOnWebRtc)) && (
+          {/* Zone polygon overlay only – detection boxes disabled */}
+          {videoDims && zonePolygonPoints && (
             <svg
               className="absolute inset-0 h-full w-full pointer-events-none"
               viewBox={`0 0 ${videoDims.width} ${videoDims.height}`}
               preserveAspectRatio="xMidYMid slice"
             >
-              {zonePolygonPoints && (
-                <>
-                  <polygon
-                    points={zonePolygonPoints}
-                    className="fill-cyan-400/10 stroke-cyan-300"
-                    strokeWidth={3}
-                    vectorEffect="non-scaling-stroke"
-                  />
-                  <polyline
-                    points={zonePolygonPoints}
-                    className="stroke-cyan-100/70"
-                    strokeWidth={1}
-                    fill="none"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                </>
-              )}
-
-              {uiStatus === "online" && !shouldSuppressClientDetectionsOnWebRtc && detections?.map((det, idx) => {
-                const [x1, y1, x2, y2] = det;
-                return (
-                  <rect
-                    data-testid="detection-box"
-                    key={idx}
-                    x={x1}
-                    y={y1}
-                    width={x2 - x1}
-                    height={y2 - y1}
-                    className="fill-primary/10 stroke-primary stroke-[2]"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                );
-              })}
+              <polygon
+                points={zonePolygonPoints}
+                className="fill-cyan-400/10 stroke-cyan-300"
+                strokeWidth={3}
+                vectorEffect="non-scaling-stroke"
+              />
+              <polyline
+                points={zonePolygonPoints}
+                className="stroke-cyan-100/70"
+                strokeWidth={1}
+                fill="none"
+                vectorEffect="non-scaling-stroke"
+              />
             </svg>
           )}
         </>
@@ -440,46 +420,26 @@ function FeedTransportSurface({
             onLoadedMetadata={onVideoLoad}
             onError={() => setPlaybackFailed(true)}
           />
-          {/* Tracking overlays (zone polygon + person boxes) */}
-          {videoDims && (zonePolygonPoints || (uiStatus === "online" && detections?.length)) && (
+          {/* Zone polygon overlay only – detection boxes disabled */}
+          {videoDims && zonePolygonPoints && (
             <svg
               className="absolute inset-0 h-full w-full pointer-events-none"
               viewBox={`0 0 ${videoDims.width} ${videoDims.height}`}
               preserveAspectRatio="xMidYMid slice"
             >
-              {zonePolygonPoints && (
-                <>
-                  <polygon
-                    points={zonePolygonPoints}
-                    className="fill-cyan-400/10 stroke-cyan-300"
-                    strokeWidth={3}
-                    vectorEffect="non-scaling-stroke"
-                  />
-                  <polyline
-                    points={zonePolygonPoints}
-                    className="stroke-cyan-100/70"
-                    strokeWidth={1}
-                    fill="none"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                </>
-              )}
-
-              {uiStatus === "online" && detections?.map((det, idx) => {
-                const [x1, y1, x2, y2] = det;
-                return (
-                  <rect
-                    data-testid="detection-box"
-                    key={idx}
-                    x={x1}
-                    y={y1}
-                    width={x2 - x1}
-                    height={y2 - y1}
-                    className="fill-primary/10 stroke-primary stroke-[2]"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                );
-              })}
+              <polygon
+                points={zonePolygonPoints}
+                className="fill-cyan-400/10 stroke-cyan-300"
+                strokeWidth={3}
+                vectorEffect="non-scaling-stroke"
+              />
+              <polyline
+                points={zonePolygonPoints}
+                className="stroke-cyan-100/70"
+                strokeWidth={1}
+                fill="none"
+                vectorEffect="non-scaling-stroke"
+              />
             </svg>
           )}
         </>

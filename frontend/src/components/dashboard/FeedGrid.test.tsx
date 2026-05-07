@@ -197,7 +197,7 @@ describe("FeedGrid MJPEG transport", () => {
     expect(screen.getByTestId("transport-badge")).toHaveTextContent("WEBRTC DIR");
   });
 
-  it("shows browser detection boxes on WEBRTC DIR even if backend annotations metadata is true", () => {
+  it("does not show client-side detection boxes on WEBRTC (all boxes rendered on backend or not at all)", () => {
     mockUseFeedWebRtc.mockReturnValue({
       videoRef: { current: null },
       streamReady: true,
@@ -244,7 +244,7 @@ describe("FeedGrid MJPEG transport", () => {
     Object.defineProperty(videoEl, "videoHeight", { configurable: true, value: 720 });
     fireEvent.loadedMetadata(videoEl!);
 
-    expect(screen.queryAllByTestId("detection-box")).toHaveLength(1);
+    expect(screen.queryAllByTestId("detection-box")).toHaveLength(0);
   });
 
   it("shows MJPEG FB badge when WebRTC falls back to MJPEG", () => {
@@ -294,7 +294,7 @@ describe("FeedGrid MJPEG transport", () => {
     expect(screen.getByTestId("transport-badge")).toHaveTextContent("MJPEG FB");
   });
 
-  it("suppresses browser detection boxes when backend annotations are active on WEBRTC ANN", () => {
+  it("does not show client-side detection boxes when backend annotations are active on WEBRTC ANN", () => {
     mockUseFeedWebRtc.mockReturnValue({
       videoRef: { current: null },
       streamReady: true,
