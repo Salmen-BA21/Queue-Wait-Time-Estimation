@@ -160,7 +160,7 @@ class WebhookJob:
     feed_id: str | None
     alert_triggered: bool = False
     alert_reason: str = ""
-    alert_severity: str = "info"
+    alert_severity: str = "warning"
     confidence_scores: list[float] | None = None
 
 
@@ -187,7 +187,7 @@ class AsyncWebhookDispatcher:
         feed_id: str | None,
         alert_triggered: bool = False,
         alert_reason: str = "",
-        alert_severity: str = "info",
+        alert_severity: str = "warning",
         confidence_scores: list[float] | None = None,
     ) -> None:
         payload = WebhookJob(

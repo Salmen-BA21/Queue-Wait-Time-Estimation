@@ -63,9 +63,7 @@ Every POST from the Python backend to n8n follows this exact JSON schema:
 | `alert.type`              | `alert.severity` | Trigger condition                          |
 |---------------------------|------------------|--------------------------------------------|
 | `WAIT_TIME_WARNING`       | `warning`        | wait_time > 60s                            |
-| `WAIT_TIME_CRITICAL`      | `critical`       | wait_time > 120s                           |
 | `QUEUE_BACKLOG_WARNING`   | `warning`        | people_in_zone > 8                         |
-| `QUEUE_BACKLOG_CRITICAL`  | `critical`       | people_in_zone > 15                        |
 | `ARRIVAL_SPIKE`           | `warning`        | arrival_rate > 0.5/sec                     |
 | `SERVICE_DEGRADATION`     | `warning`        | service_rate dropped below threshold       |
 | `HIGH_UNCERTAINTY`        | `warning`        | uncertainty.level == "HIGH"                |
@@ -102,8 +100,7 @@ Has Alerts? (IF node)
     └── YES
           ↓
         Route by Severity (Switch node)
-          ├── critical → Format Critical Message → Send Telegram (Critical)
-          └── warning  → Format Warning Message  → Send Telegram (Warning)
+                  └── warning → Format Warning Message → Send Telegram (Warning)
 ```
 
 ---
@@ -157,7 +154,6 @@ Use this to gate whether any alerts exist in the payload:
     "value1": "={{ $json.body.alerts[0].severity }}",
     "rules": {
       "rules": [
-        { "value2": "critical" },
         { "value2": "warning" }
       ]
     },
@@ -172,7 +168,7 @@ Use this to gate whether any alerts exist in the payload:
 
 ### 4. Set Node – Format Telegram Message
 
-**For CRITICAL alerts:**
+**For WARNING alerts:**
 ```json
 {
   "parameters": {
@@ -180,19 +176,16 @@ Use this to gate whether any alerts exist in the payload:
       "string": [
         {
           "name": "message",
-          "value": "={{ '🚨 *CRITICAL ALERT* — ' + $json.body.zone_id + '\\n\\n' + '📍 *Alert:* ' + $json.body.alerts[0].type + '\\n' + '📊 *Value:* ' + $json.body.alerts[0].value + ' (threshold: ' + $json.body.alerts[0].threshold + ')' + '\\n' + '👥 *In Queue:* ' + $json.body.metrics.people_in_zone + ' people' + '\\n' + '⏱ *Wait Time:* ' + $json.body.metrics.wait_time_seconds + 's' + '\\n' + '📈 *Uncertainty:* ' + $json.body.uncertainty.level + '\\n' + '🕐 ' + $json.body.timestamp }}"
+          "value": "={{ '⚠️ *WARNING* — ' + $json.body.zone_id + '\\n\\n' + '📍 *Alert:* ' + $json.body.alerts[0].type + '\\n' + '📊 *Value:* ' + $json.body.alerts[0].value + ' (threshold: ' + $json.body.alerts[0].threshold + ')' + '\\n' + '👥 *In Queue:* ' + $json.body.metrics.people_in_zone + ' people' + '\\n' + '⏱ *Wait Time:* ' + $json.body.metrics.wait_time_seconds + 's' + '\\n' + '📈 *Uncertainty:* ' + $json.body.uncertainty.level + '\\n' + '🕐 ' + $json.body.timestamp }}"
         }
       ]
     }
   },
-  "name": "Format Critical Message",
+  "name": "Format Warning Message",
   "type": "n8n-nodes-base.set",
   "typeVersion": 1
 }
 ```
-
-**For WARNING alerts:**
-Same structure but use `⚠️ *WARNING*` prefix and softer language.
 
 ### 5. Telegram Node
 ```json
@@ -259,10 +252,10 @@ Always add a **Header Auth** check right after the Webhook node to validate the 
 
 ### Alert Message Template
 ```
-🚨 *CRITICAL ALERT* — checkout_lane_3
+⚠️ *WARNING* — checkout_lane_3
 
-📍 *Alert:* WAIT_TIME_CRITICAL
-📊 *Value:* 137s  (threshold: 120s)
+📍 *Alert:* WAIT_TIME_WARNING
+📊 *Value:* 137s  (threshold: 60s)
 👥 *In Queue:* 12 people
 ⏱ *Wait Time:* 137.4s  [CI: 110s – 165s]
 📈 *Uncertainty:* LOW
@@ -272,7 +265,6 @@ Always add a **Header Auth** check right after the Webhook node to validate the 
 ### Severity → Emoji Mapping
 | Severity   | Emoji | Prefix text       |
 |------------|-------|-------------------|
-| `critical` | 🚨    | `CRITICAL ALERT`  |
 | `warning`  | ⚠️    | `WARNING`         |
 | `info`     | ℹ️    | `INFO`            |
 
@@ -340,18 +332,18 @@ Format + Send
   },
   "alerts": [
     {
-      "type": "WAIT_TIME_CRITICAL",
-      "severity": "critical",
-      "message": "Wait time exceeded 120s threshold",
+      "type": "WAIT_TIME_WARNING",
+      "severity": "warning",
+      "message": "Wait time exceeded 60s threshold",
       "value": 137.4,
-      "threshold": 120
+      "threshold": 60
     },
     {
-      "type": "QUEUE_BACKLOG_CRITICAL",
-      "severity": "critical",
-      "message": "Queue backlog exceeded 15 people threshold",
+      "type": "QUEUE_BACKLOG_WARNING",
+      "severity": "warning",
+      "message": "Queue backlog exceeded 8 people threshold",
       "value": 16,
-      "threshold": 15
+      "threshold": 8
     }
   ],
   "raw_detection_count": 16,
@@ -412,7 +404,6 @@ n8n/
 ├── credentials/
 │   └── README.md                         ← Instructions (never commit actual creds)
 └── test-payloads/
-    ├── critical_alert.json
     ├── warning_alert.json
     ├── multi_alert.json
     └── no_alert.json

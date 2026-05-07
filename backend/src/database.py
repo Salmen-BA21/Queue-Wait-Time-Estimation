@@ -6,8 +6,8 @@ Provides SQLite database initialization and helper functions for managing:
 - Video sessions (tracking which metadata was used for each video)
 """
 
-import sqlite3
 import json
+import sqlite3
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, List, Tuple, Dict, Any, cast
@@ -771,6 +771,310 @@ def archive_alert_payload(payload: Dict[str, Any]) -> int:
 
         conn.commit()
         return rows_inserted
+    finally:
+        conn.close()
+
+
+def _build_alert_history_filters(
+    *,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    camera_id: str | None = None,
+    zone_id: str | None = None,
+    severity: str | None = None,
+    alert_type: str | None = None,
+    scope_to_active_feeds: bool = False,
+    owner_user_id: int | None = None,
+) -> tuple[str, list[Any]]:
+    """Build a safe WHERE clause for alert_history queries."""
+    clauses: list[str] = []
+    params: list[Any] = []
+
+    if from_date:
+        clauses.append("date(timestamp) >= date(?)")
+        params.append(from_date)
+    if to_date:
+        clauses.append("date(timestamp) <= date(?)")
+        params.append(to_date)
+    if camera_id:
+        clauses.append("camera_id = ?")
+        params.append(camera_id)
+    if zone_id:
+        clauses.append("zone_id = ?")
+        params.append(zone_id)
+    if severity:
+        clauses.append("severity = ?")
+        params.append(severity)
+    if alert_type:
+        clauses.append("alert_type = ?")
+        params.append(alert_type)
+
+    if scope_to_active_feeds:
+        if owner_user_id is None:
+            clauses.append("camera_id IN (SELECT feed_id FROM feed_configs)")
+        else:
+            clauses.append(
+                """
+                camera_id IN (
+                    SELECT feed_id
+                    FROM feed_configs
+                    WHERE manager_user_id = ? OR manager_user_id IS NULL
+                )
+                """
+            )
+            params.append(owner_user_id)
+
+    if not clauses:
+        return "", params
+
+    return "WHERE " + " AND ".join(clauses), params
+
+
+def query_alert_history(
+    *,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    camera_id: str | None = None,
+    zone_id: str | None = None,
+    severity: str | None = None,
+    alert_type: str | None = None,
+) -> List[Dict[str, Any]]:
+    """Return archived alert rows matching the provided filters."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        where_clause, params = _build_alert_history_filters(
+            from_date=from_date,
+            to_date=to_date,
+            camera_id=camera_id,
+            zone_id=zone_id,
+            severity=severity,
+            alert_type=alert_type,
+        )
+        cursor.execute(
+            f"""
+            SELECT
+                id,
+                timestamp,
+                camera_id,
+                zone_id,
+                alert_type,
+                severity,
+                message,
+                value,
+                threshold,
+                people_in_zone,
+                arrival_rate,
+                service_rate,
+                wait_time_seconds,
+                queue_stable,
+                raw_detection_count,
+                fps,
+                alerts_count,
+                payload_json,
+                created_at
+            FROM alert_history
+            {where_clause}
+            ORDER BY timestamp DESC, id DESC
+            """,
+            params,
+        )
+        return [dict(row) for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def get_overview_statistics(
+    *,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    owner_user_id: int | None = None,
+) -> Dict[str, Any]:
+    """Return dashboard-level aggregate statistics."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        where_clause, params = _build_alert_history_filters(
+            from_date=from_date,
+            to_date=to_date,
+            scope_to_active_feeds=True,
+            owner_user_id=owner_user_id,
+        )
+        cursor.execute(
+            f"""
+            SELECT
+                COALESCE(ROUND(AVG(wait_time_seconds), 2), 0) AS avg_wait_time,
+                COALESCE(MAX(people_in_zone), 0) AS peak_queue_length,
+                COALESCE(ROUND(100.0 * AVG(CASE WHEN queue_stable = 1 THEN 1.0 ELSE 0.0 END), 2), 0) AS stability_score,
+                COUNT(*) AS total_alerts,
+                COALESCE(ROUND(AVG(people_in_zone), 2), 0) AS avg_people_in_zone,
+                COALESCE(ROUND(AVG(service_rate), 3), 0) AS avg_service_rate,
+                COALESCE(ROUND(AVG(arrival_rate), 3), 0) AS avg_arrival_rate
+            FROM alert_history
+            {where_clause}
+            """,
+            params,
+        )
+        row = cursor.fetchone() or {}
+        return dict(row)
+    finally:
+        conn.close()
+
+
+def get_zone_statistics(
+    *,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    owner_user_id: int | None = None,
+) -> List[Dict[str, Any]]:
+    """Return aggregate metrics grouped by camera and zone."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        where_clause, params = _build_alert_history_filters(
+            from_date=from_date,
+            to_date=to_date,
+            scope_to_active_feeds=True,
+            owner_user_id=owner_user_id,
+        )
+        cursor.execute(
+            f"""
+            SELECT
+                camera_id,
+                zone_id,
+                COUNT(*) AS total_alerts,
+                COALESCE(ROUND(AVG(wait_time_seconds), 2), 0) AS avg_wait_time,
+                COALESCE(MAX(wait_time_seconds), 0) AS max_wait_time,
+                COALESCE(MIN(wait_time_seconds), 0) AS min_wait_time,
+                COALESCE(ROUND(AVG(people_in_zone), 2), 0) AS avg_people_in_zone,
+                COALESCE(MAX(people_in_zone), 0) AS peak_queue_length,
+                COALESCE(ROUND(AVG(service_rate), 3), 0) AS avg_service_rate,
+                COALESCE(ROUND(100.0 * AVG(CASE WHEN queue_stable = 1 THEN 1.0 ELSE 0.0 END), 2), 0) AS stability_score
+            FROM alert_history
+            {where_clause}
+            GROUP BY camera_id, zone_id
+            ORDER BY avg_wait_time DESC, total_alerts DESC, camera_id, zone_id
+            """,
+            params,
+        )
+        return [dict(row) for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def get_time_based_statistics(
+    *,
+    period: str = "daily",
+    from_date: str | None = None,
+    to_date: str | None = None,
+    owner_user_id: int | None = None,
+) -> List[Dict[str, Any]]:
+    """Return aggregated time-series metrics for a chosen period."""
+    period_key = period.lower().strip()
+    if period_key == "hourly":
+        period_expr = "strftime('%H', timestamp)"
+        order_expr = "period"
+    elif period_key == "weekly":
+        period_expr = "strftime('%Y-W%W', timestamp)"
+        order_expr = "period"
+    else:
+        period_expr = "date(timestamp)"
+        order_expr = "period"
+        period_key = "daily"
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        where_clause, params = _build_alert_history_filters(
+            from_date=from_date,
+            to_date=to_date,
+            scope_to_active_feeds=True,
+            owner_user_id=owner_user_id,
+        )
+        cursor.execute(
+            f"""
+            SELECT
+                {period_expr} AS period,
+                COUNT(*) AS alert_count,
+                COALESCE(ROUND(AVG(wait_time_seconds), 2), 0) AS avg_wait_time,
+                COALESCE(MAX(people_in_zone), 0) AS peak_queue_length,
+                COALESCE(ROUND(100.0 * AVG(CASE WHEN queue_stable = 1 THEN 1.0 ELSE 0.0 END), 2), 0) AS stability_score,
+                COALESCE(ROUND(AVG(service_rate), 3), 0) AS avg_service_rate,
+                COALESCE(ROUND(AVG(arrival_rate), 3), 0) AS avg_arrival_rate
+            FROM alert_history
+            {where_clause}
+            GROUP BY period
+            ORDER BY {order_expr}
+            """,
+            params,
+        )
+        return [dict(row) for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def get_alert_distribution_statistics(
+    *,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    owner_user_id: int | None = None,
+) -> List[Dict[str, Any]]:
+    """Return alert type and severity frequency counts."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        where_clause, params = _build_alert_history_filters(
+            from_date=from_date,
+            to_date=to_date,
+            scope_to_active_feeds=True,
+            owner_user_id=owner_user_id,
+        )
+        alert_only_clause = "WHERE alert_type IS NOT NULL AND severity IS NOT NULL"
+        if where_clause:
+            alert_only_clause = f"{where_clause} AND alert_type IS NOT NULL AND severity IS NOT NULL"
+        cursor.execute(
+            f"""
+            SELECT
+                alert_type,
+                severity,
+                COUNT(*) AS count
+            FROM alert_history
+            {alert_only_clause}
+            GROUP BY alert_type, severity
+            ORDER BY count DESC, alert_type, severity
+            """,
+            params,
+        )
+        rows = [dict(row) for row in cursor.fetchall()]
+
+        total_where_clause, total_params = _build_alert_history_filters(
+            from_date=from_date,
+            to_date=to_date,
+            scope_to_active_feeds=True,
+            owner_user_id=owner_user_id,
+        )
+        if total_where_clause:
+            total_where_clause = f"{total_where_clause} AND alert_type IS NOT NULL AND severity IS NOT NULL"
+        else:
+            total_where_clause = "WHERE alert_type IS NOT NULL AND severity IS NOT NULL"
+
+        cursor.execute(
+            f"""
+            SELECT COUNT(*) AS total
+            FROM alert_history
+            {total_where_clause}
+            """,
+            total_params,
+        )
+        total_row = cursor.fetchone() or {"total": 0}
+        total = int(total_row["total"] if isinstance(total_row, sqlite3.Row) else total_row.get("total", 0))
+
+        if total <= 0:
+            return []
+
+        for row in rows:
+            row["percentage"] = round((int(row.get("count", 0)) / total) * 100.0, 2)
+        return rows
     finally:
         conn.close()
 
