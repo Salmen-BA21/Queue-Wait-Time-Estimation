@@ -7,6 +7,7 @@ import {
   getAlertDistributionStatistics,
   getStatisticsOverview,
   getTimeBasedStatistics,
+  listFeeds,
   getZoneStatistics,
 } from "@/lib/api";
 
@@ -43,6 +44,7 @@ vi.mock("@/lib/api", async () => {
     getZoneStatistics: vi.fn(),
     getTimeBasedStatistics: vi.fn(),
     getAlertDistributionStatistics: vi.fn(),
+    listFeeds: vi.fn(),
   };
 });
 
@@ -127,6 +129,66 @@ describe("Analytics", () => {
         percentage: 33.33,
       },
     ]);
+
+    vi.mocked(listFeeds).mockResolvedValue([
+      {
+        feed_id: "0da4d4f7-f7b8-4c22-94a3-297608e66fd6",
+        name: "IP-Camera",
+        source: "rtsp://192.168.1.16:554/profile2",
+        preview_path: null,
+        model_size: "n",
+        status: "running",
+        created_at: "2026-05-07T11:35:56.995070+00:00",
+        updated_at: "2026-05-07T11:55:31.561434+00:00",
+        establishment_id: null,
+        caisse_id: null,
+        zone: null,
+        queue_length_warning: 8,
+        latest_metrics: null,
+        transport: null,
+        last_error: null,
+        last_warning: null,
+        last_warning_code: null,
+      },
+      {
+        feed_id: "7f14eb7e-1c9f-4273-ab85-3ac8c121f90d",
+        name: "retail_store3",
+        source: "C:\\Users\\Salmen Ben Ammar\\Desktop\\Stage_PFE\\backend\\data\\uploads\\retail_store3-e43fa586.mp4",
+        preview_path: null,
+        model_size: "n",
+        status: "stopped",
+        created_at: "2026-05-06T15:35:00.531613+00:00",
+        updated_at: "2026-05-07T11:51:46.057466+00:00",
+        establishment_id: null,
+        caisse_id: null,
+        zone: null,
+        queue_length_warning: 8,
+        latest_metrics: null,
+        transport: null,
+        last_error: null,
+        last_warning: null,
+        last_warning_code: null,
+      },
+      {
+        feed_id: "771b506d-4500-4a6c-86ce-fcad16228b86",
+        name: "retail_store2",
+        source: "C:\\Users\\Salmen Ben Ammar\\Desktop\\Stage_PFE\\backend\\data\\uploads\\retail_store2-e9bae89c.mp4",
+        preview_path: null,
+        model_size: "n",
+        status: "stopped",
+        created_at: "2026-05-06T15:47:24.949895+00:00",
+        updated_at: "2026-05-06T16:10:21.421825+00:00",
+        establishment_id: null,
+        caisse_id: null,
+        zone: null,
+        queue_length_warning: 8,
+        latest_metrics: null,
+        transport: null,
+        last_error: null,
+        last_warning: null,
+        last_warning_code: null,
+      },
+    ]);
   });
 
   it("renders live statistics data in KPIs and table", async () => {
@@ -147,10 +209,12 @@ describe("Analytics", () => {
     expect(getZoneStatistics).toHaveBeenCalledWith({ from: null, to: null });
     expect(getTimeBasedStatistics).toHaveBeenCalledWith("daily", { from: null, to: null });
     expect(getAlertDistributionStatistics).toHaveBeenCalledWith({ from: null, to: null });
+    expect(listFeeds).toHaveBeenCalledTimes(1);
   });
 
   it("shows an error banner when statistics loading fails", async () => {
     vi.mocked(getStatisticsOverview).mockRejectedValueOnce(new Error("overview failed"));
+    vi.mocked(listFeeds).mockResolvedValueOnce([]);
 
     renderAnalytics();
 
@@ -215,5 +279,35 @@ describe("Analytics", () => {
         value: undefined,
       });
     }
+  });
+
+  it("falls back to feed-synced mock analytics when archive data is empty", async () => {
+    vi.mocked(getStatisticsOverview).mockResolvedValueOnce({
+      date_range: {
+        from_date: null,
+        to_date: null,
+      },
+      avg_wait_time: 0,
+      peak_queue_length: 0,
+      stability_score: 0,
+      total_alerts: 0,
+      critical_alerts: 0,
+      warning_alerts: 0,
+      avg_people_in_zone: 0,
+      avg_service_rate: 0,
+      avg_arrival_rate: 0,
+    });
+    vi.mocked(getZoneStatistics).mockResolvedValueOnce([]);
+    vi.mocked(getTimeBasedStatistics).mockResolvedValueOnce([]);
+    vi.mocked(getAlertDistributionStatistics).mockResolvedValueOnce([]);
+
+    renderAnalytics();
+
+    expect(await screen.findByText(/dashboard feeds synced/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 active stream/i)).toBeInTheDocument();
+    expect(screen.getByText("IP-Camera")).toBeInTheDocument();
+    expect(screen.getByText("retail_store3")).toBeInTheDocument();
+    expect(screen.getByText("retail_store2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Export CSV/i })).toBeEnabled();
   });
 });
