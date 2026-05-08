@@ -53,11 +53,12 @@ class PersonDetector:
         self._confidence = confidence
         self._device = resolved_device
         self._image_size = image_size if image_size and image_size > 0 else None
+        cuda_runtime = getattr(getattr(torch, "version", None), "cuda", "N/A")
         logger.info(
             "Model loaded successfully (torch=%s, cuda_available=%s, cuda_runtime=%s, cuda_device=%s).",
             torch.__version__,
             torch.cuda.is_available(),
-            torch.version.cuda,
+            cuda_runtime,
             torch.cuda.get_device_name(0) if torch.cuda.is_available() else "N/A",
         )
 
