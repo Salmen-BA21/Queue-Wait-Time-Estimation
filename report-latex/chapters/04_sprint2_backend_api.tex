@@ -49,6 +49,16 @@ The Sprint 2 backlog was organized as a table so the connectivity work can be tr
 
 The running sequence is straightforward: a frontend action reaches the backend, the feed state is updated, the worker process changes accordingly, and the new status is sent back to the live interface.
 
+\subsection{Backend Class Diagram}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{\detokenize{optional_class_diagram.pdf}}
+    \caption{Sprint 2 backend class diagram showing the core entities used by feed orchestration and persistence.}
+    \label{fig:sprint2_class_diagram}
+\end{figure}
+
+This structural view complements the sequence diagram by showing how the backend keeps manager accounts, feed configurations, video feeds, queue metrics, and alerts in a cohesive domain model. It is especially relevant in Sprint 2 because the chapter introduces authenticated API access, SQLite persistence, and feed-state recovery.
+
 \section{Implementation}
 \subsection{Camera Source Integration}
 This part of the sprint focuses on making external cameras usable inside the project. It supports:
