@@ -24,8 +24,6 @@ The collaboration provided a concrete setting for work centered on data collecti
 
 \begin{table}[!htbp]
     \centering
-    \caption{Collaboration perimeter with DataDoIt}
-    \label{tab:datadoit_perimeter}
     \begin{tabularx}{\textwidth}{|l|X|}
         \hline
         Dimension & Scope in this project \\ \hline
@@ -34,6 +32,8 @@ The collaboration provided a concrete setting for work centered on data collecti
         Expected outputs & Actionable queue indicators, wait-time estimation, and alert-ready payloads for external workflows. \\ \hline
         Validation mode & Iterative sprint reviews using implementation evidence from backend modules, API contracts, frontend behavior, and automation tests. \\ \hline
     \end{tabularx}
+    \caption{Collaboration perimeter with DataDoIt}
+    \label{tab:datadoit_perimeter}
 \end{table}
 
 \subsection{Sectors of Activity}
@@ -67,8 +67,6 @@ As a result, interventions such as staff reallocation, lane opening, or escalati
 
 \begin{table}[!htbp]
     \centering
-    \caption{From operational pain points to system-level requirements}
-    \label{tab:painpoint_to_requirement}
     \begin{tabularx}{\textwidth}{|X|X|X|}
         \hline
         Observed pain point & Operational impact & Required system capability \\ \hline
@@ -77,6 +75,8 @@ As a result, interventions such as staff reallocation, lane opening, or escalati
         Stability state is not explicit during bursty periods. & Teams may overreact or underreact when service and arrivals fluctuate quickly. & Stable/unstable queue-state classification with fallback wait-time logic. \\ \hline
         Alerting tools are not integrated with runtime analytics. & Escalation depends on manual relay, increasing response latency. & Automated webhook dispatch and workflow-based notification routing. \\ \hline
     \end{tabularx}
+    \caption{From operational pain points to system-level requirements}
+    \label{tab:painpoint_to_requirement}
 \end{table}
 
 \subsection{Study of Existing Approaches}
@@ -101,8 +101,6 @@ The following table positions the proposed solution against these existing appro
     \footnotesize
     \setlength{\tabcolsep}{3pt}
     \renewcommand{\arraystretch}{0.88}
-    \caption{Positioning of the proposed solution against existing approaches}
-    \label{tab:approach_positioning}
     \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{0.34\textwidth}|>{\raggedright\arraybackslash}p{0.31\textwidth}|>{\raggedright\arraybackslash}p{0.31\textwidth}|}
         \hline
         Approach family & Strengths & Typical limitation \\ \hline
@@ -112,6 +110,8 @@ The following table positions the proposed solution against these existing appro
         Manual or occupancy-only monitoring & Easy to deploy and interpret. & Weak predictive value and high subjectivity. \\ \hline
         Proposed integrated pipeline & Links perception, queue analytics, stability handling, web monitoring, and automation in one modular architecture. & Requires careful integration and validation across multiple technical domains. \\ \hline
     \end{tabularx}
+    \caption{Positioning of the proposed solution against existing approaches}
+    \label{tab:approach_positioning}
 \end{table}
 
 The proposed solution fills the gap between these families by combining open-source vision-based detection with queue-theoretic analytics, a web monitoring dashboard, and automated alert routing, all in one modular pipeline that does not require proprietary hardware or explicit customer interaction.
@@ -147,8 +147,6 @@ To keep the implementation traceable, the objectives are mapped to delivery modu
     \footnotesize
     \setlength{\tabcolsep}{3pt}
     \renewcommand{\arraystretch}{0.88}
-    \caption{Objective-to-module traceability}
-    \label{tab:objective_traceability}
     \begin{tabularx}{\textwidth}{|l|X|l|X|}
         \hline
         Objective ID & Objective & Primary module & Observable output \\ \hline
@@ -159,6 +157,8 @@ To keep the implementation traceable, the objectives are mapped to delivery modu
         OBJ-05 & Web monitoring & Module B & Live dashboard with feed controls, KPIs, and stream views. \\ \hline
         OBJ-06 & Automation integration & Module C & Webhook-based alert routing through n8n and Telegram. \\ \hline
     \end{tabularx}
+    \caption{Objective-to-module traceability}
+    \label{tab:objective_traceability}
 \end{table}
 
 \subsection{Project Scope and Boundaries}
@@ -219,8 +219,6 @@ This module covered automation, evaluation, and project closure:
     \footnotesize
     \setlength{\tabcolsep}{3pt}
     \renewcommand{\arraystretch}{0.88}
-    \caption{Scrum module mapping used in this report}
-    \label{tab:scrum_module_mapping}
     \begin{tabularx}{\textwidth}{|l|l|X|X|}
         \hline
         Module & Sprints & Main focus & Validation perspective \\ \hline
@@ -228,6 +226,8 @@ This module covered automation, evaluation, and project closure:
         Module B: Web Experience & 3 & Frontend design system, dashboard scaffolding, live integration, monitoring workflows & Usability, live-rendering stability, and role-based navigation. \\ \hline
         Module C: Automation and Finalization & 4 & n8n alerting, Telegram notifications, evaluation, optimization, and fault tolerance & End-to-end operability and delivery readiness. \\ \hline
     \end{tabularx}
+    \caption{Scrum module mapping used in this report}
+    \label{tab:scrum_module_mapping}
 \end{table}
 
 \subsection{Sprint Planning}
@@ -238,8 +238,6 @@ The project followed a sprint-based Scrum structure to keep the work incremental
     \footnotesize
     \setlength{\tabcolsep}{3pt}
     \renewcommand{\arraystretch}{1.08}
-    \caption{Sprint planning used in the report}
-    \label{tab:sprint_planning}
     \begin{tabularx}{\textwidth}{|l|>{\raggedright\arraybackslash}X|c|c|c|}
         \hline
         Sprint & Objectives & Start Date & End Date & User Story IDs \\ \hline
@@ -248,6 +246,8 @@ The project followed a sprint-based Scrum structure to keep the work incremental
         Sprint 3 & \shortstack[l]{\textbullet\ Web design system and frontend scaffolding\\\textbullet\ Live backend integration\\\textbullet\ Dashboard monitoring and role-based navigation} & 12/04/2026 & 09/05/2026 & US3.1--US3.9 \\ \hline
         Sprint 4 & \shortstack[l]{\textbullet\ n8n automation and Telegram alerting\\\textbullet\ Testing and verification\\\textbullet\ Runtime tuning and fault tolerance} & 10/05/2026 & 06/06/2026 & US4.1--US4.7 \\ \hline
     \end{tabularx}
+    \caption{Sprint planning used in the report}
+    \label{tab:sprint_planning}
 \end{table}
 
 The detailed user stories for each sprint are presented in the backlog tables in Chapters 3 to 6.

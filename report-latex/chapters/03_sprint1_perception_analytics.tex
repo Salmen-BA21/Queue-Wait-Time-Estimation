@@ -36,7 +36,6 @@ The Sprint 1 backlog covers both perception and queue analysis tasks, organized 
 \setlength{\tabcolsep}{3pt}
 \renewcommand{\arraystretch}{0.88}
 \begin{longtable}{|p{0.11\textwidth}|p{0.37\textwidth}|p{0.08\textwidth}|p{0.36\textwidth}|}
-    \caption{Sprint 1 backlog}\label{tab:sprint1_backlog}\\
     \hline
     User StoryID & UserStory & TaskID & Task \\ \hline
     \endfirsthead
@@ -52,6 +51,7 @@ The Sprint 1 backlog covers both perception and queue analysis tasks, organized 
     US1.7 & As a manager, I want wait time computed for stable and unstable cases so that the result remains useful in real conditions. & T1.7 & Apply the stable wait-time formula and fallback behavior. \\ \hline
     US1.8 & As a developer, I want the calculations protected from empty windows so that division-by-zero and noise do not break the runtime. & T1.8 & Add guards for empty windows, low counts, and bounded fallback output. \\ \hline
     US1.9 & As a downstream consumer, I want a clear metric output so that later layers can reuse the values without reprocessing them. & T1.9 & Publish rate estimates, wait time, people-in-zone, and stability status. \\ \hline
+    \caption{Sprint 1 backlog}\label{tab:sprint1_backlog}\\
 \end{longtable}
 
 \section{Sprint Analysis}
