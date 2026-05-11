@@ -31,7 +31,7 @@ These objectives define the core of the system. If the perception layer is noisy
 
 \section{Sprint Backlog}
 The Sprint 1 backlog covers both perception and queue analysis tasks, organized so each user story traces from a stakeholder need to an implementation task.
-
+Table~\ref{tab:sprint1_backlog} presents the Sprint 1 backlog.
 \footnotesize
 \setlength{\tabcolsep}{3pt}
 \renewcommand{\arraystretch}{0.88}
@@ -70,6 +70,7 @@ Four key scenarios are addressed in Sprint 1:
 \section{Design}
 
 \subsection{Activity Diagram}
+Figure~\ref{fig:sprint1_activity} illustrates the Sprint 1 activity flow from frame ingestion to queue metrics output.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.30\textwidth]{\detokenize{chapter3_activity.pdf}}
@@ -80,6 +81,7 @@ Four key scenarios are addressed in Sprint 1:
 The activity starts from a video source, whether it is a local file or a live camera stream. The system then detects people, keeps track of them, checks whether they are inside the queue area, and passes the filtered result to the queue analysis stage, which computes arrival rate, service rate, wait time, and stability classification.
 
 \subsection{Sequence Diagram}
+Figure~\ref{fig:sprint1_sequence} shows the Sprint 1 sequence diagram from video ingestion to queue metric publication.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{\detokenize{chapter3_sequence.pdf}}
