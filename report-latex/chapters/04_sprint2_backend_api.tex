@@ -18,8 +18,7 @@ This sprint had four main delivery goals:
 These goals are important because this sprint turns the backend into a reusable service layer rather than a one-off processing script.
 
 \section{Sprint Backlog}
-The Sprint 2 backlog was organized as a table so the connectivity work can be traced from camera onboarding to API exposure.
-Table~\ref{tab:sprint2_backlog} presents the Sprint 2 backlog.
+The Sprint 2 backlog was organized as a table so the connectivity work can be traced from camera onboarding to API exposure, as shown in Table~\ref{tab:sprint2_backlog}.
 \begin{table}[!htbp]
     \centering
     \footnotesize
@@ -40,7 +39,7 @@ Table~\ref{tab:sprint2_backlog} presents the Sprint 2 backlog.
 \section{Design}
 
 \subsection{Sequence Diagrams}
-Figure~\ref{fig:sprint2_sequence} illustrates the Sprint 2 sequence diagram for feed orchestration and live event distribution.
+The Sprint 2 sequence for feed orchestration and live event distribution is illustrated in Figure~\ref{fig:sprint2_sequence}.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{\detokenize{chapter4_sequence.pdf}}
@@ -51,7 +50,7 @@ Figure~\ref{fig:sprint2_sequence} illustrates the Sprint 2 sequence diagram for 
 The running sequence is straightforward: a frontend action reaches the backend, the feed state is updated, the worker process changes accordingly, and the new status is sent back to the live interface.
 
 \subsection{Backend Class Diagram}
-Figure~\ref{fig:sprint2_class_diagram} shows the Sprint 2 backend class diagram used by feed orchestration and persistence.
+The Sprint 2 backend class diagram used by feed orchestration and persistence is shown in Figure~\ref{fig:sprint2_class_diagram}.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{\detokenize{optional_class_diagram.pdf}}

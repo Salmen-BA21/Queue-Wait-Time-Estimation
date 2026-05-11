@@ -22,8 +22,7 @@ The actors of the system are:
 This split makes the functional scope easier to explain and validate, because access-control flows and operational monitoring flows can be tested separately.
 
 \subsection{Authentication and Access Governance}
-The platform also includes a lightweight identity layer so that the dashboard is not open to anonymous use. Managers can register, sign in, refresh their session, and log out, while administrators manage manager accounts and review the resulting actions. The detailed backend and frontend implementation appears in the sprint chapters, but the requirements are captured here because access boundaries are part of the core system behavior.
-Table~\ref{tab:auth_access_requirements} lists the authentication and access-control requirements.
+The platform includes a lightweight identity layer that restricts dashboard access to authenticated users, enabling managers to register, sign in, refresh sessions, and log out while allowing administrators to manage manager accounts and review access-related actions. Although the detailed backend and frontend implementation is deferred to the sprint chapters, these requirements are captured here because access boundaries form part of the core system behavior, as shown in Table~\ref{tab:auth_access_requirements}.
 \begin{table}[!htbp]
     \centering
     \footnotesize
@@ -55,7 +54,7 @@ At a high level, the system captures a feed, counts people, estimates queue beha
     \item historical data logging and analytics.
 \end{itemize}
 
-These requirements define the minimum end-to-end behavior expected from the platform. To keep the implementation trackable, we formalize them in a traceability matrix. Table~\ref{tab:functional_requirement_matrix} presents the functional requirement traceability matrix.
+These requirements define the minimum end-to-end behavior expected from the platform and are formalized in the traceability matrix shown in Table~\ref{tab:functional_requirement_matrix}.
 \begin{table}[!htbp]
     \centering
     \footnotesize
@@ -90,7 +89,7 @@ In addition to functional behavior, the platform must satisfy quality constraint
     \item \textbf{Maintainability}: keep modular code organization and testable interfaces.
 \end{itemize}
 
-We treat these quality attributes as engineering contracts rather than only design intentions. Table~\ref{tab:nonfunctional_quality_matrix} summarizes the non-functional requirement quality matrix.
+These quality attributes are treated as engineering contracts rather than only design intentions, and the corresponding non-functional requirement quality matrix is summarized in Table~\ref{tab:nonfunctional_quality_matrix}.
 \begin{table}[!htbp]
     \centering
     \footnotesize
@@ -121,7 +120,7 @@ The product backlog was prioritized according to business value and technical de
 The first sprints focused on backend foundations, because the dashboard and automation layers depend on a stable metric contract. This order reduced integration risk and made later validation clearer.
 
 \section{Global Use Case Diagram}
-The global use case diagram gives a high-level view of how the administrator and manager interact with the platform during configuration, monitoring, and alert handling. Figure~\ref{fig:global_use_case} shows the global use case diagram of the queue wait-time estimation system.
+The global use case diagram gives a high-level view of how the administrator and manager interact with the platform during configuration, monitoring, and alert handling, as shown in Figure~\ref{fig:global_use_case}.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{\detokenize{global_use_case.pdf}}
@@ -129,7 +128,7 @@ The global use case diagram gives a high-level view of how the administrator and
     \label{fig:global_use_case}
 \end{figure}
 
-At the system level, the use cases can be grouped into four interactions: configuration, live monitoring, analytics interpretation, and alert handling. Table~\ref{tab:global_use_cases} lists the use cases that should appear in the diagram and the main actor responsible for each one.
+At the system level, the use cases can be grouped into four interactions: configuration, live monitoring, analytics interpretation, and alert handling, with the main actor responsible for each use case listed in Table~\ref{tab:global_use_cases}.
 \begin{table}[!htbp]
     \centering
     \begin{tabularx}{\textwidth}{|l|X|l|}
@@ -152,7 +151,7 @@ We organized the project into four consolidated sprints so that the pipeline cou
 \section{Project Environment}
 
 \subsection{Hardware and Software Environment}
-The hardware environment used during development is shown in Table~\ref{tab:hardware_environment}. The software and runtime layers are summarized in Table~\ref{tab:execution_environment_profile}.
+The hardware environment used during development is shown in Table~\ref{tab:hardware_environment}, while the software and runtime layers are summarized in Table~\ref{tab:execution_environment_profile}.
 \begin{table}[!htbp]
     \centering
     \begin{tabularx}{0.8\textwidth}{|l|X|}
@@ -166,7 +165,7 @@ The hardware environment used during development is shown in Table~\ref{tab:hard
     \caption{Hardware environment}
     \label{tab:hardware_environment}
 \end{table}
-Table~\ref{tab:execution_environment_profile} summarizes the execution environment profile.
+The execution environment profile is detailed in Table~\ref{tab:execution_environment_profile}.
 \begin{table}[!htbp]
     \centering
     \begin{tabularx}{\textwidth}{|l|X|X|}
@@ -182,8 +181,7 @@ Table~\ref{tab:execution_environment_profile} summarizes the execution environme
 \end{table}
 
 \subsection{Development Tools}
-The project also relied on a small set of development tools for editing, versioning, diagramming, container support, and report generation. Keeping them separate from the technology stack makes it easier to distinguish what was used to build the project from what the project actually runs on.
-Table~\ref{tab:development_tools} lists the development tools used in the project.
+The project also relied on a small set of development tools for editing, versioning, diagramming, container support, and report generation. Keeping them separate from the technology stack makes it easier to distinguish what was used to build the project from what the project actually runs on, as listed in Table~\ref{tab:development_tools}.
 \begin{table}[!htbp]
     \centering
     \footnotesize
@@ -202,7 +200,7 @@ Table~\ref{tab:development_tools} lists the development tools used in the projec
 \end{table}
 
 \subsection{Technologies Used}
-The technology stack follows the main stages of the system and is summarized in Table~\ref{tab:technologies_used}.
+The technology stack follows the main stages of the system, as summarized in Table~\ref{tab:technologies_used}.
 \begin{table}[!htbp]
     \centering
     \footnotesize
@@ -228,7 +226,7 @@ This selection keeps the implementation modular from perception through automati
 \section{Software Architecture}
 
 \subsection{Overall Architecture}
-We describe the architecture as four stages that match the flow of data through the system. Figure~\ref{fig:overall_architecture} illustrates the overall system architecture from video acquisition to alert delivery.
+The architecture is described as four stages that match the flow of data through the system, from video acquisition to alert delivery, as illustrated in Figure~\ref{fig:overall_architecture}.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{\detokenize{chapter2_architecture.pdf}}

@@ -26,8 +26,7 @@ This sprint was organized around six outcomes spanning design and live integrati
 \end{itemize}
 
 \section{Sprint Backlog}
-The Sprint 3 backlog was organized as a table so both the design foundation and the live monitoring tasks remain traceable.
-Table~\ref{tab:sprint3_backlog} presents the Sprint 3 backlog.
+The Sprint 3 backlog was organized as a table so both the design foundation and the live monitoring tasks remain traceable, as shown in Table~\ref{tab:sprint3_backlog}.
 \begin{table}[!htbp]
     \centering
     \footnotesize
@@ -64,7 +63,7 @@ The project design specification introduces a ``Terminal Minimal'' style and a s
 The designed page set includes the landing page, dashboard, setup wizard, zone editor, analytics, settings, and heatmap views. These screens helped define what the frontend had to support before live data arrived.
 
 \subsection{Sequence Diagrams}
-Figure~\ref{fig:sprint3_sequence} illustrates the Sprint 3 sequence diagram for dashboard updates and alert surfacing.
+The Sprint 3 sequence for dashboard updates and alert surfacing is illustrated in Figure~\ref{fig:sprint3_sequence}.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{\detokenize{chapter5_sequence.pdf}}
@@ -96,15 +95,14 @@ The visual system was defined once and then applied consistently across the dash
 The frontend relies on a dedicated API layer that keeps the communication with the backend structured. It defines the main data types used by the dashboard and centralizes request handling so errors can be managed consistently. This layer acts as the contract boundary: it prevents the UI from depending directly on backend implementation details and makes it easier to reason about feed lists, dashboard summaries, and management actions as explicit typed responses.
 
 \subsection{Authentication and Role-Based Navigation}
-Sprint 3 connected the login and sign-up flows to the dashboard. The auth provider clears cached data when the session changes, protected routes redirect users according to their role, and administrators are taken to the manager administration page while managers are routed to the monitoring dashboard. This keeps the frontend aligned with the backend access rules and avoids exposing the wrong interface to the wrong user.
-Figure~\ref{fig:sprint3_login_page} shows the manager sign-in screen used to access the dashboard in Sprint 3.
+Sprint 3 connected the login and sign-up flows to the dashboard. The auth provider clears cached data when the session changes, protected routes redirect users according to their role, and administrators are taken to the manager administration page while managers are routed to the monitoring dashboard. This keeps the frontend aligned with the backend access rules and avoids exposing the wrong interface to the wrong user, with the manager sign-in screen shown in Figure~\ref{fig:sprint3_login_page}.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.65\textwidth]{\detokenize{LoginPage.png}}
     \caption{Manager sign-in screen used to access the dashboard in Sprint 3.}
     \label{fig:sprint3_login_page}
 \end{figure}
-Figure~\ref{fig:sprint3_signup_page} presents the manager account creation screen introduced as part of the Sprint 3 authentication flow.
+The complementary manager account creation screen introduced in the same authentication flow is presented in Figure~\ref{fig:sprint3_signup_page}.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.65\textwidth]{\detokenize{SignupPage.png}}
@@ -148,43 +146,42 @@ When server-side annotations are active, the dashboard hides local overlays to a
 \subsection{Dashboard UI Integration}
 The dashboard page brings together live feed controls, setup dialogs, source onboarding, KPI visualizations, and charts. The emphasis was on making those elements work together as one operational interface.
 
-The practical result is that a manager can move from onboarding to monitoring without leaving the dashboard context. That continuity mirrors the workflow described in the earlier requirements chapter.
-Figure~\ref{fig:sprint3_admin_dashboard} shows the administrator manager-administration screen for creating and maintaining manager accounts.
+The practical result is that a manager can move from onboarding to monitoring without leaving the dashboard context. That continuity mirrors the workflow described in the earlier requirements chapter, while Figure~\ref{fig:sprint3_admin_dashboard} shows the administrator screen used for creating and maintaining manager accounts.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.9\textwidth]{\detokenize{AdminDashboarUi.png}}
     \caption{Administrator manager-administration screen for creating and maintaining manager accounts.}
     \label{fig:sprint3_admin_dashboard}
 \end{figure}
-Figure~\ref{fig:sprint3_manager_dashboard} presents the manager dashboard showing the live monitoring surface, feed summary cards, and recent activity panel.
+The manager-facing monitoring dashboard, including the live surface, feed summary cards, and recent activity panel, is presented in Figure~\ref{fig:sprint3_manager_dashboard}.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{\detokenize{ManagerDashboardUi.png}}
     \caption{Manager dashboard showing the live monitoring surface, feed summary cards, and recent activity panel.}
     \label{fig:sprint3_manager_dashboard}
 \end{figure}
-Figure~\ref{fig:sprint3_feed_config} shows the feed setup screen used to prepare a local video source before zone tracing and model selection.
+The onboarding workflow starts with the feed setup screen shown in Figure~\ref{fig:sprint3_feed_config}, where the manager prepares a local video source before zone tracing and model selection.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.9\textwidth]{\detokenize{FeedConfigUi.png}}
     \caption{Feed setup screen used to prepare a local video source before zone tracing and model selection.}
     \label{fig:sprint3_feed_config}
 \end{figure}
-Figure~\ref{fig:sprint3_zone_trace} shows the zone tracing screen used to define the queue polygon for the selected feed.
+The queue polygon for the selected feed is defined through the zone tracing screen shown in Figure~\ref{fig:sprint3_zone_trace}.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.9\textwidth]{\detokenize{ZoneTraceUi.png}}
     \caption{Zone tracing screen used to define the queue polygon for the selected feed.}
     \label{fig:sprint3_zone_trace}
 \end{figure}
-Figure~\ref{fig:sprint3_model_select} shows the model selection screen used to choose the YOLO size before launching the feed.
+Before launching the feed, the manager selects the YOLO model size through the screen shown in Figure~\ref{fig:sprint3_model_select}.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.9\textwidth]{\detokenize{ModelSelectUi.png}}
     \caption{Model selection screen used to choose the YOLO size before launching the feed.}
     \label{fig:sprint3_model_select}
 \end{figure}
-Figure~\ref{fig:sprint3_review_panel} presents the review and launch panel used to confirm the staged feed before creating the batch.
+The staged feed is then confirmed in the review and launch panel presented in Figure~\ref{fig:sprint3_review_panel}.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{\detokenize{ReviewPanelUi.png}}
