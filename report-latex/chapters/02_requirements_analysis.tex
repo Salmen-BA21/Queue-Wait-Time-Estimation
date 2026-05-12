@@ -171,10 +171,10 @@ The execution environment profile is detailed in Table~\ref{tab:execution_enviro
     \begin{tabularx}{\textwidth}{|l|X|X|}
         \hline
         Environment layer & Main tooling & Purpose \\ \hline
-        Backend runtime & Python ecosystem with vision and scientific libraries & Perception, queue analytics, and integration dispatch. \\ \hline
-        Frontend runtime & Node/Bun-based TypeScript toolchain with Vite & Dashboard rendering, interaction workflows, and live-state synchronization. \\ \hline
-        Automation runtime & Self-hosted n8n with webhook endpoints & Alert routing, cooldown logic, and external notifications. \\ \hline
-        Persistence/runtime support & SQLite database store (metrics, metadata, alerts) & Historical analysis and system state continuity. \\ \hline
+        Backend runtime & Python ecosystem with vision and scientific libraries \cite{python_docs,numpy_docs,pandas_docs,scipy_docs,opencv_docs} & Perception, queue analytics, and integration dispatch. \\ \hline
+        Frontend runtime & Node/Bun-based TypeScript toolchain with Vite \cite{nodejs_docs,bun_docs,typescript_docs,vite_docs} & Dashboard rendering, interaction workflows, and live-state synchronization. \\ \hline
+        Automation runtime & Self-hosted n8n with webhook endpoints \cite{n8n_docs} & Alert routing, cooldown logic, and external notifications. \\ \hline
+        Persistence/runtime support & SQLite database store (metrics, metadata, alerts) \cite{sqlite_docs} & Historical analysis and system state continuity. \\ \hline
     \end{tabularx}
     \caption{Execution environment profile}
     \label{tab:execution_environment_profile}
@@ -190,10 +190,10 @@ The project also relied on a small set of development tools for editing, version
     \begin{tabularx}{\textwidth}{|l|X|X|}
         \hline
         Tool & Role in the project & Typical use \\ \hline
-        VS Code & Main editor for the backend, frontend, and report sources. & Day-to-day implementation, review, and navigation. \\ \hline
-        Git / GitHub & Version control and change history tracking. & Commit management, branching, and collaboration. \\ \hline
-        draw.io  & Diagram authoring for architecture and UML models. & Use case, UML class, and system architecture diagrams. \\ \hline
-        Docker / Docker Compose & Local service orchestration and reproducible setup. & Supporting services such as MediaMTX and n8n. \\ \hline
+        VS Code \cite{vscode_docs} & Main editor for the backend, frontend, and report sources. & Day-to-day implementation, review, and navigation. \\ \hline
+        Git / GitHub \cite{git_docs,github_docs} & Version control and change history tracking. & Commit management, branching, and collaboration. \\ \hline
+        draw.io \cite{drawio_docs} & Diagram authoring for architecture and UML models. & Use case, UML class, and system architecture diagrams. \\ \hline
+        Docker / Docker Compose \cite{docker_docs,docker_compose_docs} & Local service orchestration and reproducible setup. & Supporting services such as MediaMTX and n8n. \\ \hline
     \end{tabularx}
     \caption{Development tools used in the project}
     \label{tab:development_tools}
@@ -210,12 +210,12 @@ The technology stack follows the main stages of the system, as summarized in Tab
         \hline
         Layer & Main technologies & Role in the project \\ \hline
         Vision pipeline & YOLO26, ByteTrack, and OpenCV \cite{ultralytics_docs,bytetrack2022,opencv_docs} & Detects people, tracks them across frames, and prepares the visual input for queue analysis. \\ \hline
-        Queue analytics & NumPy, Pandas, SciPy, and M/M/1 modeling \cite{gross_queueing} & Computes arrival rate, service rate, and wait time. \\ \hline
-        Backend API & FastAPI and Pydantic v2 & Exposes typed endpoints, validates payloads, and coordinates the backend services. \\ \hline
+        Queue analytics & NumPy, Pandas, SciPy, and M/M/1 modeling \cite{numpy_docs,pandas_docs,scipy_docs,gross_queueing} & Computes arrival rate, service rate, and wait time. \\ \hline
+        Backend API & FastAPI and Pydantic v2 \cite{fastapi_docs,pydantic_docs} & Exposes typed endpoints, validates payloads, and coordinates the backend services. \\ \hline
         Live transport & WebRTC, MediaMTX WHEP gateway, and MJPEG fallback \cite{webrtc_w3c,mediamtx_docs} & Delivers low-latency video streaming while keeping a simpler HTTP fallback available. \\ \hline
-        Frontend & React, TypeScript, Vite, and Tailwind CSS & Implements the dashboard, user interactions, and responsive presentation layer. \\ \hline
-        Automation & n8n workflows and Telegram notifications & Routes alerts and sends operational messages to users. \\ \hline
-        Persistence & SQLite & Stores metrics, metadata, and alert history for later analysis. \\ \hline
+        Frontend & React, TypeScript, Vite, and Tailwind CSS \cite{react_docs,typescript_docs,vite_docs,tailwind_docs} & Implements the dashboard, user interactions, and responsive presentation layer. \\ \hline
+        Automation & n8n workflows and Telegram notifications \cite{n8n_docs,telegram_bot_api} & Routes alerts and sends operational messages to users. \\ \hline
+        Persistence & SQLite \cite{sqlite_docs} & Stores metrics, metadata, and alert history for later analysis. \\ \hline
     \end{tabularx}
     \caption{Technologies used in the project}
     \label{tab:technologies_used}
@@ -235,7 +235,7 @@ The architecture is described as four stages that match the flow of data through
 \end{figure}
 
 \begin{enumerate}
-    \item \textbf{Video acquisition}: local files, RTSP streams, and ONVIF discovery.
+    \item \textbf{Video acquisition}: local files, RTSP streams, and ONVIF discovery \cite{rtsp_rfc2326,onvif_specs}.
     \item \textbf{Perception}: detection, tracking, and queue-zone filtering.
     \item \textbf{Analysis}: queue metrics estimation and stability handling.
     \item \textbf{Output and integration}: web dashboard, webhook dispatch, and alert automation.

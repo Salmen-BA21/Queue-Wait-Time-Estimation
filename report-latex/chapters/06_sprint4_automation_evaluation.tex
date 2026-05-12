@@ -96,7 +96,7 @@ Before anything is sent, the payload is validated so malformed records do not le
 To reduce the risk of missed notifications, the delivery client uses a timeout, a retry policy, an optional shared-secret header, and logging for both successes and failures. Historical payloads remain in SQLite, which gives the system one place to recover past events if needed.
 
 \subsection{Telegram Bot Setup}
-Before the workflow could send operational alerts, a Telegram bot was created and connected to the project as the final notification channel. Its API token was added to n8n as a credential instead of being hardcoded, which kept the workflow portable and prevented secret exposure in the exported JSON. Once the credential was available, the Telegram node could use it after the webhook validation and cooldown checks passed.
+Before the workflow could send operational alerts, a Telegram bot was created and connected to the project as the final notification channel \cite{telegram_bot_api}. Its API token was added to n8n as a credential instead of being hardcoded, which kept the workflow portable and prevented secret exposure in the exported JSON. Once the credential was available, the Telegram node could use it after the webhook validation and cooldown checks passed.
 
 \subsection{Alert Dispatch in the Runtime Loop}
 Inside the main loop, alert sending is moved to \texttt{AsyncWebhookDispatcher} so the perception pipeline keeps running without waiting on the network. This makes it possible to send periodic metric updates and immediate alerts, while a deduplication window limits repeated notifications for the same situation.
