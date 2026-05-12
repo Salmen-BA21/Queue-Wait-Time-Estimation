@@ -26,7 +26,11 @@ This sprint was organized around six outcomes spanning design and live integrati
 \end{itemize}
 
 \section{Sprint Backlog}
-The Sprint 3 backlog was organized as a table so both the design foundation and the live monitoring tasks remain traceable, as shown in Table~\ref{tab:sprint3_backlog}.
+The Sprint 3 backlog separates manager-facing user stories from technical implementation tasks. User stories represent stakeholder needs and value; technical tasks are internal infrastructure concerns.
+
+\subsection{User Stories}
+The user stories in Sprint 3 represent manager and admin needs for dashboard interfaces and live monitoring, as shown in Table~\ref{tab:sprint3_user_stories}.
+
 \begin{table}[!htbp]
     \centering
     \footnotesize
@@ -34,20 +38,39 @@ The Sprint 3 backlog was organized as a table so both the design foundation and 
     \renewcommand{\arraystretch}{0.88}
     \begin{tabularx}{\textwidth}{|l|X|l|X|}
         \hline
-        User StoryID & UserStory & TaskID & Task \\ \hline
-        US3.1 & As a user, I want a consistent visual style so that the dashboard feels like one coherent product. & T3.1 & Define colors, typography, spacing, and reusable component rules. \\ \hline
+        User StoryID & User Story & TaskID & Task \\ \hline
+        US3.1 & As a manager, I want a consistent visual style so that the dashboard feels like one coherent product. & T3.1 & Define colors, typography, spacing, and reusable component rules. \\ \hline
         US3.2 & As a manager, I want the main page layouts prepared so that onboarding, monitoring, editing, and analytics screens are available. & T3.2 & Prepare the landing page, dashboard, setup wizard, zone editor, analytics, and settings layouts. \\ \hline
-        US3.3 & As a developer, I want reusable frontend elements so that the interface can grow without duplication. & T3.3 & Set up the frontend project with shared components and page scaffolding. \\ \hline
-        US3.4 & As a user, I want the dashboard connected to backend responses so that the interface reflects live operational data. & T3.4 & Implement the API integration layer and typed request handling. \\ \hline
+        US3.3 & As an admin, I want to create and maintain manager accounts so that system access is centrally controlled. & T3.3 & Build the admin dashboard for manager account creation, editing, and deletion. \\ \hline
+        US3.4 & As a manager, I want the dashboard connected to backend responses so that the interface reflects live operational data. & T3.4 & Implement the API integration layer and typed request handling. \\ \hline
         US3.5 & As a manager, I want to manage feeds from the interface so that feed lifecycle actions stay centralized. & T3.5 & Connect login state, protected routes, and feed control actions to the dashboard. \\ \hline
-        US3.6 & As a user, I want live updates without refreshing so that changes are visible immediately. & T3.6 & Add websocket-driven live state updates and dashboard orchestration. \\ \hline
-        US3.7 & As a user, I want a suitable video transport chosen automatically so that the feed remains usable when conditions change. & T3.7 & Add transport selection, fallback streaming, and reconnection logic. \\ \hline
-        US3.8 & As a user, I want the dashboard to stay usable during interruptions so that monitoring does not stop during transient failures. & T3.8 & Add fallback polling and stale-data guards. \\ \hline
-        US3.9 & As a developer, I want setup and onboarding flows validated so that the integration behaves correctly end to end. & T3.9 & Validate dashboard setup, feed onboarding, and error behavior with integration tests. \\ \hline
+        US3.6 & As a manager, I want live updates without refreshing so that changes are visible immediately. & T3.6 & Add websocket-driven live state updates and dashboard orchestration. \\ \hline
+        US3.7 & As a manager, I want a suitable video transport chosen automatically so that the feed remains usable when conditions change. & T3.7 & Add transport selection, fallback streaming, and reconnection logic. \\ \hline
+        US3.8 & As a manager, I want the dashboard to stay usable during interruptions so that monitoring does not stop during transient failures. & T3.8 & Add fallback polling and stale-data guards. \\ \hline
     \end{tabularx}
-    \caption{Sprint 3 backlog}
-    \label{tab:sprint3_backlog}
+    \caption{Sprint 3 user stories}
+    \label{tab:sprint3_user_stories}
 \end{table}
+\normalsize
+
+\subsection{Technical Tasks}
+The technical tasks in Sprint 3 represent internal implementation concerns needed to support the user stories.
+
+\begin{table}[!htbp]
+    \centering
+    \footnotesize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{0.88}
+    \begin{tabularx}{\textwidth}{|l|X|l|X|}
+        \hline
+        Task ID & Task & Subtask ID & Subtask \\ \hline
+        T3.10 & Set up the frontend project with shared components and page scaffolding so that the interface can grow without duplication. & & Create reusable UI component library and establish project structure. \\ \hline
+        T3.11 & Validate dashboard setup and onboarding flows with integration tests to ensure the integration behaves correctly end to end. & & Implement scenario-based tests for dashboard lifecycle and error paths. \\ \hline
+    \end{tabularx}
+    \caption{Sprint 3 technical tasks}
+    \label{tab:sprint3_technical_tasks}
+\end{table}
+\normalsize
 
 \section{Design}
 

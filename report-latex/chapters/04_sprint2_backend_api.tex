@@ -18,7 +18,11 @@ This sprint had four main delivery goals:
 These goals are important because this sprint turns the backend into a reusable service layer rather than a one-off processing script.
 
 \section{Sprint Backlog}
-The Sprint 2 backlog was organized as a table so the connectivity work can be traced from camera onboarding to API exposure, as shown in Table~\ref{tab:sprint2_backlog}.
+The Sprint 2 backlog separates manager-facing user stories from technical implementation tasks. User stories represent stakeholder needs and value; technical tasks are internal infrastructure concerns.
+
+\subsection{User Stories}
+The user stories in Sprint 2 represent manager needs for secure and automated camera integration, as shown in Table~\ref{tab:sprint2_user_stories}.
+
 \begin{table}[!htbp]
     \centering
     \footnotesize
@@ -26,15 +30,16 @@ The Sprint 2 backlog was organized as a table so the connectivity work can be tr
     \renewcommand{\arraystretch}{0.88}
     \begin{tabularx}{\textwidth}{|l|X|l|X|}
         \hline
-        User StoryID & UserStory & TaskID & Task \\ \hline
+        User StoryID & User Story & TaskID & Task \\ \hline
         US2.1 & As a manager, I want IP camera streams connected securely so that live sources can be reused reliably. & T2.1 & Add authentication, transport control, reconnection, and snapshots for RTSP feeds. \\ \hline
         US2.2 & As a manager, I want cameras discovered automatically so that stream addresses do not need to be hardcoded. & T2.2 & Detect IP cameras and resolve their stream addresses. \\ \hline
-        US2.3 & As an operator, I want feed management exposed through the API so that camera lifecycle actions are centralized. & T2.3 & Expose feed control, metadata handling, and diagnostic operations. \\ \hline
-        US2.4 & As a user, I want live delivery to stay available so that the dashboard can keep showing the active feed. & T2.4 & Support live delivery through real-time events and a layered video transport strategy. \\ \hline
+        US2.3 & As a manager, I want feed management exposed through the API so that camera lifecycle actions are centralized. & T2.3 & Expose feed control, metadata handling, and diagnostic operations. \\ \hline
+        US2.4 & As a manager, I want live delivery to stay available so that the dashboard can keep showing the active feed. & T2.4 & Support live delivery through real-time events and a layered video transport strategy. \\ \hline
     \end{tabularx}
-    \caption{Sprint 2 backlog}
-    \label{tab:sprint2_backlog}
+    \caption{Sprint 2 user stories}
+    \label{tab:sprint2_user_stories}
 \end{table}
+\normalsize
 
 \section{Design}
 

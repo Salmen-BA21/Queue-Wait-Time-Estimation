@@ -28,7 +28,11 @@ This sprint was organized around automation and evaluation outcomes:
 \end{itemize}
 
 \section{Sprint Backlog}
-The Sprint 4 backlog covers both the automation tasks and the evaluation work needed to finalize the project, as shown in Table~\ref{tab:sprint4_backlog}.
+The Sprint 4 backlog separates manager-facing user stories from technical implementation tasks. User stories represent stakeholder needs and value; technical tasks are internal infrastructure concerns.
+
+\subsection{User Stories}
+The user stories in Sprint 4 represent manager needs for automated alerting and reliable notification delivery, as shown in Table~\ref{tab:sprint4_user_stories}.
+
 \begin{table}[!htbp]
     \centering
     \footnotesize
@@ -36,18 +40,36 @@ The Sprint 4 backlog covers both the automation tasks and the evaluation work ne
     \renewcommand{\arraystretch}{0.88}
     \begin{tabularx}{\textwidth}{|l|X|l|X|}
         \hline
-        User StoryID & UserStory & TaskID & Task \\ \hline
+        User StoryID & User Story & TaskID & Task \\ \hline
         US4.1 & As a manager, I want alert payloads dispatched to n8n so that operational staff can be notified automatically. & T4.1 & Define the webhook payload schema and validate it before dispatch. \\ \hline
-        US4.2 & As a developer, I want webhook delivery to be reliable so that notifications are not silently lost. & T4.2 & Add retry logic, timeout handling, and logging for webhook delivery. \\ \hline
         US4.3 & As a manager, I want alerts routed through Telegram so that I receive notifications on a familiar channel. & T4.3 & Create and configure the Telegram bot, store its credential in n8n, and configure the workflow. \\ \hline
-        US4.4 & As a developer, I want the n8n workflow validated with repeatable test scripts. & T4.4 & Prepare PowerShell scripts for single-alert, multi-feed, and execution polling scenarios. \\ \hline
-        US4.5 & As a developer, I want the full system verified under realistic conditions so that integration issues are caught before delivery. & T4.5 & Run backend and frontend tests together and confirm lifecycle, streaming, and API contracts. \\ \hline
-        US4.6 & As a developer, I want runtime throughput improved so that the processing loop stays responsive. & T4.6 & Apply runtime tuning: configurable image size, frame stride, async dispatch, and playback pacing. \\ \hline
-        US4.7 & As a developer, I want fault tolerance strengthened so that the system recovers from transient failures. & T4.7 & Improve feed worker supervision, frame handoff continuity, and websocket reconnection. \\ \hline
     \end{tabularx}
-    \caption{Sprint 4 backlog}
-    \label{tab:sprint4_backlog}
+    \caption{Sprint 4 user stories}
+    \label{tab:sprint4_user_stories}
 \end{table}
+\normalsize
+
+\subsection{Technical Tasks}
+The technical tasks in Sprint 4 represent internal implementation concerns for alert delivery reliability, workflow validation, and system-level verification.
+
+\begin{table}[!htbp]
+    \centering
+    \footnotesize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{0.88}
+    \begin{tabularx}{\textwidth}{|l|X|l|X|}
+        \hline
+        Task ID & Task & Subtask ID & Subtask \\ \hline
+        T4.2 & Add retry logic, timeout handling, and logging for webhook delivery to ensure notifications are not silently lost. & & Implement delivery resilience with exponential backoff and failure tracking. \\ \hline
+        T4.4 & Prepare PowerShell scripts for single-alert, multi-feed, and execution polling scenarios to validate n8n workflow behavior. & & Create repeatable test automation for workflow routing and alerting paths. \\ \hline
+        T4.5 & Run backend and frontend tests together and confirm lifecycle, streaming, and API contracts under realistic conditions. & & Execute comprehensive integration verification to catch issues before delivery. \\ \hline
+        T4.6 & Apply runtime tuning: configurable image size, frame stride, async dispatch, and playback pacing to improve processing responsiveness. & & Implement performance optimizations for the main processing loop. \\ \hline
+        T4.7 & Improve feed worker supervision, frame handoff continuity, and websocket reconnection to strengthen fault tolerance. & & Enhance system recovery from transient failures and network disruptions. \\ \hline
+    \end{tabularx}
+    \caption{Sprint 4 technical tasks}
+    \label{tab:sprint4_technical_tasks}
+\end{table}
+\normalsize
 
 \section{Design}
 

@@ -30,28 +30,48 @@ This sprint was focused on two complementary groups of outcomes:
 These objectives define the core of the system. If the perception layer is noisy or the analytics layer is fragile, every later metric and operational decision becomes harder to trust.
 
 \section{Sprint Backlog}
-The Sprint 1 backlog covers both perception and queue analysis tasks, organized so each user story traces from a stakeholder need to an implementation task, as shown in Table~\ref{tab:sprint1_backlog}.
-\footnotesize
-\setlength{\tabcolsep}{3pt}
-\renewcommand{\arraystretch}{0.88}
-\begin{longtable}{|p{0.11\textwidth}|p{0.37\textwidth}|p{0.08\textwidth}|p{0.36\textwidth}|}
-    \hline
-    User StoryID & UserStory & TaskID & Task \\ \hline
-    \endfirsthead
-    \hline
-    User StoryID & UserStory & TaskID & Task \\ \hline
-    \endhead
-    US1.1 & As a monitoring operator, I want to detect people in the video stream so that queue observations start from a reliable signal. & T1.1 & Configure the detector to identify people in live and recorded video. \\ \hline
-    US1.2 & As a monitoring operator, I want to keep the same person identifiable across frames so that counts remain consistent. & T1.2 & Integrate tracking to preserve identity across consecutive frames. \\ \hline
-    US1.3 & As a manager, I want to restrict counting to queue zones so that irrelevant movement does not affect the queue state. & T1.3 & Define queue zones as polygons and filter detections by zone. \\ \hline
-    US1.4 & As a developer, I want capture, detection, tracking, and display to work together so that the perception loop stays continuous. & T1.4 & Connect capture, detection, tracking, zone filtering, and display into one flow. \\ \hline
-    US1.5 & As a developer, I want basic runtime settings so that the pipeline can be adapted without code changes. & T1.5 & Expose runtime settings for frame handling and visualization. \\ \hline
-    US1.6 & As a manager, I want queue rates estimated from tracked people so that the dashboard can interpret flow intensity. & T1.6 & Group tracked events into short windows and compute arrival and service rates. \\ \hline
-    US1.7 & As a manager, I want wait time computed for stable and unstable cases so that the result remains useful in real conditions. & T1.7 & Apply the stable wait-time formula and fallback behavior. \\ \hline
-    US1.8 & As a developer, I want the calculations protected from empty windows so that division-by-zero and noise do not break the runtime. & T1.8 & Add guards for empty windows, low counts, and bounded fallback output. \\ \hline
-    US1.9 & As a downstream consumer, I want a clear metric output so that later layers can reuse the values without reprocessing them. & T1.9 & Publish rate estimates, wait time, people-in-zone, and stability status. \\ \hline
-    \caption{Sprint 1 backlog}\label{tab:sprint1_backlog}\\
-\end{longtable}
+The Sprint 1 backlog separates manager-facing user stories from technical implementation tasks. User stories represent stakeholder needs and value; technical tasks are internal infrastructure concerns. This structure ensures that traceability focuses on business outcomes while documenting all delivery work.
+
+\subsection{User Stories}
+The user stories in Sprint 1 represent manager needs for reliable perception and analytics, as shown in Table~\ref{tab:sprint1_user_stories}.
+
+\begin{table}[!htbp]
+    \centering
+    \footnotesize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{0.88}
+    \begin{tabularx}{\textwidth}{|l|X|l|X|}
+        \hline
+        User StoryID & User Story & TaskID & Task \\ \hline
+        US1.1 & As a manager, I want to detect people in the video stream so that queue observations start from a reliable signal. & T1.1 & Configure the detector to identify people in live and recorded video. \\ \hline
+        US1.2 & As a manager, I want to keep the same person identifiable across frames so that counts remain consistent. & T1.2 & Integrate tracking to preserve identity across consecutive frames. \\ \hline
+        US1.3 & As a manager, I want to restrict counting to queue zones so that irrelevant movement does not affect the queue state. & T1.3 & Define queue zones as polygons and filter detections by zone. \\ \hline
+        US1.6 & As a manager, I want queue rates estimated from tracked people so that the dashboard can interpret flow intensity. & T1.6 & Group tracked events into short windows and compute arrival and service rates. \\ \hline
+        US1.7 & As a manager, I want wait time computed for stable and unstable cases so that the result remains useful in real conditions. & T1.7 & Apply the stable wait-time formula and fallback behavior. \\ \hline
+        US1.9 & As a manager, I want a clear metric output so that the dashboard can reuse these values without reprocessing them. & T1.9 & Publish rate estimates, wait time, people-in-zone, and stability status. \\ \hline
+    \end{tabularx}
+    \caption{Sprint 1 user stories}\label{tab:sprint1_user_stories}
+\end{table}
+\normalsize
+
+\subsection{Technical Tasks}
+The technical tasks in Sprint 1 represent internal implementation concerns needed to support the user stories.
+
+\begin{table}[!htbp]
+    \centering
+    \footnotesize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{0.88}
+    \begin{tabularx}{\textwidth}{|l|X|l|X|}
+        \hline
+        Task ID & Task & Subtask ID & Subtask \\ \hline
+        T1.4 & Connect capture, detection, tracking, zone filtering, and display into one continuous flow. & & Implement runtime orchestration that integrates all perception components. \\ \hline
+        T1.5 & Expose runtime settings so that the pipeline can be adapted without code changes. & & Provide configurable parameters for frame handling and visualization. \\ \hline
+        T1.8 & Add guards for empty windows, low counts, and bounded fallback output to protect calculations from division-by-zero and noise. & & Implement defensive bounds checking in the analytics layer. \\ \hline
+    \end{tabularx}
+    \caption{Sprint 1 technical tasks}\label{tab:sprint1_technical_tasks}
+\end{table}
+\normalsize
 
 \section{Sprint Analysis}
 
