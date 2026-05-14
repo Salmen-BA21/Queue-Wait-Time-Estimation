@@ -46,7 +46,7 @@ At a high level, the system captures a feed, counts people, estimates queue beha
     \item real-time person detection and tracking,
     \item configurable queue zone definition,
     \item estimation of arrival rate ($\lambda$), service rate ($\mu$), and wait time ($W$),
-    \item queue stability classification with robust wait-time fallback behavior,
+    \item adaptive wait-time estimation with robust fallback behavior,
     \item real-time web dashboard updates and alerts,
     \item IP camera integration through complementary ONVIF discovery and RTSP streaming,
     \item automated webhook and Telegram notifications,
@@ -67,7 +67,7 @@ These requirements define the minimum end-to-end behavior expected from the plat
         FR-02 & Preserve identity continuity across frames for queue analysis. & High & Validate tracker ID continuity in runtime scenarios. \\ \hline
         FR-03 & Restrict counting to configurable polygon queue zones. & High & Validate polygon inclusion in the zone-management layer. \\ \hline
         FR-04 & Compute $\lambda$, $\mu$, and expected wait time from event windows. & High & Validate queue formulas and stability handling in analytics. \\ \hline
-        FR-05 & Classify stable/unstable queue states with fallback wait-time logic. & High & Validate stability branches and fallback behavior. \\ \hline
+        FR-05 & Compute wait time with adaptive logic that switches between precise and conservative estimates. & High & Validate formula branches and fallback behavior. \\ \hline
         FR-06 & Expose feed control and live updates through API and websocket channels. & High & Validate endpoint and runtime behavior in API tests. \\ \hline
         FR-07 & Dispatch alert payloads to automation workflows. & Medium & Validate webhook dispatch and n8n branching. \\ \hline
         FR-08 & Persist operational metrics and metadata for analysis and auditing. & Medium & Validate persistence behavior in runtime and database checks. \\ \hline
@@ -237,7 +237,7 @@ The architecture is described as four stages that match the flow of data through
 \begin{enumerate}
     \item \textbf{Video acquisition}: local files, RTSP streams, and ONVIF discovery \cite{rtsp_rfc2326,onvif_specs}.
     \item \textbf{Perception}: detection, tracking, and queue-zone filtering.
-    \item \textbf{Analysis}: queue metrics estimation and stability handling.
+    \item \textbf{Analysis}: queue metrics estimation with adaptive wait-time logic.
     \item \textbf{Output and integration}: web dashboard, webhook dispatch, and alert automation.
 \end{enumerate}
 

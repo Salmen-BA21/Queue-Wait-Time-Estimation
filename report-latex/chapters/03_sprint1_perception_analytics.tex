@@ -47,8 +47,8 @@ The user stories in Sprint 1 represent manager needs for reliable perception and
         US1.2 & As a manager, I want to keep the same person identifiable across frames so that counts remain consistent. & T1.2 & Integrate tracking to preserve identity across consecutive frames. \\ \hline
         US1.3 & As a manager, I want to restrict counting to queue zones so that irrelevant movement does not affect the queue state. & T1.3 & Define queue zones as polygons and filter detections by zone. \\ \hline
         US1.6 & As a manager, I want queue rates estimated from tracked people so that the dashboard can interpret flow intensity. & T1.6 & Group tracked events into short windows and compute arrival and service rates. \\ \hline
-        US1.7 & As a manager, I want wait time computed for stable and unstable cases so that the result remains useful in real conditions. & T1.7 & Apply the stable wait-time formula and fallback behavior. \\ \hline
-        US1.9 & As a manager, I want a clear metric output so that the dashboard can reuse these values without reprocessing them. & T1.9 & Publish rate estimates, wait time, people-in-zone, and stability status. \\ \hline
+        US1.7 & As a manager, I want wait time computed adaptively so that the result remains useful in real conditions. & T1.7 & Apply the M/M/1 formula when arrivals are below service capacity and fallback to occupancy-based estimation otherwise. \\ \hline
+        US1.9 & As a manager, I want a clear metric output so that the dashboard can reuse these values without reprocessing them. & T1.9 & Publish rate estimates, wait time, and people-in-zone occupancy. \\ \hline
     \end{tabularx}
     \caption{Sprint 1 user stories}\label{tab:sprint1_user_stories}
 \end{table}
@@ -83,7 +83,7 @@ Four key scenarios are addressed in Sprint 1:
     \item \textbf{Person entry into queue zone:} when a person enters the queue area, the system treats that person as a possible arrival.
     \item \textbf{Consistency across frames:} when the same person appears in consecutive frames, the system keeps the identification stable and avoids double counting.
     \item \textbf{Zone filtering under mixed scenes:} people outside the queue area are ignored so the queue state stays focused on the relevant part of the scene.
-    \item \textbf{Queue stability under varying load:} when arrivals stay below service, the usual wait-time estimate is valid; when arrivals exceed service, the system reports a stability flag and uses a fallback value.
+    \item \textbf{Queue behavior under varying load:} when arrivals stay below service, the system uses the M/M/1 formula; when arrivals exceed service, the system switches to a conservative occupancy-based estimate without requiring an explicit stability output.
 \end{enumerate}
 
 \section{Design}
@@ -97,7 +97,7 @@ The Sprint 1 activity flow from frame ingestion to queue metrics output is illus
     \label{fig:sprint1_activity}
 \end{figure}
 
-The activity starts from a video source, whether it is a local file or a live camera stream. The system then detects people, keeps track of them, checks whether they are inside the queue area, and passes the filtered result to the queue analysis stage, which computes arrival rate, service rate, wait time, and stability classification.
+The activity starts from a video source, whether it is a local file or a live camera stream. The system then detects people, keeps track of them, checks whether they are inside the queue area, and passes the filtered result to the queue analysis stage, which computes arrival rate, service rate, and expected wait time.
 
 \subsection{Sequence Diagram}
 The Sprint 1 sequence from video ingestion to queue metric publication is shown in Figure~\ref{fig:sprint1_sequence}.
@@ -113,11 +113,11 @@ In practice, each frame moves through source handling, detection, tracking, zone
 \subsection{Operational Scenarios}
 The queue analysis is easiest to understand through the situations it must handle every time a new metric window is evaluated:
 \begin{enumerate}
-    \item \textbf{Stable queue:} arrivals stay below service, so the usual wait-time estimate is valid and can be forwarded to later layers.
-    \item \textbf{Growing backlog:} arrivals start to approach service, so the system keeps a stability flag and a fallback value instead of trusting a fragile instantaneous estimate.
-    \item \textbf{Empty or stalled queue:} no service events are available, so the output stays bounded and downstream logic can ignore the value rather than reacting to noise.
+    \item \textbf{Normal queue:} arrivals stay below service, so the M/M/1 formula gives a precise estimate based on measured rates.
+    \item \textbf{Growing backlog:} arrivals start to approach service, so the system seamlessly switches to a conservative estimate based on current occupancy.
+    \item \textbf{Empty or stalled queue:} no service events are available, so the output stays bounded and downstream logic receives safe, interpretable values.
 \end{enumerate}
-These scenarios explain why the sprint reports both point estimates and a stability signal instead of returning a raw number with no operational context.
+These scenarios explain why the sprint computes wait time with adaptive logic: a single metric that responds correctly to real-world queue conditions without requiring separate state signals.
 
 \section{Implementation}
 
@@ -146,32 +146,30 @@ The queue-analysis step uses short time windows to count arrivals and departures
 \]
 From these counts, the system estimates the arrival rate and the service rate. To avoid unstable values at the beginning of a run, the implementation waits until enough events have been observed before returning non-zero rates.
 
-\subsection{Wait-Time Logic and Stability Handling}
-The queue is considered stable when arrivals stay below service and service is actually observed:
+\subsection{Wait-Time Logic and Adaptive Estimation}
+The system estimates wait time using an adaptive formula that responds to queue conditions:
 \[
-\texttt{queue\_stable} = (\lambda < \mu) \land (\mu > 0)
+W = \begin{cases}
+\dfrac{1}{\mu - \lambda} & \text{if } \lambda < \mu \text{ and } \mu > 0 \\
+\dfrac{L}{\mu} & \text{otherwise}
+\end{cases}
 \]
-When that condition is met, the normal wait-time formula is used. Otherwise, the system falls back to a more conservative estimate based on the current occupancy:
-\begin{itemize}
-    \item stable queue: $W = \frac{1}{\mu-\lambda}$,
-    \item unstable but service observed: fallback $W = \frac{L}{\mu}$, where $L$ is the number of people in the zone.
-\end{itemize}
-We use the M/M/1 sojourn-time expression because the project models each monitored lane as a single service channel with one effective queue, which matches the cashier-style setting studied in the report. This formula is also easy to interpret during a defense: it depends directly on the measured arrival and service rates, it gives a closed-form estimate without needing a large historical dataset, and it stays aligned with the real-time pipeline used by the tracker. Other models were less appropriate here: M/M/c would assume multiple parallel servers, which is not the default lane setup, and Little's Law is useful for validation but does not directly produce a forward wait-time estimate from the instantaneous rates alone.
-When no service events are observed, the implementation returns a zero fallback so that downstream components do not use an unreliable value.
+where $L$ is the current number of people in the zone. We use the M/M/1 sojourn-time expression because the project models each monitored lane as a single service channel with one effective queue, which matches the cashier-style setting studied in the report. This formula is also easy to interpret during a defense: it depends directly on the measured arrival and service rates, it gives a closed-form estimate without needing a large historical dataset, and it stays aligned with the real-time pipeline used by the tracker. Other models were less appropriate here: M/M/c would assume multiple parallel servers, which is not the default lane setup, and Little's Law is useful for validation but does not directly produce a forward wait-time estimate from the instantaneous rates alone.
+
+The adaptive formula ensures the output always remains safe and interpretable: when arrivals are below service capacity, the formula is precise; when arrivals exceed capacity, it gracefully degrades to a conservative estimate based on current queue size. When no service events are observed, the implementation returns zero so that downstream components do not use an unreliable value.
 
 \subsection{Runtime Metric Contract}
 The final metric output includes:
 \begin{itemize}
     \item point estimates ($\lambda$, $\mu$, $W$),
-    \item people-in-zone occupancy,
-    \item stability flag for safe downstream interpretation.
+    \item people-in-zone occupancy.
 \end{itemize}
 These values are then reused by logs, overlays, webhook payloads, and dashboard events \cite{opencv_docs,gross_queueing}.
 
 \section{Conclusion}
-Sprint 1 delivered the full path from raw video to operational queue indicators. People can be detected, followed across frames, counted inside the queue area, and the resulting events are turned into arrival rates, service rates, wait-time estimates, and stability classifications. That gives the next sprint a trustworthy analytical contract to build on for camera integration and API services.
+Sprint 1 delivered the full path from raw video to operational queue indicators. People can be detected, followed across frames, counted inside the queue area, and the resulting events are turned into arrival rates, service rates, and wait-time estimates. That gives the next sprint a trustworthy analytical contract to build on for camera integration and API services.
 
 \section{Sprint Retrospective}
-The main achievement of this sprint was connecting perception to interpretation in one delivery. The tracker and zone logic reduce false continuity problems, while the queue model provides both formulas and guardrails. A mathematically correct wait-time result is not enough if the input window is empty or the queue is unstable, so the implementation had to treat safety and interpretability as equal concerns alongside detection accuracy.
+The main achievement of this sprint was connecting perception to interpretation in one delivery. The tracker and zone logic reduce false continuity problems, while the queue model provides an adaptive wait-time formula that remains interpretable across all operating conditions. A mathematically correct wait-time result is not enough if the input window is empty or the queue is overloaded, so the implementation had to treat safety and interpretability as equal concerns alongside detection accuracy.
 
-The value of this sprint is that it gives the rest of the system a trustworthy metric layer. Once the queue state is expressed through rates, stability, and fallback behavior, the dashboard and automation work can operate on structured signals instead of raw counts.
+The value of this sprint is that it gives the rest of the system a trustworthy metric layer. Once the queue state is expressed through rates and adaptive wait-time estimation, the dashboard and automation work can operate on structured signals instead of raw counts.

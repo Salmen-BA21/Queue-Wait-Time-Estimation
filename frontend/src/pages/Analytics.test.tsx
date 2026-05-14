@@ -79,6 +79,7 @@ describe("Analytics", () => {
       peak_queue_length: 21,
       stability_score: 84,
       total_alerts: 12,
+      warning_alerts: 10,
       avg_people_in_zone: 8.4,
       avg_service_rate: 0.22,
       avg_arrival_rate: 0.18,
@@ -96,6 +97,7 @@ describe("Analytics", () => {
         peak_queue_length: 18,
         avg_service_rate: 0.2,
         stability_score: 78,
+        warning_alerts: 5,
       },
     ]);
 

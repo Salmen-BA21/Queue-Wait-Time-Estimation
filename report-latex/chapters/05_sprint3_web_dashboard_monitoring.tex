@@ -212,6 +212,19 @@ The staged feed is then confirmed in the review and launch panel presented in Fi
     \label{fig:sprint3_review_panel}
 \end{figure}
 
+\subsection{Analytics and Historical Reporting}
+The analytics view extends the dashboard from live supervision into historical reporting. It aggregates archived alert history and queue metrics into a summary that helps managers identify trend shifts and recurring bottlenecks without leaving the web application.
+
+Four KPI cards provide a fast overview: average wait time, peak queue length, stability score, and total alerts across the selected range. A period selector (hourly, daily, weekly) controls the aggregation granularity, while date filters allow managers to isolate specific operating windows. The page then visualizes wait time and queue size trends, highlights the top-performing and underperforming zones, and summarizes the alert mix by severity.
+
+The analytics view also supports CSV export so the same statistics can be used in external reporting. When the archive is empty, the interface seeds a mock dataset derived from active feeds to keep the dashboard informative during early pilots. Figure~\ref{fig:sprint3_analytics_page} presents the consolidated analytics dashboard.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{\detokenize{AnalyticsPageUi.png}}
+    \caption{Analytics dashboard with KPI summaries, trend charts, zone breakdowns, and export controls.}
+    \label{fig:sprint3_analytics_page}
+\end{figure}
+
 \subsection{Integration Testing}
 Frontend integration behavior is validated through scenario-based tests that cover dashboard setup, live event handling, transport fallback, feed routing, and error behavior.
 

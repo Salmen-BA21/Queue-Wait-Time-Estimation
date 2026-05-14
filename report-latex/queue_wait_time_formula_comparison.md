@@ -4,38 +4,32 @@ This note summarizes the wait-time formulas that were considered for the project
 
 ## Project Context
 
-The system monitors a queue lane in real time, estimates:
+The system monitors a queue lane in real time and estimates:
 
-- arrival rate $\lambda$
-- service rate $\mu$
-- expected wait time $W$
-- queue stability
+- arrival rate $\lambda$ (people entering per second)
+- service rate $\mu$ (people leaving per second)
+- expected wait time $W$ (seconds)
 
-The implementation uses a single effective service channel for each monitored lane, so the wait-time model must be simple, explainable, and directly tied to the measured rates.
+The implementation uses a single effective service channel per lane, so the wait-time model must be simple, explainable, and directly tied to the measured rates.
 
 ## Main Formula Used
 
-### M/M/1 wait-time model
+The system outputs **only the wait time** $ W $ using an adaptive formula:
 
 $$
-W = \frac{1}{\mu - \lambda}
+W = \begin{cases}
+\dfrac{1}{\mu - \lambda} & \text{if } \lambda < \mu \\[0.5em]
+\dfrac{L}{\mu} & \text{otherwise}
+\end{cases}
 $$
 
-Valid when the queue is stable:
+where:
+- $ L $ is the current number of people in the zone
+- $ \mu > 0 $ ensures we never divide by zero
 
-$$
-\lambda < \mu
-$$
+**In plain terms:** When arrivals are lower than service capacity, use the M/M/1 formula. When arrivals exceed capacity, use a simpler calculation based on current queue size. The formula adapts automatically—no separate "stability" output.
 
-### Fallback used in the project
-
-When the queue is unstable but service is still observed, the implementation uses:
-
-$$
-W = \frac{L}{\mu}
-$$
-
-where $L$ is the number of people currently in the zone.
+**Why this approach:** Testing on real video feeds showed that a separate stability flag created false positives and was hard to interpret. The wait time alone is sufficient: if it's high, the queue is congested; if it's low, the queue is clear.
 
 ## Alternatives Considered
 
@@ -61,11 +55,11 @@ where $L$ is the number of people currently in the zone.
 
 If asked during the presentation, a short answer is:
 
-> I used the M/M/1 formula because the system models each monitored lane as one effective queue with one service channel. It gives a simple closed-form wait-time estimate from the measured arrival and service rates, so it is both mathematically justified and easy to use in real time. Other models, like M/M/c or G/G/1, were more complex and did not match the structure of the project as well.
+> I output only the wait time. When the queue isn't full and arrivals are below service capacity, I use the M/M/1 formula for a precise estimate. When the queue gets busy and arrivals exceed capacity, I use a simpler calculation. The formula adapts automatically. When I tested this on real video feeds, I found that the wait time alone is clear and actionable: high wait time means the queue is congested, period.
 
 ## Practical Summary
 
-- **Main estimator:** M/M/1
-- **Stable case:** $W = 1 / (\mu - \lambda)$
-- **Unstable fallback:** $W = L / \mu$
-- **Why it fits:** simple, real-time, explainable, and aligned with a single-lane queue
+- **Output:** Wait time $ W $ only
+- **When arriving < service:** $W = 1 / (\mu - \lambda)$ (M/M/1 precise estimate)
+- **When arriving ≥ service:** $W = L / \mu$ (conservative fallback)
+- **Why it works:** One metric that adapts automatically; tested on real video feeds and proven simpler and clearer than stability flags

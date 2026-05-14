@@ -155,7 +155,6 @@ export interface StatisticsOverview {
   peak_queue_length: number;
   stability_score: number;
   total_alerts: number;
-  critical_alerts: number;
   warning_alerts: number;
   avg_people_in_zone: number;
   avg_service_rate: number;
@@ -173,7 +172,6 @@ export interface ZoneStatisticsItem {
   peak_queue_length: number;
   avg_service_rate: number;
   stability_score: number;
-  critical_alerts: number;
   warning_alerts: number;
 }
 

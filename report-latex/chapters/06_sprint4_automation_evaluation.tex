@@ -109,7 +109,7 @@ These targets intentionally mirror the behavior that an operator would notice fi
 The webhook schema is centered on \texttt{QueuePayload}, which keeps the information needed by n8n in one structure. It carries:
 \begin{itemize}
     \item source metadata (timestamp, frame, source, feed ID),
-    \item queue metrics ($\lambda$, $\mu$, wait time, stability),
+    \item queue metrics ($\lambda$, $\mu$, wait time),
     \item alert flags and severity fields.
 \end{itemize}
 Before anything is sent, the payload is validated so malformed records do not leave the backend.

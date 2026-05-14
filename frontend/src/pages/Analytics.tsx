@@ -94,6 +94,8 @@ function buildMockAnalytics(feeds: VideoFeed[], period: "hourly" | "daily" | "we
     const avgArrivalRate = round(clamp(avgServiceRate - (isActive ? 0.03 : 0.06) + ((feedSeed >> 2) % 3) * 0.005, 0.04, 0.48), 2);
     const stabilityScore = round(clamp(100 - avgWaitTime * (isActive ? 0.45 : 0.28) + (isActive ? -2 : 10), 35, 98));
 
+    const warningAlerts = Math.max(0, Math.round(totalAlerts * 0.8));
+
     return {
       camera_id: feed.name,
       zone_id: `${feed.status === "running" ? "active" : "idle"}_lane_${index + 1}`,
@@ -106,6 +108,7 @@ function buildMockAnalytics(feeds: VideoFeed[], period: "hourly" | "daily" | "we
       avg_service_rate: avgServiceRate,
       avg_arrival_rate: avgArrivalRate,
       stability_score: stabilityScore,
+      warning_alerts: warningAlerts,
     };
   });
 
@@ -126,6 +129,7 @@ function buildMockAnalytics(feeds: VideoFeed[], period: "hourly" | "daily" | "we
   const stabilityScore = zoneStatistics.length
     ? round(zoneStatistics.reduce((sum, item) => sum + item.stability_score, 0) / zoneStatistics.length)
     : 0;
+  const warningAlerts = zoneStatistics.reduce((sum, item) => sum + item.warning_alerts, 0);
 
   const overview: StatisticsOverview = {
     date_range: { from_date: null, to_date: null },
@@ -133,6 +137,7 @@ function buildMockAnalytics(feeds: VideoFeed[], period: "hourly" | "daily" | "we
     peak_queue_length: peakQueueLength,
     stability_score: stabilityScore,
     total_alerts: totalAlerts,
+    warning_alerts: warningAlerts,
     avg_people_in_zone: avgPeopleInZone,
     avg_service_rate: avgServiceRate,
     avg_arrival_rate: avgArrivalRate,

@@ -52,7 +52,7 @@ DataDoIt delivers sustainability solutions across six mission-critical sectors w
 \subsection{Project Context}
 Manual queue supervision is often subjective, hard to scale, and dependent on continuous attention. In many settings, teams react only after congestion appears instead of anticipating it with measurable indicators.
 
-This project addresses that gap by turning camera streams into decision-oriented telemetry. The target output is not limited to occupancy counts, but includes people in zone, arrival rate, service rate, expected wait time, queue stability state, and alert states that can be consumed by monitoring and automation layers.
+This project addresses that gap by turning camera streams into decision-oriented telemetry. The target output is not limited to occupancy counts, but includes people in zone, arrival rate, service rate, adaptive wait-time estimates, and alert states that can be consumed by monitoring and automation layers.
 
 \subsection{Problem Statement}
 Current operational practices and basic counting tools still have recurring limitations:
@@ -71,7 +71,7 @@ As a result, interventions such as staff reallocation, lane opening, or escalati
         Observed pain point & Operational impact & Required system capability \\ \hline
         Manual visual estimation is inconsistent across shifts. & Queue state interpretation varies between staff members, reducing decision reliability. & Standardized per-feed metrics with explicit formulas and stable update cadence. \\ \hline
         Occupancy-only monitoring is descriptive but not predictive. & Teams react late because no forward-looking wait-time signal is available. & Continuous estimation of $\lambda$, $\mu$, and expected wait time $W$. \\ \hline
-        Stability state is not explicit during bursty periods. & Teams may overreact or underreact when service and arrivals fluctuate quickly. & Stable/unstable queue-state classification with fallback wait-time logic. \\ \hline
+        Queue behavior under load spikes is hard to interpret. & Teams may overreact or underreact when service and arrivals fluctuate quickly. & Adaptive wait-time formula that responds gracefully to changing queue conditions. \\ \hline
         Alerting tools are not integrated with runtime analytics. & Escalation depends on manual relay, increasing response latency. & Automated webhook dispatch and workflow-based notification routing. \\ \hline
     \end{tabularx}
     \caption{From operational pain points to system-level requirements}
@@ -120,7 +120,7 @@ The system combines perception, analytics, and integration in one modular pipeli
     \item person detection and multi-object tracking from camera feeds,
     \item polygon-based queue-zone filtering,
     \item estimation of $\lambda$, $\mu$, and expected wait time,
-    \item stable/unstable queue-state interpretation for safe operational decisions,
+    \item adaptive queue-state metrics that remain interpretable under varying load,
     \item real-time web supervision through tiered live transport (WebRTC primary, MJPEG fallback),
     \item automation through n8n webhooks and Telegram alerts.
 \end{enumerate}
@@ -134,7 +134,7 @@ The project objectives are to:
     \item count people in configurable queue zones,
     \item estimate arrival and service rates,
     \item compute expected wait time,
-    \item classify queue stability for operational reliability,
+    \item estimate wait time adaptively for operational reliability,
     \item expose metrics through web interfaces and automation workflows.
 \end{enumerate}
 
@@ -150,7 +150,7 @@ To keep the implementation traceable, the objectives are mapped to delivery modu
         OBJ-01 & Real-time detection and tracking & Module A & Stable in-frame detections with persistent tracker IDs. \\ \hline
         OBJ-02 & Queue-zone counting & Module A & Per-frame in-zone people count and zone-aware overlays. \\ \hline
         OBJ-03 & Queue metric estimation ($\lambda,\mu,W$) & Module A & Continuous metric payloads from queue analysis pipeline. \\ \hline
-        OBJ-04 & Queue stability handling & Module A & Stable/unstable state classification and robust fallback wait-time behavior. \\ \hline
+        OBJ-04 & Adaptive wait-time estimation & Module A & Compute wait time with adaptive logic that responds to queue load. \\ \hline
         OBJ-05 & Web monitoring & Module B & Live dashboard with feed controls, KPIs, and stream views. \\ \hline
         OBJ-06 & Automation integration & Module C & Webhook-based alert routing through n8n and Telegram. \\ \hline
     \end{tabularx}
@@ -194,7 +194,7 @@ The Scrum methodology used to organize the project is illustrated in Figure~\ref
 \subsubsection{Module A: Backend Core (Sprints 1--2)}
 This module established the vision, analytics, and backend service backbone:
 \begin{itemize}
-    \item Sprint 1: detection, tracking, zone filtering, queue metrics, and stability handling,
+    \item Sprint 1: detection, tracking, zone filtering, and queue metrics estimation,
     \item Sprint 2: camera connectivity, backend API exposure, and live transport.
 \end{itemize}
 
