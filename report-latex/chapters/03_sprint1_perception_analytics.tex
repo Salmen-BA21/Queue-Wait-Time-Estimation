@@ -99,6 +99,17 @@ The Sprint 1 activity flow from frame ingestion to queue metrics output is illus
 
 The activity starts from a video source, whether it is a local file or a live camera stream. The system then detects people, keeps track of them, checks whether they are inside the queue area, and passes the filtered result to the queue analysis stage, which computes arrival rate, service rate, and expected wait time.
 
+\subsection{Analytics Activity Diagram}
+The detailed queue analytics logic is shown in Figure~\ref{fig:sprint1_analytics_activity}. This diagram focuses on the dynamic step that transforms tracked people inside the zone into the metric payload consumed by the dashboard and later automation layers.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth]{\detokenize{chapter3_activity_Analytics.pdf}}
+    \caption{Sprint 1 analytics activity diagram for queue metric generation.}
+    \label{fig:sprint1_analytics_activity}
+\end{figure}
+
+The analytics activity compares the current tracked identifiers with the previous observation window to identify arrivals and departures. These events are stored in short windows, then converted into $\lambda$ and $\mu$. Before applying the wait-time formula, the system checks whether enough events were observed, whether $\mu$ is positive, and whether arrivals remain below service capacity. If these guards are satisfied, it uses the M/M/1 expression; otherwise, it falls back to a bounded occupancy-based estimate. This maps directly to US1.6, US1.7, T1.6, T1.7, and T1.8.
+
 \subsection{Sequence Diagram}
 The Sprint 1 sequence from video ingestion to queue metric publication is shown in Figure~\ref{fig:sprint1_sequence}.
 \begin{figure}[H]

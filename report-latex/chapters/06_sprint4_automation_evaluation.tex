@@ -84,6 +84,17 @@ The Sprint 4 n8n workflow used to route queue alerts through cooldown checks, ar
 
 The automation chain includes the runtime metrics collector, the webhook serializer, the HTTP delivery client, the n8n workflow, and the final notification channel. When an alert needs to be preserved for later review, it goes back to the backend through a dedicated archive endpoint. The workflow checks the webhook secret, applies the cooldown gate, formats the alert, and either acknowledges the payload or forwards it to Telegram.
 
+\subsection{Evaluation and Resilience Activity Diagram}
+The evaluation and resilience path is summarized in Figure~\ref{fig:sprint4_evaluation_resilience_activity}. This diagram complements the n8n workflow by covering the verification, tuning, and fault-tolerance backlog items that are not part of the alert-routing diagram itself.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.74\textwidth]{\detokenize{chapter6_evaluation_resilience_activity.pdf}}
+    \caption{Sprint 4 evaluation and resilience activity diagram for tests, tuning, and recovery verification.}
+    \label{fig:sprint4_evaluation_resilience_activity}
+\end{figure}
+
+The activity starts by collecting the verification inputs, then runs backend, frontend, and n8n scenario checks. After that, runtime behavior is measured, tuning and recovery improvements are applied, and failed cases loop back into the affected test layer until the acceptance criteria are met.
+
 \subsection{Verification Plan}
 Validation followed a layered strategy that covered the system from the backend to the dashboard:
 \begin{itemize}

@@ -81,9 +81,19 @@ The source-handling layer routes local files and webcams through one path and li
 Sprint 2 also introduced session-aware access control in the backend API. Managers can only interact with the feeds that belong to their account, while administrators keep the broader management scope needed for account governance. The same identity context is applied to feed listing, feed creation, feed lifecycle actions, stream snapshots, and websocket subscriptions so the runtime respects the ownership rules defined earlier in the report.
 
 \subsection{Camera Discovery and Stream Setup}
-The camera discovery step is used to find available cameras automatically and recover their stream information. This avoids hardcoding stream addresses and makes onboarding easier when new IP cameras are added.
+The camera discovery step is used to find available cameras automatically and recover their stream information. This avoids hardcoding stream addresses and makes onboarding easier when new IP cameras are added. In the implementation, this is not a generic object-detection step; it is a network-source discovery workflow based on ONVIF and RTSP. The backend sends WS-Discovery probes on the local network, extracts device metadata from ONVIF probe responses, resolves the advertised media service, requests RTSP stream URIs through ONVIF media SOAP calls, and then validates the selected stream with OpenCV before it is registered as a feed \cite{onvif_specs,rtsp_rfc2326,opencv_docs}.
 
 In the practical setup, the workstation and the IP camera were connected to the same local network through a router, which made the device reachable for discovery and RTSP validation. The test source used during this stage was a Digital Watchdog IP camera, allowing the connectivity workflow to be validated against a real camera feed.
+
+The resulting onboarding logic is summarized in Figure~\ref{fig:sprint2_camera_discovery_activity}.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.78\textwidth]{\detokenize{chapter4_camera_discovery_activity.pdf}}
+    \caption{Sprint 2 camera discovery activity diagram for ONVIF discovery, RTSP resolution, and stream validation.}
+    \label{fig:sprint2_camera_discovery_activity}
+\end{figure}
+
+The same flow is exposed through backend endpoints for ONVIF discovery, stream resolution, camera testing, and RTSP snapshots. Credentials are accepted as runtime inputs and are kept out of user-facing logs, while the RTSP transport option allows TCP or UDP to be selected depending on stream stability and latency needs.
 
 \subsection{API Layer and Data Contract}
 The API layer acts as the bridge between the backend services and the rest of the project. It provides structured inputs and outputs so the frontend can interact with the backend in a predictable way. The main groups of operations are:

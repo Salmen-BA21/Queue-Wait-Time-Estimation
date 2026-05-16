@@ -101,13 +101,35 @@ Three main flows were implemented:
     \item \textbf{Alert surfacing:} alerts reach the interface and appear in the activity and attention areas.
 \end{enumerate}
 
+\subsection{Dashboard Data-Flow Sequence Diagram}
+Figure~\ref{fig:sprint3_dashboard_data_flow_sequence} details how data moves between the user, the React dashboard, the API layer, the backend, the runtime worker, the websocket channel, and the media transport layer.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{\detokenize{chapter5_dashboard_data_flow_sequence.pdf}}
+    \caption{Sprint 3 detailed sequence diagram for dashboard data flow, live events, fallback polling, and video transport.}
+    \label{fig:sprint3_dashboard_data_flow_sequence}
+\end{figure}
+
+This sequence starts with protected dashboard access and initial REST queries for feeds and system health. The dashboard then opens the metrics websocket, receives an initial snapshot, and keeps its local state synchronized from feed lifecycle, metric, alert, and warning events. Feed actions are sent as REST commands and reflected back through websocket status events. When live events become stale, the frontend polls the feed list as a fallback. For video playback, the dashboard negotiates WebRTC through the backend when the transport is ready and otherwise uses the MJPEG stream endpoint as the simpler fallback.
+
+\subsection{Live Dashboard Activity Diagram}
+The frontend runtime behavior is summarized in Figure~\ref{fig:sprint3_live_activity}. This diagram complements the sequence view by showing how the dashboard decides between real-time websocket updates, fallback polling, feed actions, and video transport modes.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.78\textwidth]{\detokenize{chapter5_live_dashboard_activity.pdf}}
+    \caption{Sprint 3 live dashboard activity diagram for websocket updates, fallback polling, feed actions, and transport selection.}
+    \label{fig:sprint3_live_activity}
+\end{figure}
+
+The activity begins with authenticated dashboard access, then loads the feed list and system health. After that, the websocket channel keeps feed status, metric updates, alerts, and warnings synchronized with the local query cache. If the websocket becomes stale or unavailable while feeds are running, the dashboard temporarily polls the feed endpoint so the monitoring surface remains usable. In parallel, each feed card selects the best available video surface: WebRTC when the backend reports a ready stream, MJPEG when WebRTC is unavailable or fails, and a stored preview when the feed is not yet running.
+
 \subsection{Design Rationale}
 The design phase was kept as a foundation step rather than a full UI release. The goal was to settle navigation, component boundaries, and interaction patterns before live data and transport logic arrived. A clean shell was a useful deliverable because the integration work depended on it.
 
 \section{Implementation}
 
 \subsection{Project Setup and Layout Skeleton}
-The implementation started by turning the design specification into an application skeleton. The workspace setup established the application entry point, the navigation structure, and the shared layout that all pages reuse.
+The implementation started by turning the design specification into an application skeleton. The workspace setup established the application entry point, protected navigation, the dashboard layout, and the shared components that all pages reuse.
 
 The order of the pages was not arbitrary. The layout had to support a workflow that begins with onboarding, continues through configuration, and ends with live supervision. That is why the page skeleton was treated as an operational path rather than a list of unrelated screens.
 
@@ -167,7 +189,7 @@ Reconnection uses increasing delays between attempts. When the problem is not re
 When server-side annotations are active, the dashboard hides local overlays to avoid drawing the same boxes twice on the same video.
 
 \subsection{Dashboard UI Integration}
-The dashboard page brings together live feed controls, setup dialogs, source onboarding, KPI visualizations, and charts. The emphasis was on making those elements work together as one operational interface.
+The dashboard page brings together live feed controls, setup dialogs, source onboarding, KPI visualizations, and charts. The onboarding workflow supports both uploaded videos and ONVIF camera sources. For camera sources, the manager discovers devices, applies per-camera credentials when needed, resolves RTSP streams, tests the selected camera, captures a snapshot for zone tracing, and then stages the feed for batch launch. The emphasis was on making those elements work together as one operational interface.
 
 The practical result is that a manager can move from onboarding to monitoring without leaving the dashboard context. That continuity mirrors the workflow described in the earlier requirements chapter, while Figure~\ref{fig:sprint3_admin_dashboard} shows the administrator screen used for creating and maintaining manager accounts.
 \begin{figure}[H]
@@ -183,11 +205,11 @@ The manager-facing monitoring dashboard, including the live surface, feed summar
     \caption{Manager dashboard showing the live monitoring surface, feed summary cards, and recent activity panel.}
     \label{fig:sprint3_manager_dashboard}
 \end{figure}
-The onboarding workflow starts with the feed setup screen shown in Figure~\ref{fig:sprint3_feed_config}, where the manager prepares a local video source before zone tracing and model selection.
+The onboarding workflow starts with the feed setup screen shown in Figure~\ref{fig:sprint3_feed_config}, where the manager prepares an uploaded video or an ONVIF camera source before zone tracing and model selection.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.9\textwidth]{\detokenize{FeedConfigUi.png}}
-    \caption{Feed setup screen used to prepare a local video source before zone tracing and model selection.}
+    \caption{Feed setup screen used to prepare an uploaded video or ONVIF camera source before zone tracing and model selection.}
     \label{fig:sprint3_feed_config}
 \end{figure}
 The queue polygon for the selected feed is defined through the zone tracing screen shown in Figure~\ref{fig:sprint3_zone_trace}.
@@ -204,11 +226,11 @@ Before launching the feed, the manager selects the YOLO model size through the s
     \caption{Model selection screen used to choose the YOLO size before launching the feed.}
     \label{fig:sprint3_model_select}
 \end{figure}
-The staged feed is then confirmed in the review and launch panel presented in Figure~\ref{fig:sprint3_review_panel}.
+The staged feed or batch of feeds is then confirmed in the review and launch panel presented in Figure~\ref{fig:sprint3_review_panel}.
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{\detokenize{ReviewPanelUi.png}}
-    \caption{Review and launch panel used to confirm the staged feed before creating the batch.}
+    \caption{Review and launch panel used to confirm staged feeds before batch creation or launch.}
     \label{fig:sprint3_review_panel}
 \end{figure}
 

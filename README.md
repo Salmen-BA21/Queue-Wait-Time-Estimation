@@ -16,6 +16,8 @@ The project combines computer vision, queueing theory, stability-aware queue ana
 2. Read [docs/agent-guide/PROJECT_CONCEPT.md](docs/agent-guide/PROJECT_CONCEPT.md) for system concepts.
 3. Read [docs/tracking/PROGRESS.md](docs/tracking/PROGRESS.md) for current delivery status.
 
+Documentation policy: The codebase is the single source of truth for implemented features. Documentation and diagrams must only claim features that have corresponding implementation in `backend/src` (or other code paths). If a feature is described but not implemented, mark it as "documented/planned" and reference the report or issue that tracks implementation.
+
 ## Tech Stack
 
 | Layer | Stack |

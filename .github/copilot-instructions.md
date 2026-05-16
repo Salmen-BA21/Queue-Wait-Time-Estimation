@@ -10,7 +10,8 @@
 This project is a **computer-vision queue monitoring system** that:
 - Detects and tracks people in queue zones via YOLO + ByteTrack
 - Calculates arrival rate (λ), service rate (μ), and expected wait time (W) using M/M/1 queuing theory
-- Quantifies uncertainty via Bayesian Gamma posteriors
+ - Calculates arrival rate (λ), service rate (μ), and expected wait time (W) using M/M/1 queuing theory
+ - Uncertainty estimation is discussed in the project report but is NOT implemented in the codebase; the codebase is the single source of truth for implemented features
 - Sends metrics to n8n via HTTP POST webhooks
 - Uses **self-hosted n8n** (not n8n Cloud)
 
@@ -20,7 +21,7 @@ Your job is to help build, extend, and debug the **n8n side** of this pipeline.
 
 ## 🔌 Inbound Webhook Payload
 
-Every POST from the Python backend to n8n follows this exact JSON schema:
+Every POST from the Python backend to n8n follows this exact JSON schema (current runtime payload):
 
 ```json
 {
@@ -34,13 +35,6 @@ Every POST from the Python backend to n8n follows this exact JSON schema:
     "service_rate": 0.16,
     "wait_time_seconds": 15.0,
     "queue_stable": true
-  },
-
-  "uncertainty": {
-    "lambda_ci": [0.10, 0.22],
-    "mu_ci": [0.11, 0.23],
-    "wait_time_ci": [9.5, 24.3],
-    "level": "MEDIUM"
   },
 
   "alerts": [
@@ -66,7 +60,7 @@ Every POST from the Python backend to n8n follows this exact JSON schema:
 | `QUEUE_BACKLOG_WARNING`   | `warning`        | people_in_zone > 8                         |
 | `ARRIVAL_SPIKE`           | `warning`        | arrival_rate > 0.5/sec                     |
 | `SERVICE_DEGRADATION`     | `warning`        | service_rate dropped below threshold       |
-| `HIGH_UNCERTAINTY`        | `warning`        | uncertainty.level == "HIGH"                |
+| `HIGH_UNCERTAINTY`        | `warning`        | (only used if present in incoming payload; not produced by current codebase)                |
 | `QUEUE_UNSTABLE`          | `warning`        | queue_stable == false                      |
 
 ---
@@ -176,7 +170,7 @@ Use this to gate whether any alerts exist in the payload:
       "string": [
         {
           "name": "message",
-          "value": "={{ '⚠️ *WARNING* — ' + $json.body.zone_id + '\\n\\n' + '📍 *Alert:* ' + $json.body.alerts[0].type + '\\n' + '📊 *Value:* ' + $json.body.alerts[0].value + ' (threshold: ' + $json.body.alerts[0].threshold + ')' + '\\n' + '👥 *In Queue:* ' + $json.body.metrics.people_in_zone + ' people' + '\\n' + '⏱ *Wait Time:* ' + $json.body.metrics.wait_time_seconds + 's' + '\\n' + '📈 *Uncertainty:* ' + $json.body.uncertainty.level + '\\n' + '🕐 ' + $json.body.timestamp }}"
+          "value": "={{ '⚠️ *WARNING* — ' + $json.body.zone_id + '\\n\\n' + '📍 *Alert:* ' + $json.body.alerts[0].type + '\\n' + '📊 *Value:* ' + $json.body.alerts[0].value + ' (threshold: ' + $json.body.alerts[0].threshold + ')' + '\\n' + '👥 *In Queue:* ' + $json.body.metrics.people_in_zone + ' people' + '\\n' + '⏱ *Wait Time:* ' + $json.body.metrics.wait_time_seconds + 's' + '\\n' + '🕐 ' + $json.body.timestamp }}"
         }
       ]
     }
@@ -258,7 +252,7 @@ Always add a **Header Auth** check right after the Webhook node to validate the 
 📊 *Value:* 137s  (threshold: 60s)
 👥 *In Queue:* 12 people
 ⏱ *Wait Time:* 137.4s  [CI: 110s – 165s]
-📈 *Uncertainty:* LOW
+📈 *Uncertainty:* (not produced by current codebase)
 🕐 2026-03-05T14:32:10Z
 ```
 
@@ -324,12 +318,7 @@ Format + Send
     "wait_time_seconds": 137.4,
     "queue_stable": false
   },
-  "uncertainty": {
-    "lambda_ci": [0.10, 0.22],
-    "mu_ci": [0.11, 0.23],
-    "wait_time_ci": [110.0, 165.0],
-    "level": "LOW"
-  },
+  /* uncertainty omitted - not produced by runtime */
   "alerts": [
     {
       "type": "WAIT_TIME_WARNING",
@@ -364,12 +353,7 @@ Format + Send
     "wait_time_seconds": 5.0,
     "queue_stable": true
   },
-  "uncertainty": {
-    "lambda_ci": [0.02, 0.09],
-    "mu_ci": [0.06, 0.15],
-    "wait_time_ci": [3.0, 8.5],
-    "level": "LOW"
-  },
+  /* uncertainty omitted - not produced by runtime */
   "alerts": [],
   "raw_detection_count": 3,
   "fps": 24.9

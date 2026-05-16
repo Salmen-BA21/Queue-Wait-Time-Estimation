@@ -1,39 +1,141 @@
-<mxfile host="app.diagrams.net" modified="2026-04-25T12:00:00.000Z" agent="5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36" etag="def456" version="21.7.5" type="device">
-  <diagram id="diagram1" name="Page-1">
-    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
-      <root>
-        <mxCell id="0"/>
-        <mxCell id="1" parent="0"/>
-        <mxCell id="title" value="Chapter 2 System Architecture" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" parent="1" vertex="1">
-          <mxGeometry x="70" y="30" width="360" height="30" as="geometry"/>
-        </mxCell>
-        <!-- Video Acquisition Component -->
-        <mxCell id="2" value="&lt;&lt;component&gt;&gt;&#xa;Video Acquisition" style="shape=component;whiteSpace=wrap;html=1;" parent="1" vertex="1">
-          <mxGeometry x="70" y="190" width="140" height="90" as="geometry"/>
-        </mxCell>
-        <!-- Perception Component -->
-        <mxCell id="3" value="&lt;&lt;component&gt;&gt;&#xa;Perception" style="shape=component;whiteSpace=wrap;html=1;" parent="1" vertex="1">
-          <mxGeometry x="255" y="190" width="140" height="90" as="geometry"/>
-        </mxCell>
-        <!-- Queue Analysis Component -->
-        <mxCell id="4" value="&lt;&lt;component&gt;&gt;&#xa;Queue Analysis" style="shape=component;whiteSpace=wrap;html=1;" parent="1" vertex="1">
-          <mxGeometry x="450" y="190" width="150" height="90" as="geometry"/>
-        </mxCell>
-        <!-- Notification / Dashboard Component -->
-        <mxCell id="5" value="&lt;&lt;component&gt;&gt;&#xa;Notification / Dashboard" style="shape=component;whiteSpace=wrap;html=1;" parent="1" vertex="1">
-          <mxGeometry x="300" y="360" width="170" height="90" as="geometry"/>
-        </mxCell>
-        <!-- Dependencies -->
-        <mxCell id="6" style="endArrow=open;endSize=8;dashed=1;html=1;" parent="1" source="2" target="3" edge="1">
-          <mxGeometry relative="1" as="geometry"/>
-        </mxCell>
-        <mxCell id="7" style="endArrow=open;endSize=8;dashed=1;html=1;" parent="1" source="3" target="4" edge="1">
-          <mxGeometry relative="1" as="geometry"/>
-        </mxCell>
-        <mxCell id="8" style="endArrow=open;endSize=8;dashed=1;html=1;" parent="1" source="4" target="5" edge="1">
-          <mxGeometry relative="1" as="geometry"/>
-        </mxCell>
-      </root>
-    </mxGraphModel>
-  </diagram>
+<mxfile host="65bd71144e">
+    <diagram id="diagram1" name="Page-1">
+        <mxGraphModel dx="806" dy="423" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="Chapter 2 Component Diagram - Queue Wait-Time Estimation System" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontStyle=1;fontSize=18;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="20" width="760" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="system_boundary" value="&lt;br&gt;&lt;b&gt;QueueVisionPlatform&lt;/b&gt;" style="html=1;dropTarget=0;whiteSpace=wrap;fontSize=15;labelPosition=left;verticalLabelPosition=top;align=right;verticalAlign=bottom;spacingRight=-170;spacingBottom=-45;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="70" width="980" height="690" as="geometry"/>
+                </mxCell>
+                <mxCell id="system_boundary_glyph" value="" style="shape=module;jettyWidth=8;jettyHeight=4;fontSize=16;" parent="system_boundary" vertex="1">
+                    <mxGeometry x="1" width="20" height="20" relative="1" as="geometry">
+                        <mxPoint x="-27" y="7" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="camera_sources" value="&lt;&lt;component&gt;&gt;&lt;br&gt;&lt;b&gt;:CameraSources&lt;/b&gt;&lt;br&gt;RTSP / ONVIF feeds" style="html=1;dropTarget=0;whiteSpace=wrap;fontSize=12;fillColor=#f5f5f5;strokeColor=#666666;" parent="1" vertex="1">
+                    <mxGeometry x="50" y="135.5" width="170" height="85" as="geometry"/>
+                </mxCell>
+                <mxCell id="camera_sources_glyph" value="" style="shape=module;jettyWidth=8;jettyHeight=4;fontSize=16;" parent="camera_sources" vertex="1">
+                    <mxGeometry x="1" width="20" height="20" relative="1" as="geometry">
+                        <mxPoint x="-27" y="7" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="video_acquisition" value="&lt;&lt;component&gt;&gt;&lt;br&gt;&lt;b&gt;:VideoAcquisition&lt;/b&gt;&lt;br&gt;Frame capture and stream handling" style="html=1;dropTarget=0;whiteSpace=wrap;fontSize=12;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
+                    <mxGeometry x="290" y="130.5" width="190" height="95" as="geometry"/>
+                </mxCell>
+                <mxCell id="video_acquisition_glyph" value="" style="shape=module;jettyWidth=8;jettyHeight=4;fontSize=16;" parent="video_acquisition" vertex="1">
+                    <mxGeometry x="1" width="20" height="20" relative="1" as="geometry">
+                        <mxPoint x="-27" y="7" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="perception" value="&lt;&lt;component&gt;&gt;&lt;br&gt;&lt;b&gt;:PerceptionEngine&lt;/b&gt;&lt;br&gt;YOLO + ByteTrack" style="html=1;dropTarget=0;whiteSpace=wrap;fontSize=12;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
+                    <mxGeometry x="530" y="130.5" width="190" height="95" as="geometry"/>
+                </mxCell>
+                <mxCell id="perception_glyph" value="" style="shape=module;jettyWidth=8;jettyHeight=4;fontSize=16;" parent="perception" vertex="1">
+                    <mxGeometry x="1" width="20" height="20" relative="1" as="geometry">
+                        <mxPoint x="-27" y="7" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="queue_analysis" value="&lt;&lt;component&gt;&gt;&lt;br&gt;&lt;b&gt;:QueueAnalyzer&lt;/b&gt;&lt;br&gt;M/M/1" style="html=1;dropTarget=0;whiteSpace=wrap;fontSize=12;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="530" y="280" width="190" height="95" as="geometry"/>
+                </mxCell>
+                <mxCell id="queue_analysis_glyph" value="" style="shape=module;jettyWidth=8;jettyHeight=4;fontSize=16;" parent="queue_analysis" vertex="1">
+                    <mxGeometry x="1" width="20" height="20" relative="1" as="geometry">
+                        <mxPoint x="-27" y="7" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="backend_api" value="&lt;&lt;component&gt;&gt;&lt;br&gt;&lt;b&gt;:BackendAPI&lt;/b&gt;&lt;br&gt;FastAPI + WebSocket" style="html=1;dropTarget=0;whiteSpace=wrap;fontSize=12;fillColor=#f5f5f5;strokeColor=#666666;" parent="1" vertex="1">
+                    <mxGeometry x="190" y="400" width="180" height="95" as="geometry"/>
+                </mxCell>
+                <mxCell id="backend_api_glyph" value="" style="shape=module;jettyWidth=8;jettyHeight=4;fontSize=16;" parent="backend_api" vertex="1">
+                    <mxGeometry x="1" width="20" height="20" relative="1" as="geometry">
+                        <mxPoint x="-27" y="7" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="alerting" value="&lt;&lt;component&gt;&gt;&lt;br&gt;&lt;b&gt;:AlertOrchestrator&lt;/b&gt;&lt;br&gt;n8n workflow" style="html=1;dropTarget=0;whiteSpace=wrap;fontSize=12;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="535" y="470" width="180" height="95" as="geometry"/>
+                </mxCell>
+                <mxCell id="alerting_glyph" value="" style="shape=module;jettyWidth=8;jettyHeight=4;fontSize=16;" parent="alerting" vertex="1">
+                    <mxGeometry x="1" width="20" height="20" relative="1" as="geometry">
+                        <mxPoint x="-27" y="7" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="storage" value="&lt;&lt;component&gt;&gt;&lt;br&gt;&lt;b&gt;:Persistence&lt;/b&gt;&lt;br&gt;CSV + SQLite" style="html=1;dropTarget=0;whiteSpace=wrap;fontSize=12;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="190" y="270" width="180" height="95" as="geometry"/>
+                </mxCell>
+                <mxCell id="storage_glyph" value="" style="shape=module;jettyWidth=8;jettyHeight=4;fontSize=16;" parent="storage" vertex="1">
+                    <mxGeometry x="1" width="20" height="20" relative="1" as="geometry">
+                        <mxPoint x="-27" y="7" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="dashboard" value="&lt;&lt;component&gt;&gt;&lt;br&gt;&lt;b&gt;:LiveDashboard&lt;/b&gt;&lt;br&gt;React + charts" style="html=1;dropTarget=0;whiteSpace=wrap;fontSize=12;fillColor=#f5f5f5;strokeColor=#666666;" parent="1" vertex="1">
+                    <mxGeometry x="180" y="580" width="200" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="dashboard_glyph" value="" style="shape=module;jettyWidth=8;jettyHeight=4;fontSize=16;" parent="dashboard" vertex="1">
+                    <mxGeometry x="1" width="20" height="20" relative="1" as="geometry">
+                        <mxPoint x="-27" y="7" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="telegram" value="&lt;&lt;component&gt;&gt;&lt;br&gt;&lt;b&gt;:TelegramChannel&lt;/b&gt;" style="html=1;dropTarget=0;whiteSpace=wrap;fontSize=12;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="1" vertex="1">
+                    <mxGeometry x="535" y="620" width="180" height="75" as="geometry"/>
+                </mxCell>
+                <mxCell id="telegram_glyph" value="" style="shape=module;jettyWidth=8;jettyHeight=4;fontSize=16;" parent="telegram" vertex="1">
+                    <mxGeometry x="1" width="20" height="20" relative="1" as="geometry">
+                        <mxPoint x="-27" y="7" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="if_rtsp" value="RTSPStream" style="ellipse;html=1;fontSize=9;align=center;fillColor=none;points=[];aspect=fixed;resizable=0;verticalAlign=top;labelPosition=center;verticalLabelPosition=bottom;strokeColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="255" y="173" width="10" height="10" as="geometry"/>
+                </mxCell>
+                <mxCell id="if_tracks" value="Tracks" style="ellipse;html=1;fontSize=9;align=center;fillColor=none;points=[];aspect=fixed;resizable=0;verticalAlign=top;labelPosition=center;verticalLabelPosition=bottom;strokeColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="620" y="240" width="10" height="10" as="geometry"/>
+                </mxCell>
+                <mxCell id="if_metrics" value="QueueMetrics" style="ellipse;html=1;fontSize=9;align=center;fillColor=none;points=[];aspect=fixed;resizable=0;verticalAlign=top;labelPosition=center;verticalLabelPosition=bottom;strokeColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="470" y="430" width="10" height="10" as="geometry"/>
+                </mxCell>
+                <mxCell id="if_ws" value="RealtimeFeed" style="ellipse;html=1;fontSize=9;align=center;fillColor=none;points=[];aspect=fixed;resizable=0;verticalAlign=top;labelPosition=center;verticalLabelPosition=bottom;strokeColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="275" y="520" width="10" height="10" as="geometry"/>
+                </mxCell>
+                <mxCell id="e1" value="" style="endArrow=none;html=1;rounded=0;endFill=0;" parent="1" source="camera_sources" target="if_rtsp" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e2" value="" style="endArrow=open;endSize=8;dashed=1;html=1;" parent="1" source="if_rtsp" target="video_acquisition" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3" value="frames" style="endArrow=open;endSize=8;dashed=1;html=1;fontSize=9;" parent="1" source="video_acquisition" target="perception" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e4" value="" style="endArrow=none;html=1;rounded=0;endFill=0;" parent="1" source="perception" target="if_tracks" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e5" value="" style="endArrow=open;endSize=8;dashed=1;html=1;" parent="1" source="if_tracks" target="queue_analysis" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e6" value="metrics" style="endArrow=open;endSize=8;dashed=1;html=1;fontSize=9;" parent="1" source="queue_analysis" target="if_metrics" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e7" value="" style="endArrow=open;endSize=8;dashed=1;html=1;" parent="1" source="if_metrics" target="backend_api" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e8" value="" style="endArrow=open;endSize=8;dashed=1;html=1;" parent="1" source="if_metrics" target="alerting" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e9" value="store records" style="endArrow=open;endSize=8;dashed=1;html=1;fontSize=9;" parent="1" source="backend_api" target="storage" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e10" value="alerts" style="endArrow=open;endSize=8;dashed=1;html=1;fontSize=9;" parent="1" source="alerting" target="telegram" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e11" value="" style="endArrow=none;html=1;rounded=0;endFill=0;" parent="1" source="backend_api" target="if_ws" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e12" value="" style="endArrow=open;endSize=8;dashed=1;html=1;" parent="1" source="if_ws" target="dashboard" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
 </mxfile>
