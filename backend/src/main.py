@@ -642,7 +642,6 @@ def run(cfg: AppConfig) -> None:
                         estimated_wait_sec=metrics.estimated_wait_sec,
                         arrival_rate=metrics.arrival_rate,
                         service_rate=metrics.service_rate,
-                        queue_stable=metrics.queue_stable,
                         frame_id=frame_count,
                         timestamp=event_timestamp,
                     )
@@ -870,7 +869,6 @@ def _metrics_dict(m: QueueMetrics) -> dict[str, str]:
         "λ (arr)": f"{m.arrival_rate:.3f}",
         "μ (svc)": f"{m.service_rate:.3f}",
         "Wait": f"{m.estimated_wait_sec:.1f}s",
-        "Stable": "✓" if m.queue_stable else "✗",
     }
 
 
@@ -887,13 +885,12 @@ def _log_metrics(
 ) -> None:
     """Write queue metrics and rolling loop performance diagnostics."""
     logger.info(
-        "[frame %d] zone=%d | λ=%.4f | μ=%.4f | W=%.1fs | stable=%s | loop_fps=%.2f | proc_fps=%.2f | stride=%d | detect=%.1fms | track=%.1fms | analyze=%.1fms",
+        "[frame %d] zone=%d | λ=%.4f | μ=%.4f | W=%.1fs | loop_fps=%.2f | proc_fps=%.2f | stride=%d | detect=%.1fms | track=%.1fms | analyze=%.1fms",
         frame_count,
         m.people_in_zone,
         m.arrival_rate,
         m.service_rate,
         m.estimated_wait_sec,
-        m.queue_stable,
         loop_fps,
         processed_fps,
         process_stride,
@@ -909,7 +906,6 @@ def _dashboard_metrics_payload(
     detections: sv.Detections | None = None,
 ) -> dict[str, object]:
     """Convert runtime metrics into the frontend websocket contract."""
-    wait_time_seconds: float | None = m.estimated_wait_sec if m.queue_stable else None
 
     # Convert supervision detections (xyxy) to nested list for JSON
     # Each detection is [x1, y1, x2, y2, confidence, class_id, tracker_id]
@@ -930,8 +926,7 @@ def _dashboard_metrics_payload(
         "people_in_zone": m.people_in_zone,
         "arrival_rate": m.arrival_rate,
         "service_rate": m.service_rate,
-        "wait_time_seconds": wait_time_seconds,
-        "queue_stable": m.queue_stable,
+        "wait_time_seconds": m.estimated_wait_sec,
         "detections": det_list,
     }
 

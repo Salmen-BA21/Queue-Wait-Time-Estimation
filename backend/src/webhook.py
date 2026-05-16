@@ -31,9 +31,6 @@ class QueuePayload:
     arrival_rate: float  # λ – per second
     service_rate: float  # μ – per second
     estimated_wait_sec: float
-
-    # Classification
-    queue_stable: bool
     
     # Alerts and thresholds
     alert_triggered: bool = False
@@ -78,7 +75,6 @@ class QueuePayload:
             arrival_rate=metrics.arrival_rate,
             service_rate=metrics.service_rate,
             estimated_wait_sec=metrics.estimated_wait_sec,
-            queue_stable=metrics.queue_stable,
             alert_triggered=alert_triggered,
             alert_reason=alert_reason,
             alert_severity=alert_severity,
@@ -96,7 +92,6 @@ EXAMPLE_PAYLOAD = {
     "arrival_rate": 0.133,
     "service_rate": 0.050,
     "estimated_wait_sec": 5.2,
-    "queue_stable": True,
     "alert_triggered": False,
     "alert_reason": "",
     "alert_severity": "warning",
@@ -113,7 +108,7 @@ def validate_payload(payload: dict) -> bool:
     required_fields = {
         "timestamp", "frame_id", "source", "feed_id", "people_in_zone",
         "arrival_rate", "service_rate", "estimated_wait_sec",
-        "queue_stable", "alert_triggered"
+        "alert_triggered"
     }
     
     if not all(field in payload for field in required_fields):

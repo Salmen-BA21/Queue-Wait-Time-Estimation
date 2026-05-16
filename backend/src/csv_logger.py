@@ -33,7 +33,7 @@ class CSVMetricsLogger:
         self.headers = [
             "timestamp", "frame_id", "source", "people_in_zone",
             "arrival_rate", "service_rate", "estimated_wait_sec",
-            "queue_stable", "alert_triggered", "alert_message",
+            "alert_triggered", "alert_message",
             "establishment_name", "section_name", "employee_name"
         ]
         

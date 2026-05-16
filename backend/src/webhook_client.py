@@ -226,7 +226,6 @@ if __name__ == "__main__":
         arrival_rate=0.15,
         service_rate=0.08,
         estimated_wait_sec=4.5,
-        queue_stable=True,
     )
     
     print("Testing webhook client...")

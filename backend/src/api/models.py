@@ -148,7 +148,6 @@ class QueueAlertMetrics(BaseModel):
     arrival_rate: float = Field(ge=0.0)
     service_rate: float = Field(ge=0.0)
     wait_time_seconds: float = Field(ge=0.0)
-    queue_stable: bool
 
 
 class QueueAlertArchiveRequest(BaseModel):
@@ -185,7 +184,6 @@ class StatisticsOverviewResponse(BaseModel):
     date_range: StatisticsDateRange
     avg_wait_time: float = Field(ge=0.0)
     peak_queue_length: int = Field(ge=0)
-    stability_score: float = Field(ge=0.0)
     total_alerts: int = Field(ge=0)
     avg_people_in_zone: float = Field(ge=0.0)
     avg_service_rate: float = Field(ge=0.0)
@@ -204,7 +202,6 @@ class ZoneStatisticsItem(BaseModel):
     avg_people_in_zone: float = Field(ge=0.0)
     peak_queue_length: int = Field(ge=0)
     avg_service_rate: float = Field(ge=0.0)
-    stability_score: float = Field(ge=0.0)
 
 
 class TimeSeriesStatisticsItem(BaseModel):
@@ -214,7 +211,6 @@ class TimeSeriesStatisticsItem(BaseModel):
     alert_count: int = Field(ge=0)
     avg_wait_time: float = Field(ge=0.0)
     peak_queue_length: int = Field(ge=0)
-    stability_score: float = Field(ge=0.0)
     avg_service_rate: float = Field(ge=0.0)
     avg_arrival_rate: float = Field(ge=0.0)
 
@@ -327,7 +323,6 @@ class QueueMetricsModel(BaseModel):
     arrival_rate: float = Field(ge=0.0)
     service_rate: float = Field(ge=0.0)
     wait_time_seconds: float | None = Field(default=None, ge=0.0)
-    queue_stable: bool
     detections: list[list[float]] | None = None
     render_frame_jpeg_base64: str | None = None
     backend_annotations_active: bool = False

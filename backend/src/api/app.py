@@ -1888,7 +1888,6 @@ async def test_webhook_integration(
         arrival_rate=0.05,
         service_rate=0.10,
         estimated_wait_sec=5.0,
-        queue_stable=True,
     )
 
     try:

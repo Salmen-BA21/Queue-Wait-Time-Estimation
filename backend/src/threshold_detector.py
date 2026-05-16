@@ -60,7 +60,6 @@ class QueueThresholdDetector:
         estimated_wait_sec: float,
         arrival_rate: float,
         service_rate: float,
-        queue_stable: bool,
         frame_id: int,
         timestamp: float,
     ) -> list[QueueAlert]:
@@ -77,8 +76,6 @@ class QueueThresholdDetector:
             Arrival rate (people/second).
         service_rate : float
             Service rate (people/second).
-        queue_stable : bool
-            Whether queue is in stable state.
         frame_id : int
             Current frame ID for tracking.
         timestamp : float

@@ -269,7 +269,6 @@ class TestQueueVisionApi(unittest.TestCase):
                     "arrival_rate": 0.15,
                     "service_rate": 0.16,
                     "wait_time_seconds": 137.4,
-                    "queue_stable": False,
                 },
                 "alerts": [
                     {
@@ -303,7 +302,7 @@ class TestQueueVisionApi(unittest.TestCase):
             cursor.execute("SELECT COUNT(*) FROM alert_history")
             count = cursor.fetchone()[0]
             cursor.execute(
-                "SELECT alert_type, severity, message, people_in_zone, queue_stable, alerts_count FROM alert_history ORDER BY id"
+                "SELECT alert_type, severity, message, people_in_zone, alerts_count FROM alert_history ORDER BY id"
             )
             rows = cursor.fetchall()
         finally:
@@ -313,7 +312,6 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertEqual(rows[0]["alert_type"], "WAIT_TIME_CRITICAL")
         self.assertEqual(rows[0]["severity"], "critical")
         self.assertEqual(rows[0]["people_in_zone"], 16)
-        self.assertEqual(rows[0]["queue_stable"], 0)
         self.assertEqual(rows[0]["alerts_count"], 2)
         self.assertEqual(rows[1]["alert_type"], "QUEUE_BACKLOG_CRITICAL")
         self.assertEqual(rows[1]["alerts_count"], 2)
@@ -656,7 +654,6 @@ class TestQueueVisionApi(unittest.TestCase):
                             "arrival_rate": 0.12,
                             "service_rate": 0.15,
                             "wait_time_seconds": wait_time,
-                            "queue_stable": True,
                         },
                         "alerts": [
                             {
@@ -2075,7 +2072,6 @@ class TestQueueVisionApi(unittest.TestCase):
             arrival_rate=0.2,
             service_rate=0.4,
             wait_time_seconds=5.0,
-            queue_stable=True,
         )
         alert = AlertModel(
             alert_type="queue_backlog",
@@ -2120,7 +2116,6 @@ class TestQueueVisionApi(unittest.TestCase):
             arrival_rate=0.15,
             service_rate=0.30,
             wait_time_seconds=6.0,
-            queue_stable=True,
         )
 
         async def exercise() -> None:
@@ -2180,7 +2175,6 @@ class TestQueueVisionApi(unittest.TestCase):
                     "arrival_rate": 0.3,
                     "service_rate": 0.5,
                     "wait_time_seconds": 9.0,
-                    "queue_stable": True,
                 }
             },
         )

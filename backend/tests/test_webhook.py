@@ -11,7 +11,6 @@ def test_queue_payload_includes_feed_id_and_validates():
         arrival_rate=0.12,
         service_rate=0.15,
         estimated_wait_sec=12.3,
-        queue_stable=True,
     )
 
     payload = QueuePayload.from_queue_metrics(

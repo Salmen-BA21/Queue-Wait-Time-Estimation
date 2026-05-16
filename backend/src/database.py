@@ -111,7 +111,6 @@ def _create_current_schema(cursor: sqlite3.Cursor) -> None:
             arrival_rate REAL,
             service_rate REAL,
             wait_time_seconds REAL,
-            queue_stable INTEGER,
             raw_detection_count INTEGER,
             fps REAL,
             alerts_count INTEGER,
@@ -694,12 +693,11 @@ def archive_alert_payload(payload: Dict[str, Any]) -> int:
                     arrival_rate,
                     service_rate,
                     wait_time_seconds,
-                    queue_stable,
                     raw_detection_count,
                     fps,
                     alerts_count,
                     payload_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     payload.get("timestamp"),
@@ -714,7 +712,6 @@ def archive_alert_payload(payload: Dict[str, Any]) -> int:
                     metrics.get("arrival_rate"),
                     metrics.get("service_rate"),
                     metrics.get("wait_time_seconds"),
-                    int(bool(metrics.get("queue_stable", True))),
                     payload.get("raw_detection_count"),
                     payload.get("fps"),
                     0,
@@ -740,12 +737,11 @@ def archive_alert_payload(payload: Dict[str, Any]) -> int:
                     arrival_rate,
                     service_rate,
                     wait_time_seconds,
-                    queue_stable,
                     raw_detection_count,
                     fps,
                     alerts_count,
                     payload_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     payload.get("timestamp"),
@@ -760,7 +756,6 @@ def archive_alert_payload(payload: Dict[str, Any]) -> int:
                     metrics.get("arrival_rate"),
                     metrics.get("service_rate"),
                     metrics.get("wait_time_seconds"),
-                    int(bool(metrics.get("queue_stable", True))),
                     payload.get("raw_detection_count"),
                     payload.get("fps"),
                     len(alerts),
@@ -867,7 +862,6 @@ def query_alert_history(
                 arrival_rate,
                 service_rate,
                 wait_time_seconds,
-                queue_stable,
                 raw_detection_count,
                 fps,
                 alerts_count,
@@ -905,7 +899,6 @@ def get_overview_statistics(
             SELECT
                 COALESCE(ROUND(AVG(wait_time_seconds), 2), 0) AS avg_wait_time,
                 COALESCE(MAX(people_in_zone), 0) AS peak_queue_length,
-                COALESCE(ROUND(100.0 * AVG(CASE WHEN queue_stable = 1 THEN 1.0 ELSE 0.0 END), 2), 0) AS stability_score,
                 COUNT(*) AS total_alerts,
                 COALESCE(ROUND(AVG(people_in_zone), 2), 0) AS avg_people_in_zone,
                 COALESCE(ROUND(AVG(service_rate), 3), 0) AS avg_service_rate,
@@ -948,8 +941,7 @@ def get_zone_statistics(
                 COALESCE(MIN(wait_time_seconds), 0) AS min_wait_time,
                 COALESCE(ROUND(AVG(people_in_zone), 2), 0) AS avg_people_in_zone,
                 COALESCE(MAX(people_in_zone), 0) AS peak_queue_length,
-                COALESCE(ROUND(AVG(service_rate), 3), 0) AS avg_service_rate,
-                COALESCE(ROUND(100.0 * AVG(CASE WHEN queue_stable = 1 THEN 1.0 ELSE 0.0 END), 2), 0) AS stability_score
+                COALESCE(ROUND(AVG(service_rate), 3), 0) AS avg_service_rate
             FROM alert_history
             {where_clause}
             GROUP BY camera_id, zone_id
@@ -998,7 +990,6 @@ def get_time_based_statistics(
                 COUNT(*) AS alert_count,
                 COALESCE(ROUND(AVG(wait_time_seconds), 2), 0) AS avg_wait_time,
                 COALESCE(MAX(people_in_zone), 0) AS peak_queue_length,
-                COALESCE(ROUND(100.0 * AVG(CASE WHEN queue_stable = 1 THEN 1.0 ELSE 0.0 END), 2), 0) AS stability_score,
                 COALESCE(ROUND(AVG(service_rate), 3), 0) AS avg_service_rate,
                 COALESCE(ROUND(AVG(arrival_rate), 3), 0) AS avg_arrival_rate
             FROM alert_history

@@ -32,7 +32,6 @@ class QueueMetrics:
     arrival_rate: float = 0.0   # λ – persons / sec
     service_rate: float = 0.0   # μ – persons / sec
     estimated_wait_sec: float = 0.0
-    queue_stable: bool = True
 
 
 class QueueAnalyzer:
@@ -113,9 +112,8 @@ class QueueAnalyzer:
 
         # Wait time estimation
         people = len(current_ids)
-        stable = lam < mu if mu > 0 else False
 
-        if stable and mu > 0:
+        if lam < mu and mu > 0:
             wait = 1.0 / (mu - lam)       # M/M/1 sojourn time
         elif mu > 0:
             wait = people / mu             # rough fallback
@@ -128,7 +126,6 @@ class QueueAnalyzer:
             arrival_rate=round(lam, 4),
             service_rate=round(mu, 4),
             estimated_wait_sec=round(max(wait, 0.0), 1),
-            queue_stable=stable,
         )
         return self._metrics
 
