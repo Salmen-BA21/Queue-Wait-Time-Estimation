@@ -1,6 +1,6 @@
 ﻿<mxfile host="65bd71144e">
     <diagram id="global-use-case" name="Global Use Case">
-        <mxGraphModel dx="592" dy="385" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="1048" dy="618" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -19,8 +19,20 @@
                 <mxCell id="uc_manage" value="Manage accounts" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" parent="system" vertex="1">
                     <mxGeometry x="120" y="90" width="190" height="80" as="geometry"/>
                 </mxCell>
-                <mxCell id="uc_feeds" value="Register and configure feeds" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="system" vertex="1">
+                <mxCell id="uc_feeds" value="Register and configure feeds&#xa;(includes camera discovery)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="system" vertex="1">
                     <mxGeometry x="120" y="215" width="235" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="uc_discover_cameras" value="Discover IP cameras&#xa;(ONVIF/WS-Discovery)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="system">
+                    <mxGeometry x="540" y="40" width="200" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="uc_test_camera" value="Test camera connection&#xa;and stream quality" style="ellipse;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="system">
+                    <mxGeometry x="540" y="140" width="200" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="i_discover" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="dashed=1;endArrow=open;endFill=0;html=1;rounded=0;" edge="1" parent="system" source="uc_feeds" target="uc_discover_cameras">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="i_test" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="dashed=1;endArrow=open;endFill=0;html=1;rounded=0;" edge="1" parent="system" source="uc_feeds" target="uc_test_camera">
+                    <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
                 <mxCell id="uc_zones" value="Define queue zones" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" parent="system" vertex="1">
                     <mxGeometry x="120" y="340" width="205" height="80" as="geometry"/>

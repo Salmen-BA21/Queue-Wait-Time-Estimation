@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="chapter4-camera-discovery-activity" name="Page-1">
-        <mxGraphModel dx="247" dy="269" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="655" dy="386" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -44,19 +44,19 @@
                     <mxGeometry x="290" y="1020" width="245" height="70" as="geometry"/>
                 </mxCell>
                 <mxCell id="dec_test" value="Connection&#xa;valid?" style="rhombus;fillColor=#fff2cc;strokeColor=#d6b656;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
-                    <mxGeometry x="575" y="1008" width="110" height="95" as="geometry"/>
+                    <mxGeometry x="600" y="1008" width="110" height="95" as="geometry"/>
                 </mxCell>
                 <mxCell id="act_register" value="Register feed configuration&#xa;source, metadata, transport" style="rounded=1;arcSize=50;fillColor=#d5e8d4;strokeColor=#82b366;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
-                    <mxGeometry x="555" y="890" width="210" height="70" as="geometry"/>
+                    <mxGeometry x="550" y="890" width="210" height="70" as="geometry"/>
                 </mxCell>
                 <mxCell id="act_snapshot" value="Capture snapshot for zone setup" style="rounded=1;arcSize=50;fillColor=#d5e8d4;strokeColor=#82b366;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
-                    <mxGeometry x="555" y="760" width="210" height="60" as="geometry"/>
+                    <mxGeometry x="550" y="760" width="210" height="60" as="geometry"/>
                 </mxCell>
                 <mxCell id="act_fail_test" value="Return validation error&#xa;with safe diagnostic message" style="rounded=1;arcSize=50;fillColor=#f8cecc;strokeColor=#b85450;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
-                    <mxGeometry x="555" y="1115" width="210" height="70" as="geometry"/>
+                    <mxGeometry x="550" y="1150" width="210" height="70" as="geometry"/>
                 </mxCell>
                 <mxCell id="end" value="" style="ellipse;shape=doubleEllipse;aspect=fixed;fillColor=#000000;html=1;" parent="1" vertex="1">
-                    <mxGeometry x="645" y="670" width="30" height="30" as="geometry"/>
+                    <mxGeometry x="640" y="670" width="30" height="30" as="geometry"/>
                 </mxCell>
                 <mxCell id="edge_start" style="html=1;endArrow=block;rounded=0;" parent="1" source="start" target="act_request" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
@@ -109,7 +109,9 @@
                 <mxCell id="edge_no_streams_end" style="html=1;endArrow=block;rounded=0;" parent="1" source="act_no_streams" target="end" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <Array as="points">
-                            <mxPoint x="170" y="690"/>
+                            <mxPoint x="180" y="750"/>
+                            <mxPoint x="410" y="750"/>
+                            <mxPoint x="540" y="750"/>
                         </Array>
                     </mxGeometry>
                 </mxCell>

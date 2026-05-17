@@ -235,13 +235,13 @@ The architecture is described as four stages that match the flow of data through
 \end{figure}
 
 \begin{enumerate}
-    \item \textbf{Video acquisition}: local files, RTSP streams, and ONVIF discovery \cite{rtsp_rfc2326,onvif_specs}.
-    \item \textbf{Perception}: detection, tracking, and queue-zone filtering.
-    \item \textbf{Analysis}: queue metrics estimation with adaptive wait-time logic.
-    \item \textbf{Output and integration}: web dashboard, webhook dispatch, and alert automation.
+    \item \textbf{Video acquisition}: camera sources and video streams (RTSP, ONVIF, and local files) feed into the video acquisition component, which handles frame capture and stream management \cite{rtsp_rfc2326,onvif_specs}.
+    \item \textbf{Perception}: the perception engine runs detection and tracking on each captured frame and exposes tracked identities through a defined interface to the queue analyzer.
+    \item \textbf{Analysis}: the queue analyzer receives tracked events and computes queue metrics ($\lambda$, $\mu$, $W$) using adaptive wait-time estimation logic.
+    \item \textbf{Output and integration}: the backend API acts as the hub that receives queue metrics and distributes them across three outputs — the live dashboard via a real-time feed, the persistence layer (SQLite) for historical records, and the alert orchestrator (n8n) which routes alert payloads to the Telegram notification channel.
 \end{enumerate}
 
-This separation keeps perception, analysis, the user interface, and automation independently testable. For example, queue formulas depend on perception events, but they do not depend on the frontend or notification delivery.
+This separation keeps the four stages independently testable. Queue formulas in the analyzer depend only on perception events; the backend API depends only on the metric contract; and the dashboard, persistence, and alert orchestration are each driven by the API without depending on each other.
 
 \subsection{Backend Architecture}
 The backend exposes REST and websocket interfaces for feed lifecycle control and live metrics. It includes modules for detection orchestration, tracking, queue analysis, threshold evaluation, webhook delivery, and camera-source management.
