@@ -26,6 +26,7 @@
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{enumitem}
+\usepackage{multicol}
 \usepackage{xcolor}
 \usepackage{csquotes}
 \usepackage{fancyhdr}
@@ -86,6 +87,7 @@
 
 \newcommand{\chaptertoc}{%
 	\begingroup
+	\pagestyle{empty}
 	\etocsetnexttocdepth{subsection}
 	\etocsettocstyle{%
 		\vspace{0.8cm}%

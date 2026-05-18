@@ -1,60 +1,82 @@
 <mxfile host="65bd71144e">
     <diagram id="chapter6-evaluation-resilience-activity" name="Page-1">
-        <mxGraphModel dx="900" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="655" dy="386" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
-                <mxCell id="title" value="Sprint 4 Evaluation and Resilience Activity Diagram" style="text;fontSize=14;fontStyle=1;align=center;html=1;" vertex="1" parent="1">
+                <mxCell id="title" value="Activity Diagram: Evaluation and Resilience" style="text;fontSize=14;fontStyle=1;align=center;html=1;" parent="1" vertex="1">
                     <mxGeometry x="60" y="20" width="710" height="30" as="geometry"/>
                 </mxCell>
-                <mxCell id="start" value="" style="ellipse;shape=doubleEllipse;aspect=fixed;fillColor=#000000;html=1;" vertex="1" parent="1">
+                <mxCell id="start" value="" style="ellipse;shape=doubleEllipse;aspect=fixed;fillColor=#000000;html=1;" parent="1" vertex="1">
                     <mxGeometry x="398" y="70" width="30" height="30" as="geometry"/>
                 </mxCell>
-                <mxCell id="collect" value="Collect verification inputs&#xa;API contract, dashboard flows, n8n scripts" style="rounded=1;arcSize=50;fillColor=#f5f5f5;strokeColor=#666666;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" vertex="1" parent="1">
+                <mxCell id="collect" value="Collect verification inputs" style="rounded=1;arcSize=50;fillColor=#f5f5f5;strokeColor=#666666;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
                     <mxGeometry x="300" y="125" width="225" height="62" as="geometry"/>
                 </mxCell>
-                <mxCell id="backend" value="Run backend tests&#xa;analytics, feed lifecycle, streaming, webhook payloads" style="rounded=1;arcSize=50;fillColor=#dae8fc;strokeColor=#6c8ebf;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" vertex="1" parent="1">
+                <mxCell id="backend" value="Run backend tests" style="rounded=1;arcSize=50;fillColor=#dae8fc;strokeColor=#6c8ebf;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
                     <mxGeometry x="290" y="220" width="245" height="70" as="geometry"/>
                 </mxCell>
-                <mxCell id="frontend" value="Run frontend integration tests&#xa;setup, websocket events, API errors, media fallback" style="rounded=1;arcSize=50;fillColor=#dae8fc;strokeColor=#6c8ebf;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" vertex="1" parent="1">
+                <mxCell id="frontend" value="Run frontend tests" style="rounded=1;arcSize=50;fillColor=#dae8fc;strokeColor=#6c8ebf;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
                     <mxGeometry x="290" y="325" width="245" height="70" as="geometry"/>
                 </mxCell>
-                <mxCell id="scripts" value="Execute n8n scenario scripts&#xa;single alert, multi-feed alert, execution polling" style="rounded=1;arcSize=50;fillColor=#e1d5e7;strokeColor=#9673a6;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" vertex="1" parent="1">
+                <mxCell id="scripts" value="Run n8n scenarios" style="rounded=1;arcSize=50;fillColor=#e1d5e7;strokeColor=#9673a6;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
                     <mxGeometry x="290" y="430" width="245" height="70" as="geometry"/>
                 </mxCell>
-                <mxCell id="perf" value="Measure runtime behavior&#xa;frame cadence, async webhook impact, stream continuity" style="rounded=1;arcSize=50;fillColor=#d5e8d4;strokeColor=#82b366;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" vertex="1" parent="1">
+                <mxCell id="perf" value="Measure runtime behavior" style="rounded=1;arcSize=50;fillColor=#d5e8d4;strokeColor=#82b366;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
                     <mxGeometry x="290" y="535" width="245" height="70" as="geometry"/>
                 </mxCell>
-                <mxCell id="tune" value="Apply tuning and resilience changes&#xa;image size, frame stride, pacing, worker supervision" style="rounded=1;arcSize=50;fillColor=#d5e8d4;strokeColor=#82b366;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" vertex="1" parent="1">
+                <mxCell id="tune" value="Apply resilience tuning" style="rounded=1;arcSize=50;fillColor=#d5e8d4;strokeColor=#82b366;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
                     <mxGeometry x="290" y="640" width="245" height="72" as="geometry"/>
                 </mxCell>
-                <mxCell id="decision" value="Acceptance&#xa;criteria met?" style="rhombus;fillColor=#fff2cc;strokeColor=#d6b656;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" vertex="1" parent="1">
+                <mxCell id="decision" value="Criteria met?" style="rhombus;fillColor=#fff2cc;strokeColor=#d6b656;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
                     <mxGeometry x="352" y="750" width="120" height="95" as="geometry"/>
                 </mxCell>
-                <mxCell id="retest" value="Fix failed case&#xa;and rerun affected checks" style="rounded=1;arcSize=50;fillColor=#f8cecc;strokeColor=#b85450;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" vertex="1" parent="1">
-                    <mxGeometry x="70" y="770" width="190" height="58" as="geometry"/>
+                <mxCell id="retest" value="Fix and rerun checks" style="rounded=1;arcSize=50;fillColor=#f8cecc;strokeColor=#b85450;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="768.5" width="190" height="58" as="geometry"/>
                 </mxCell>
-                <mxCell id="document" value="Document verified coverage&#xa;automation, tests, performance, fault tolerance" style="rounded=1;arcSize=50;fillColor=#f5f5f5;strokeColor=#666666;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" vertex="1" parent="1">
+                <mxCell id="document" value="Document verified coverage" style="rounded=1;arcSize=50;fillColor=#f5f5f5;strokeColor=#666666;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
                     <mxGeometry x="290" y="890" width="245" height="66" as="geometry"/>
                 </mxCell>
-                <mxCell id="end" value="" style="ellipse;shape=doubleEllipse;aspect=fixed;fillColor=#000000;strokeColor=#000000;html=1;" vertex="1" parent="1">
+                <mxCell id="end" value="" style="ellipse;shape=doubleEllipse;aspect=fixed;fillColor=#000000;strokeColor=#000000;html=1;" parent="1" vertex="1">
                     <mxGeometry x="398" y="995" width="30" height="30" as="geometry"/>
                 </mxCell>
-                <mxCell id="e1" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="start" target="collect"><mxGeometry relative="1" as="geometry"/></mxCell>
-                <mxCell id="e2" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="collect" target="backend"><mxGeometry relative="1" as="geometry"/></mxCell>
-                <mxCell id="e3" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="backend" target="frontend"><mxGeometry relative="1" as="geometry"/></mxCell>
-                <mxCell id="e4" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="frontend" target="scripts"><mxGeometry relative="1" as="geometry"/></mxCell>
-                <mxCell id="e5" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="scripts" target="perf"><mxGeometry relative="1" as="geometry"/></mxCell>
-                <mxCell id="e6" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="perf" target="tune"><mxGeometry relative="1" as="geometry"/></mxCell>
-                <mxCell id="e7" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="tune" target="decision"><mxGeometry relative="1" as="geometry"/></mxCell>
-                <mxCell id="e8" value="No" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="decision" target="retest"><mxGeometry relative="1" as="geometry"/></mxCell>
-                <mxCell id="e9" value="Rerun" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="retest" target="backend">
+                <mxCell id="e1" style="endArrow=block;html=1;rounded=0;" parent="1" source="start" target="collect" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e2" style="endArrow=block;html=1;rounded=0;" parent="1" source="collect" target="backend" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3" style="endArrow=block;html=1;rounded=0;" parent="1" source="backend" target="frontend" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e4" style="endArrow=block;html=1;rounded=0;" parent="1" source="frontend" target="scripts" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e5" style="endArrow=block;html=1;rounded=0;" parent="1" source="scripts" target="perf" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e6" style="endArrow=block;html=1;rounded=0;" parent="1" source="perf" target="tune" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e7" style="endArrow=block;html=1;rounded=0;" parent="1" source="tune" target="decision" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e8" value="No" style="endArrow=block;html=1;rounded=0;" parent="1" source="decision" target="retest" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e9" value="Rerun" style="endArrow=block;html=1;rounded=0;" parent="1" source="retest" target="backend" edge="1">
                     <mxGeometry relative="1" as="geometry">
-                        <Array as="points"><mxPoint x="120" y="255"/></Array>
+                        <Array as="points">
+                            <mxPoint x="120" y="255"/>
+                        </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="e10" value="Yes" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="decision" target="document"><mxGeometry relative="1" as="geometry"/></mxCell>
-                <mxCell id="e11" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="document" target="end"><mxGeometry relative="1" as="geometry"/></mxCell>
+                <mxCell id="e10" value="Yes" style="endArrow=block;html=1;rounded=0;" parent="1" source="decision" target="document" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e11" style="endArrow=block;html=1;rounded=0;" parent="1" source="document" target="end" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
             </root>
         </mxGraphModel>
     </diagram>

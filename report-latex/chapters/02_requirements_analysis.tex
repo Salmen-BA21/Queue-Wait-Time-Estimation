@@ -11,15 +11,16 @@ The requirements are tied to the queue-monitoring pipeline used throughout the p
 \section{Requirements Specification}
 
 \subsection{Identification of Actors}
-The system has two actors whose responsibilities reflect the two main operating levels of the platform: governance and supervision. Both roles use the same application, but they do so with different permissions and goals.
+The platform involves two in-system actors and one external operational actor. This separation clarifies which actions are executed inside the software and which actions happen on site.
 
-The actors of the system are:
+The actors are:
 \begin{itemize}
     \item \textbf{Administrator}: manages manager accounts (create, update, delete) and controls access governance.
     \item \textbf{Manager}: configures sources and thresholds, monitors live queues, reacts to alerts, and reviews performance indicators.
+    \item \textbf{On-site Operator (external actor)}: receives operational instructions from the manager and applies field actions (for example opening a new queue line or redirecting customer flow), then confirms completion.
 \end{itemize}
 
-This split makes the functional scope easier to explain and validate, because access-control flows and operational monitoring flows can be tested separately.
+This split makes the functional scope easier to explain and validate: access-control and monitoring actions remain in-system, while physical queue intervention is explicitly modeled as an external operational action.
 
 \subsection{Authentication and Access Governance}
 The platform includes a lightweight identity layer that restricts dashboard access to authenticated users, enabling managers to register, sign in, refresh sessions, and log out while allowing administrators to manage manager accounts and review access-related actions. Although the detailed backend and frontend implementation is deferred to the sprint chapters, these requirements are captured here because access boundaries form part of the core system behavior, as shown in Table~\ref{tab:auth_access_requirements}.
@@ -123,12 +124,12 @@ The first sprints focused on backend foundations, because the dashboard and auto
 The global use case diagram gives a high-level view of how the administrator and manager interact with the platform during configuration, monitoring, and alert handling, as shown in Figure~\ref{fig:global_use_case}.
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.95\textwidth]{\detokenize{global_use_case.pdf}}
+    \includegraphics[width=0.95\textwidth]{\detokenize{chapter2_use_case.pdf}}
     \caption{Global use case diagram of the queue wait-time estimation system.}
     \label{fig:global_use_case}
 \end{figure}
 
-At the system level, the use cases can be grouped into four interactions: configuration, live monitoring, analytics interpretation, and alert handling, with the main actor responsible for each use case listed in Table~\ref{tab:global_use_cases}.
+At the system level, the use cases can be grouped into four interactions: configuration, live monitoring, analytics interpretation, and alert handling/resolution, with the main actor responsible for each use case listed in Table~\ref{tab:global_use_cases}.
 \begin{table}[!htbp]
     \centering
     \begin{tabularx}{\textwidth}{|l|X|l|}
@@ -139,7 +140,9 @@ At the system level, the use cases can be grouped into four interactions: config
         UC-03 & Define or update queue zone geometry. & Manager \\ \hline
         UC-04 & Monitor live queue metrics and feed status. & Manager \\ \hline
         UC-05 & Receive and interpret warning or critical alerts. & Manager \\ \hline
-        UC-06 & Review trends and performance indicators. & Manager \\ \hline
+        UC-06 & Dispatch operator after an alert. & Manager \\ \hline
+        UC-07 & Confirm queue action completion. & On-site Operator (external) \\ \hline
+        UC-08 & Review trends and performance indicators. & Manager \\ \hline
     \end{tabularx}
     \caption{Primary global use cases}
     \label{tab:global_use_cases}
