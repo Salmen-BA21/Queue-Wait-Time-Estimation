@@ -37,7 +37,7 @@
                 <mxCell id="11" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="10" vertex="1">
                     <mxGeometry x="40" y="130" width="10" height="300" as="geometry"/>
                 </mxCell>
-                <mxCell id="12" value="push metrics+alerts" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="3" target="5" edge="1">
+                <mxCell id="12" value="Push metrics and alerts" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="3" target="5" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="170" y="110" as="sourcePoint"/>
                         <Array as="points">
@@ -45,7 +45,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="13" value="merge state" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="5" target="7" edge="1">
+                <mxCell id="13" value="Merge live state" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="5" target="7" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="360" y="160" as="sourcePoint"/>
                         <Array as="points">
@@ -53,7 +53,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="14" value="render kpis" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="7" target="9" edge="1">
+                <mxCell id="14" value="Render KPIs" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="7" target="9" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="570" y="210" as="sourcePoint"/>
                         <Array as="points">
@@ -61,7 +61,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="15" value="ack alert" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="11" target="9" edge="1">
+                <mxCell id="15" value="Acknowledge alert" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="11" target="9" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="780" y="250" as="sourcePoint"/>
                         <Array as="points">
@@ -69,7 +69,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="16" value="dismiss" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="9" target="7" edge="1">
+                <mxCell id="16" value="Dismiss alert" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="9" target="7" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="570" y="300" as="sourcePoint"/>
                         <Array as="points">

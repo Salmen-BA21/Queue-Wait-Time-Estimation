@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="O36x8rjJXweqkzDt87So" name="Page-1">
-        <mxGraphModel dx="462" dy="433" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="524" dy="309" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -46,11 +46,11 @@
                 <mxCell id="15" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="14" vertex="1">
                     <mxGeometry x="55" y="120" width="10" height="310" as="geometry"/>
                 </mxCell>
-                <mxCell id="16" value="frame()" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="3" target="5" edge="1">
+                <mxCell id="16" value="Capture frame" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="3" target="5" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="175" y="70" as="sourcePoint"/>
                         <Array as="points">
-                            <mxPoint x="160" y="100"/>
+                            <mxPoint x="160" y="110"/>
                         </Array>
                     </mxGeometry>
                 </mxCell>
@@ -78,7 +78,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="20" value="metrics(&#955;, &#956;, W, L)" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="11" target="13" edge="1">
+                <mxCell id="20" value="Queue metrics" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="11" target="13" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="895" y="270" as="sourcePoint"/>
                         <Array as="points">
@@ -86,7 +86,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="21" value="publish_snapshot(payload)" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="13" target="15" edge="1">
+                <mxCell id="21" value="Send metrics snapshot" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="13" target="15" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="1075" y="320" as="sourcePoint"/>
                         <Array as="points">
@@ -94,8 +94,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-</root>
+            </root>
         </mxGraphModel>
     </diagram>
 </mxfile>
-

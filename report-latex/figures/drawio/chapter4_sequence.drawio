@@ -28,7 +28,7 @@
                 <mxCell id="11" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;newEdgeStyle={&quot;edgeStyle&quot;:&quot;elbowEdgeStyle&quot;,&quot;elbow&quot;:&quot;vertical&quot;,&quot;curved&quot;:0,&quot;rounded&quot;:0};" parent="10" vertex="1">
                     <mxGeometry x="55" y="130" width="10" height="420" as="geometry"/>
                 </mxCell>
-                <mxCell id="12" value="feed request" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="29" target="5" edge="1">
+                <mxCell id="12" value="Request feed action" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="29" target="5" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="95" y="140" as="sourcePoint"/>
                         <Array as="points">
@@ -36,7 +36,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="13" value="orchestrate" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="5" target="7" edge="1">
+                <mxCell id="13" value="Run feed orchestration" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="5" target="7" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="390" y="150" as="sourcePoint"/>
                         <Array as="points">
@@ -44,13 +44,13 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="14" value="save state" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" edge="1">
+                <mxCell id="14" value="Save feed state" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="490" y="259.9966666666666" as="sourcePoint"/>
                         <mxPoint x="700" y="259.9966666666666" as="targetPoint"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="15" value="back" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="9" target="6" edge="1">
+                <mxCell id="15" value="State saved" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="9" target="6" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="480" y="289.9966666666666" as="targetPoint"/>
                         <mxPoint x="690" y="289.9966666666666" as="sourcePoint"/>
@@ -59,7 +59,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="16" value="emit live event" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="7" target="11" edge="1">
+                <mxCell id="16" value="Emit live update" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="7" target="11" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="810" y="300" as="sourcePoint"/>
                         <Array as="points">
@@ -67,7 +67,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="17" value="feed response" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="5" target="29" edge="1">
+                <mxCell id="17" value="Return feed status" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="5" target="29" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="95" y="420" as="targetPoint"/>
                         <Array as="points">
@@ -78,7 +78,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="18" value="transport fail" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="10" target="29" edge="1">
+                <mxCell id="18" value="Notify transport issue" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="10" target="29" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="95" y="480" as="targetPoint"/>
                         <mxPoint x="925" y="470" as="sourcePoint"/>
@@ -87,7 +87,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="19" value="fallback reply" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="5" target="29" edge="1">
+                <mxCell id="19" value="Return fallback status" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="5" target="29" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="89.25000000000023" y="510" as="targetPoint"/>
                         <mxPoint x="269.5" y="550.35" as="sourcePoint"/>
@@ -147,3 +147,5 @@
         </mxGraphModel>
     </diagram>
 </mxfile>
+
+
