@@ -72,10 +72,29 @@ def draw_detections(
         Annotated frame (same object, modified in-place).
     """
     frame = annotators["box"].annotate(scene=frame, detections=detections)
-    if labels:
-        frame = annotators["label"].annotate(
-            scene=frame, detections=detections, labels=labels,
-        )
+    if labels is not None:
+        det_count = len(detections.xyxy)
+        if len(labels) < det_count:
+            labels = labels + (["No ID"] * (det_count - len(labels)))
+        elif len(labels) > det_count:
+            labels = labels[:det_count]
+
+        # Draw labels manually to avoid implicit placeholder text (e.g. "???")
+        # from the upstream annotator implementation when lengths drift.
+        for idx, box in enumerate(detections.xyxy):
+            text = labels[idx]
+            x1, y1 = int(box[0]), int(box[1])
+            y_text = max(16, y1 - 8)
+            cv2.putText(
+                frame,
+                text,
+                (x1, y_text),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.45,
+                (0, 255, 0),
+                1,
+                cv2.LINE_AA,
+            )
     frame = annotators["trace"].annotate(scene=frame, detections=detections)
     return frame
 

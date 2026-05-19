@@ -50,6 +50,7 @@ from src.detector import PersonDetector
 from src.queue_analyzer import QueueAnalyzer, QueueMetrics
 from src.threshold_detector import QueueThresholdDetector, ThresholdConfig
 from src.tracker import ObjectTracker
+from src.utils.drawing import create_annotators, draw_detections
 from src.utils.logging_setup import setup_logging
 from src.video_capture import VideoStream, open_video_source
 from src.webhook_client import WebhookClient
@@ -252,6 +253,93 @@ class AsyncWebhookDispatcher:
 # ═══════════════════════════════════════════════════════════════
 # Argument parser
 # ═══════════════════════════════════════════════════════════════
+
+class TrackerIdStabilizer:
+    """Stabilize tracker IDs across short exits/re-entries for GUI usage."""
+
+    def __init__(
+        self,
+        *,
+        reconnect_window_sec: float = 20.0,
+        reconnect_max_distance_px: float = 140.0,
+    ) -> None:
+        self._reconnect_window_sec = max(0.0, float(reconnect_window_sec))
+        self._reconnect_max_distance_px = max(1.0, float(reconnect_max_distance_px))
+        self._next_stable_id = 1
+        self._raw_to_stable: dict[int, int] = {}
+        self._stable_last_center: dict[int, tuple[float, float]] = {}
+        self._lost_pool: dict[int, tuple[float, tuple[float, float]]] = {}
+
+    def stabilize(self, detections: sv.Detections) -> np.ndarray | None:
+        raw_ids = detections.tracker_id
+        if raw_ids is None:
+            return None
+        if len(raw_ids) == 0:
+            self._expire_lost_pool(time.monotonic())
+            return np.array([], dtype=np.int32)
+
+        now = time.monotonic()
+        self._expire_lost_pool(now)
+        centers = [self._center_of_box(box) for box in detections.xyxy]
+
+        current_raw_ids = {int(rid) for rid in raw_ids}
+        disappeared_raw_ids = set(self._raw_to_stable.keys()) - current_raw_ids
+        for raw_id in disappeared_raw_ids:
+            stable_id = self._raw_to_stable.pop(raw_id, None)
+            if stable_id is None:
+                continue
+            center = self._stable_last_center.get(stable_id)
+            if center is not None:
+                self._lost_pool[stable_id] = (now, center)
+
+        stable_ids: list[int] = []
+        for idx, raw_id_value in enumerate(raw_ids):
+            raw_id = int(raw_id_value)
+            stable_id = self._raw_to_stable.get(raw_id)
+            if stable_id is None:
+                stable_id = self._try_relink_stable_id(
+                    current_center=centers[idx],
+                    now=now,
+                )
+                if stable_id is None:
+                    stable_id = self._next_stable_id
+                    self._next_stable_id += 1
+                self._raw_to_stable[raw_id] = stable_id
+
+            self._stable_last_center[stable_id] = centers[idx]
+            stable_ids.append(stable_id)
+
+        return np.array(stable_ids, dtype=np.int32)
+
+    @staticmethod
+    def _center_of_box(box: np.ndarray) -> tuple[float, float]:
+        return (float((box[0] + box[2]) / 2.0), float((box[1] + box[3]) / 2.0))
+
+    def _try_relink_stable_id(
+        self,
+        *,
+        current_center: tuple[float, float],
+        now: float,
+    ) -> int | None:
+        best_stable_id: int | None = None
+        best_dist = float('inf')
+        for stable_id, (lost_at, prev_center) in list(self._lost_pool.items()):
+            if (now - lost_at) > self._reconnect_window_sec:
+                self._lost_pool.pop(stable_id, None)
+                continue
+            dist = math.hypot(current_center[0] - prev_center[0], current_center[1] - prev_center[1])
+            if dist <= self._reconnect_max_distance_px and dist < best_dist:
+                best_dist = dist
+                best_stable_id = stable_id
+
+        if best_stable_id is not None:
+            self._lost_pool.pop(best_stable_id, None)
+        return best_stable_id
+
+    def _expire_lost_pool(self, now: float) -> None:
+        for stable_id, (lost_at, _center) in list(self._lost_pool.items()):
+            if (now - lost_at) > self._reconnect_window_sec:
+                self._lost_pool.pop(stable_id, None)
 
 def build_parser() -> argparse.ArgumentParser:
     """Build and return the CLI argument parser."""
@@ -473,6 +561,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Run without opening any GUI windows (cv2.imshow). (default: False)",
     )
+    parser.add_argument(
+        "--show-tracker-ids",
+        action="store_true",
+        help="Show tracker ID labels on the desktop OpenCV window.",
+    )
     return parser
 
 
@@ -536,7 +629,9 @@ def run(cfg: AppConfig) -> None:
             polygon_points=cfg.zone_polygon,
             frame_resolution=stream.resolution,
         )
+        annotators = create_annotators()
         analyzer = QueueAnalyzer()
+        id_stabilizer = TrackerIdStabilizer()
         threshold_detector = QueueThresholdDetector(
             ThresholdConfig(
                 queue_length_warning=cfg.queue_length_warning,
@@ -631,9 +726,14 @@ def run(cfg: AppConfig) -> None:
 
                     stage_started = time.perf_counter()
                     in_zone = zone_mgr.trigger(detections)
+                    stable_tracker_ids = (
+                        id_stabilizer.stabilize(detections)
+                        if cfg.show_tracker_ids
+                        else detections.tracker_id
+                    )
                     metrics = analyzer.update(
                         in_zone_mask=in_zone,
-                        tracker_ids=detections.tracker_id,
+                        tracker_ids=stable_tracker_ids,
                     )
                     analyze_ms_window += (time.perf_counter() - stage_started) * 1000.0
 
@@ -645,7 +745,7 @@ def run(cfg: AppConfig) -> None:
                         frame_id=frame_count,
                         timestamp=event_timestamp,
                     )
-                    labels = _build_labels(detections, in_zone)
+                    labels = _build_labels(stable_tracker_ids, in_zone)
 
                     last_detections = detections
                     last_in_zone = in_zone
@@ -665,7 +765,15 @@ def run(cfg: AppConfig) -> None:
 
                 # 5. Draw + 6. Show
                 if not cfg.headless:
-                    rendered_display_frame = zone_mgr.annotate(frame.copy())
+                    rendered_display_frame = frame.copy()
+                    if cfg.show_tracker_ids:
+                        rendered_display_frame = draw_detections(
+                            rendered_display_frame,
+                            detections,
+                            annotators=annotators,
+                            labels=labels,
+                        )
+                    rendered_display_frame = zone_mgr.annotate(rendered_display_frame)
 
                     # Resize frame if scale != 1.0
                     if cfg.resize_scale != 1.0:
@@ -701,6 +809,13 @@ def run(cfg: AppConfig) -> None:
                         render_frame = rendered_display_frame
                     else:
                         render_frame = frame.copy()
+                        if cfg.show_tracker_ids:
+                            render_frame = draw_detections(
+                                render_frame,
+                                detections,
+                                annotators=annotators,
+                                labels=labels,
+                            )
                         render_frame = zone_mgr.annotate(render_frame)
 
                         if cfg.resize_scale != 1.0:
@@ -817,16 +932,16 @@ def run(cfg: AppConfig) -> None:
 # Helpers
 # ═══════════════════════════════════════════════════════════════
 
-def _build_labels(detections, in_zone: np.ndarray) -> list[str]:
-    """Generate per-detection labels like ``#5 ✓`` or ``#5``."""
+def _build_labels(tracker_ids: np.ndarray | None, in_zone: np.ndarray) -> list[str]:
+    """Generate per-detection labels and avoid implicit unknown placeholders."""
     labels: list[str] = []
-    ids = detections.tracker_id
-    if ids is None:
-        return labels
-    for tid, inside in zip(ids, in_zone):
-        tag = f"#{int(tid)}"
+    for idx, inside in enumerate(in_zone):
+        if tracker_ids is not None and idx < len(tracker_ids):
+            tag = f"#{int(tracker_ids[idx])}"
+        else:
+            tag = "No ID"
         if inside:
-            tag += " \u2713"  # ✓
+            tag += " [IN]"
         labels.append(tag)
     return labels
 
@@ -986,6 +1101,7 @@ def main() -> None:
         dashboard_frame_channel_host=args.dashboard_frame_channel_host,
         dashboard_frame_channel_port=args.dashboard_frame_channel_port,
         dashboard_frame_channel_token=args.dashboard_frame_channel_token,
+        show_tracker_ids=bool(args.show_tracker_ids),
         headless=args.headless,
     )
 
@@ -995,3 +1111,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+

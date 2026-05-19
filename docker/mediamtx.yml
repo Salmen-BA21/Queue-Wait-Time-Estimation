@@ -33,4 +33,7 @@ pathDefaults:
   source: publisher
   sourceOnDemand: false
 
-paths: {}
+paths:
+  cam_19:
+    source: rtsp://admin:Datadoit_1234@192.168.1.23:554/profile2
+    sourceProtocol: tcp

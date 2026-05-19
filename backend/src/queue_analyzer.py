@@ -18,7 +18,12 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from src.config import ARRIVAL_WINDOW_SEC, MIN_EVENTS_FOR_RATE, SERVICE_WINDOW_SEC
+from src.config import (
+    ARRIVAL_WINDOW_SEC,
+    ID_ABSENCE_GRACE_SEC,
+    MIN_EVENTS_FOR_RATE,
+    SERVICE_WINDOW_SEC,
+)
 
 logger = logging.getLogger("queue_system.queue_analyzer")
 
@@ -49,9 +54,11 @@ class QueueAnalyzer:
         self,
         arrival_window: float = ARRIVAL_WINDOW_SEC,
         service_window: float = SERVICE_WINDOW_SEC,
+        id_absence_grace_sec: float = ID_ABSENCE_GRACE_SEC,
     ) -> None:
         self._arrival_window = arrival_window
         self._service_window = service_window
+        self._id_absence_grace_sec = max(0.0, float(id_absence_grace_sec))
 
         # Timestamps of recent arrivals / departures
         self._arrivals: deque[float] = deque()
@@ -59,6 +66,8 @@ class QueueAnalyzer:
 
         # Set of tracker IDs currently known inside the zone
         self._ids_in_zone: set[int] = set()
+        # IDs that disappeared recently and may reappear without counting as a departure.
+        self._missing_since: dict[int, float] = {}
 
         self._metrics = QueueMetrics()
 
@@ -90,17 +99,32 @@ class QueueAnalyzer:
         else:
             current_ids = set(int(tid) for tid, inside in zip(tracker_ids, in_zone_mask) if inside)
 
-        # Arrivals: IDs appearing that were not previously in zone
+        # Graceful departures: only count as departure if missing for longer than grace window.
+        expired_ids: set[int] = set()
+        if self._missing_since:
+            for tid, missing_since in list(self._missing_since.items()):
+                if (now - missing_since) > self._id_absence_grace_sec:
+                    expired_ids.add(tid)
+                    self._missing_since.pop(tid, None)
+                    self._ids_in_zone.discard(tid)
+                    self._departures.append(now)
+
+        # IDs seen again cancel pending graceful departure.
+        for tid in current_ids:
+            self._missing_since.pop(tid, None)
+
+        # Arrivals: IDs appearing that were not previously in-zone and not in a pending state.
         new_arrivals = current_ids - self._ids_in_zone
         for _ in new_arrivals:
             self._arrivals.append(now)
 
-        # Departures: IDs that were in zone but are no longer
-        new_departures = self._ids_in_zone - current_ids
-        for _ in new_departures:
-            self._departures.append(now)
+        # Start grace timer for IDs that are absent this frame.
+        for tid in (self._ids_in_zone - current_ids):
+            if tid not in expired_ids and tid not in self._missing_since:
+                self._missing_since[tid] = now
 
-        self._ids_in_zone = current_ids
+        # Keep recently-missing IDs in the active set so they can return without double counting.
+        self._ids_in_zone.update(current_ids)
 
         # Purge old events
         self._purge(self._arrivals, now, self._arrival_window)

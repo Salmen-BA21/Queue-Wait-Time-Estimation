@@ -86,6 +86,36 @@ Show all CLI options:
 python -m src.main --help
 ```
 
+### 2.1 Tracking Reliability Validation (Backend)
+
+Run from repository root:
+
+```bash
+python backend/scripts/evaluate_tracking.py --mode quick
+```
+
+Full dataset run:
+
+```bash
+python backend/scripts/evaluate_tracking.py --mode full
+```
+
+Artifacts are written to `backend/data/tracking_reports/`:
+
+- `latest_summary.json` and `summary_<mode>.json`
+- per-clip `detections.csv`
+
+Dataset manifest and thresholds:
+
+- `backend/data/tracking_dataset/manifest.json`
+
+Tracking-focused tests:
+
+```bash
+python -m unittest backend.tests.test_tracking_validation
+pytest -m tracking backend/tests/test_tracking_validation.py
+```
+
 ### 3. Web dashboard mode (API + frontend)
 
 Backend API:

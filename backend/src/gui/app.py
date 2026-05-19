@@ -1770,6 +1770,7 @@ class MainWindow:
                 "--log-level", self.log_level.get(),
                 "--resize-scale", "0.5",
                 "--queue-length-warning", str(warning_threshold),
+                "--show-tracker-ids",
             ]
             pts = self.zone_points_map.get(path)
             if pts:

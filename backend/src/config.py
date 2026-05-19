@@ -102,6 +102,7 @@ def _env_int(name: str, default: int) -> int:
 
 
 DEFAULT_REALTIME_FILE_PLAYBACK: bool = _env_flag("QUEUE_REALTIME_FILE_PLAYBACK", True)
+ID_ABSENCE_GRACE_SEC: float = max(0.0, _env_float("QUEUE_ID_ABSENCE_GRACE_SEC", 1.0))
 
 DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY: int = int(
     os.getenv("QUEUE_DASHBOARD_JPEG_QUALITY", "70"),
@@ -210,6 +211,7 @@ class AppConfig:
     dashboard_frame_channel_host: Optional[str] = None
     dashboard_frame_channel_port: Optional[int] = None
     dashboard_frame_channel_token: Optional[str] = None
+    show_tracker_ids: bool = False
     headless: bool = False
 
     @property
