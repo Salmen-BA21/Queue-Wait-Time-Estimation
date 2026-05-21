@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="chapter5-dashboard-data-flow-sequence" name="Page-1">
-        <mxGraphModel dx="338" dy="199" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1300" pageHeight="900" math="0" shadow="0">
+        <mxGraphModel dx="750" dy="704" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1300" pageHeight="900" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -37,7 +37,7 @@
                 <mxCell id="act_socket" value="" style="html=1;points=[];perimeter=orthogonalPerimeter;outlineConnect=0;targetShapes=umlLifeline;portConstraint=eastwest;" parent="lf_socket" vertex="1">
                     <mxGeometry x="70" y="110" width="10" height="830" as="geometry"/>
                 </mxCell>
-                <mxCell id="lf_transport" value=":Media" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;" parent="1" vertex="1">
+                <mxCell id="lf_transport" value=":Mediamtx server" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=0;dropTarget=0;collapsible=0;recursiveResize=0;outlineConnect=0;portConstraint=eastwest;" parent="1" vertex="1">
                     <mxGeometry x="1210" y="70" width="150" height="970" as="geometry"/>
                 </mxCell>
                 <mxCell id="msg_open" value="Open dashboard" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" parent="1" source="8" edge="1">
