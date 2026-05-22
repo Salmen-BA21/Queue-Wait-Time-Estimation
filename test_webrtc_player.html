@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Stream Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        input {
+            padding: 10px;
+            width: 400px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #video {
+            width: 100%;
+            max-width: 1140px;
+            background: #000;
+            border-radius: 4px;
+        }
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WebRTC Stream Viewer (WHEP)</h1>
+        
+        <div class="controls">
+            <input 
+                type="text" 
+                id="streamUrl" 
+                value="http://localhost:8889/test-rtsp-camera/whep"
+                placeholder="Enter WHEP endpoint URL"
+            />
+            <button id="playBtn" onclick="startStream()">Play Stream</button>
+            <button id="stopBtn" onclick="stopStream()" disabled>Stop Stream</button>
+        </div>
+        
+        <video id="video" autoplay muted playsinline controls></video>
+        
+        <div id="status" class="status info" style="display: none;"></div>
+    </div>
+
+    <script>
+        let pc = null;
+        
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.style.display = 'block';
+        }
+        
+        async function startStream() {
+            const streamUrl = document.getElementById('streamUrl').value;
+            const video = document.getElementById('video');
+            const playBtn = document.getElementById('playBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            
+            try {
+                showStatus('Connecting to stream...', 'info');
+                playBtn.disabled = true;
+                
+                // Create RTCPeerConnection
+                pc = new RTCPeerConnection({
+                    iceServers: []
+                });
+                
+                // Handle incoming tracks
+                pc.ontrack = (event) => {
+                    console.log('Received track:', event.track.kind);
+                    video.srcObject = event.streams[0];
+                    showStatus('Stream connected successfully!', 'success');
+                    stopBtn.disabled = false;
+                };
+                
+                // Handle connection state
+                pc.onconnectionstatechange = () => {
+                    console.log('Connection state:', pc.connectionState);
+                    if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+                        showStatus('Connection lost', 'error');
+                        stopStream();
+                    }
+                };
+                
+                // Add transceiver for receiving video
+                pc.addTransceiver('video', { direction: 'recvonly' });
+                pc.addTransceiver('audio', { direction: 'recvonly' });
+                
+                // Create offer
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                
+                // Send offer to WHEP endpoint
+                const response = await fetch(streamUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/sdp'
+                    },
+                    body: offer.sdp
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`WHEP request failed: ${response.status} ${response.statusText}`);
+                }
+                
+                // Get answer from server
+                const answerSdp = await response.text();
+                await pc.setRemoteDescription({
+                    type: 'answer',
+                    sdp: answerSdp
+                });
+                
+                console.log('WebRTC connection established');
+                
+            } catch (error) {
+                console.error('Error starting stream:', error);
+                showStatus(`Error: ${error.message}`, 'error');
+                playBtn.disabled = false;
+                stopStream();
+            }
+        }
+        
+        function stopStream() {
+            const video = document.getElementById('video');
+            const playBtn = document.getElementById('playBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            
+            if (pc) {
+                pc.close();
+                pc = null;
+            }
+            
+            video.srcObject = null;
+            playBtn.disabled = false;
+            stopBtn.disabled = true;
+            showStatus('Stream stopped', 'info');
+        }
+    </script>
+</body>
+</html>

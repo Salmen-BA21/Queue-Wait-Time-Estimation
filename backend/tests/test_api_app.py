@@ -5,12 +5,12 @@ from __future__ import annotations
 import asyncio
 import json
 import tempfile
+import time
 import unittest
 from datetime import datetime
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -835,14 +835,19 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertIn("--confidence", command)
         self.assertIn("--detector-imgsz", command)
         self.assertIn("--process-every-n-frames", command)
+        self.assertEqual(command[command.index("--process-every-n-frames") + 1], "2")
+        self.assertIn("--resize-scale", command)
+        self.assertEqual(command[command.index("--resize-scale") + 1], "1.0")
         self.assertIn("--dashboard-render-frames", command)
         self.assertIn("--dashboard-frame-jpeg-quality", command)
+        self.assertEqual(command[command.index("--dashboard-frame-jpeg-quality") + 1], "55")
         self.assertIn("--dashboard-frame-channel-host", command)
         self.assertIn("127.0.0.1", command)
         self.assertIn("--dashboard-frame-channel-port", command)
         self.assertIn("32123", command)
         self.assertIn("--dashboard-frame-channel-token", command)
         self.assertIn("test-frame-channel-token", command)
+        self.assertNotIn("--annotated-webrtc-enable", command)
 
     def test_feed_snapshot_uses_saved_rtsp_credentials(self) -> None:
         response = self.client.post(
@@ -886,30 +891,34 @@ class TestQueueVisionApi(unittest.TestCase):
             transport="udp",
         )
 
+    def test_non_rtsp_worker_command_enables_published_webrtc_publish_args(self) -> None:
+        feed = asyncio.run(
+            app.state.registry.create_feed(
+                name="Webcam Annotated",
+                source="0",
+            )
+        )
+        asyncio.run(app.state.registry.start_feed(feed.feed_id))
+        record = app.state.registry._feeds[feed.feed_id]
+        runner = SubprocessFeedWorkerRunner()
+
+        command = runner._build_command(record, Path("dummy.events.jsonl"))
+
+        self.assertIn("--annotated-webrtc-enable", command)
+        self.assertIn("--annotated-webrtc-path", command)
+        path_value = command[command.index("--annotated-webrtc-path") + 1]
+        self.assertTrue(path_value.startswith("ann-"))
+        self.assertIn("--annotated-webrtc-rtsp-host", command)
+        self.assertIn("--annotated-webrtc-rtsp-port", command)
+        self.assertIn("--annotated-webrtc-fps", command)
+        self.assertIn("--annotated-webrtc-ffmpeg-binary", command)
+        self.assertIn("--pipeline-engine", command)
+        self.assertIn("--gstreamer-rtsp-latency-ms", command)
+
     def test_feed_snapshot_returns_not_found_for_missing_feed(self) -> None:
         response = self.client.get("/api/feeds/missing-feed/snapshot")
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["detail"], "Feed not found.")
-
-    def test_feed_stream_returns_not_found_for_missing_feed(self) -> None:
-        response = self.client.get("/api/feeds/missing-feed/stream")
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()["detail"], "Feed not found.")
-
-    def test_feed_stream_requires_running_feed(self) -> None:
-        response = self.client.post(
-            "/api/feeds",
-            json={
-                "name": "Camera Stream",
-                "source": "rtsp://192.168.1.96/live/main",
-            },
-        )
-        self.assertEqual(response.status_code, 201)
-        feed = response.json()["data"]
-
-        stream_response = self.client.get(f"/api/feeds/{feed['feed_id']}/stream")
-        self.assertEqual(stream_response.status_code, 409)
-        self.assertEqual(stream_response.json()["detail"], "Feed must be running before opening the stream.")
 
     def test_feed_transport_returns_not_found_for_missing_feed(self) -> None:
         response = self.client.get("/api/feeds/missing-feed/transport")
@@ -932,13 +941,9 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertEqual(transport_response.status_code, 200)
 
         payload = transport_response.json()["data"]
-        self.assertFalse(payload["webrtc"]["enabled"])
+        self.assertTrue(payload["webrtc"]["enabled"])
         self.assertFalse(payload["webrtc"]["ready"])
-        self.assertEqual(payload["webrtc"]["source_mode"], "none")
         self.assertEqual(payload["webrtc"]["reason"], "feed_not_running")
-        self.assertTrue(payload["mjpeg"]["enabled"])
-        self.assertFalse(payload["mjpeg"]["ready"])
-        self.assertEqual(payload["mjpeg"]["reason"], "feed_not_running")
 
     def test_feed_transport_reports_stopped_feed_capabilities(self) -> None:
         response = self.client.post(
@@ -961,13 +966,9 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertEqual(transport_response.status_code, 200)
 
         payload = transport_response.json()["data"]
-        self.assertFalse(payload["webrtc"]["enabled"])
+        self.assertTrue(payload["webrtc"]["enabled"])
         self.assertFalse(payload["webrtc"]["ready"])
-        self.assertEqual(payload["webrtc"]["source_mode"], "none")
         self.assertEqual(payload["webrtc"]["reason"], "feed_not_running")
-        self.assertTrue(payload["mjpeg"]["enabled"])
-        self.assertFalse(payload["mjpeg"]["ready"])
-        self.assertEqual(payload["mjpeg"]["reason"], "feed_not_running")
 
     def test_feed_transport_reports_running_rtsp_capabilities(self) -> None:
         response = self.client.post(
@@ -987,14 +988,16 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertEqual(transport_response.status_code, 200)
 
         payload = transport_response.json()["data"]
-        self.assertFalse(payload["backend_annotations"])
         self.assertTrue(payload["webrtc"]["enabled"])
-        self.assertTrue(payload["webrtc"]["ready"])
-        self.assertEqual(payload["webrtc"]["source_mode"], "direct")
-        self.assertEqual(payload["webrtc"]["path_name"], feed["feed_id"])
-        self.assertIsNone(payload["webrtc"]["reason"])
-        self.assertTrue(payload["mjpeg"]["enabled"])
-        self.assertTrue(payload["mjpeg"]["ready"])
+        self.assertFalse(payload["webrtc"]["ready"])
+        self.assertTrue(isinstance(payload["webrtc"]["path_name"], str))
+        self.assertTrue(payload["webrtc"]["path_name"].startswith("ann-"))
+        self.assertEqual(payload["webrtc"]["reason"], "publisher_not_ready")
+        self.assertIn("end_to_end_latency_ms", payload["webrtc"])
+        self.assertIn("metadata_video_skew_ms", payload["webrtc"])
+        self.assertIn("dropped_frame_ratio", payload["webrtc"])
+        self.assertIn("health_state", payload["webrtc"])
+        self.assertIn("health_reason", payload["webrtc"])
 
     def test_feed_transport_reports_non_rtsp_webrtc_unavailable(self) -> None:
         response = self.client.post(
@@ -1014,12 +1017,165 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertEqual(transport_response.status_code, 200)
 
         payload = transport_response.json()["data"]
-        self.assertFalse(payload["webrtc"]["enabled"])
+        self.assertTrue(payload["webrtc"]["enabled"])
         self.assertFalse(payload["webrtc"]["ready"])
-        self.assertEqual(payload["webrtc"]["source_mode"], "none")
-        self.assertEqual(payload["webrtc"]["reason"], "rtsp_source_required")
-        self.assertTrue(payload["mjpeg"]["enabled"])
-        self.assertTrue(payload["mjpeg"]["ready"])
+        self.assertTrue(isinstance(payload["webrtc"]["path_name"], str))
+        self.assertTrue(payload["webrtc"]["path_name"].startswith("ann-"))
+        self.assertEqual(payload["webrtc"]["reason"], "publisher_not_ready")
+
+    def test_feed_transport_uses_canonical_published_path_for_all_running_feeds(self) -> None:
+        rtsp_feed = self.client.post(
+            "/api/feeds",
+            json={"name": "RTSP Canonical", "source": "rtsp://192.168.1.150/live/main"},
+        ).json()["data"]
+        usb_feed = self.client.post(
+            "/api/feeds",
+            json={"name": "USB Canonical", "source": "0"},
+        ).json()["data"]
+
+        self.assertEqual(self.client.post(f"/api/feeds/{rtsp_feed['feed_id']}/start").status_code, 200)
+        self.assertEqual(self.client.post(f"/api/feeds/{usb_feed['feed_id']}/start").status_code, 200)
+
+        rtsp_transport = self.client.get(f"/api/feeds/{rtsp_feed['feed_id']}/transport").json()["data"]["webrtc"]
+        usb_transport = self.client.get(f"/api/feeds/{usb_feed['feed_id']}/transport").json()["data"]["webrtc"]
+
+        self.assertTrue(isinstance(rtsp_transport["path_name"], str))
+        self.assertTrue(isinstance(usb_transport["path_name"], str))
+        self.assertTrue(rtsp_transport["path_name"].startswith("ann-"))
+        self.assertTrue(usb_transport["path_name"].startswith("ann-"))
+        self.assertEqual(rtsp_transport["reason"], "publisher_not_ready")
+        self.assertEqual(usb_transport["reason"], "publisher_not_ready")
+
+    def test_transport_status_accepts_legacy_worker_payload_keys(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={"name": "Legacy Transport Event", "source": "0"},
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+        self.assertEqual(self.client.post(f"/api/feeds/{feed['feed_id']}/start").status_code, 200)
+
+        self.dispatch_worker_event(
+            feed["feed_id"],
+            "transport_status",
+            {
+                "annotated_webrtc_ready": False,
+                "annotated_webrtc_path": f"ann-{feed['feed_id']}",
+                "reason": "annotated_publisher_unavailable",
+            },
+        )
+
+        payload = self.client.get(f"/api/feeds/{feed['feed_id']}/transport").json()["data"]["webrtc"]
+        self.assertEqual(payload["reason"], "publisher_unavailable")
+
+    def test_transport_status_surfaces_codec_compatibility_reason_as_health_warning(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={"name": "Codec Compatibility", "source": "0"},
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+        self.assertEqual(self.client.post(f"/api/feeds/{feed['feed_id']}/start").status_code, 200)
+
+        self.dispatch_worker_event(
+            feed["feed_id"],
+            "transport_status",
+            {
+                "published_webrtc_ready": True,
+                "published_webrtc_path": f"ann-{feed['feed_id']}",
+                "reason": None,
+                "compatibility_reason": "codec_fallback_dimension_alignment",
+            },
+        )
+
+        payload = self.client.get(f"/api/feeds/{feed['feed_id']}/transport").json()["data"]["webrtc"]
+        self.assertEqual(payload["health_state"], "warning")
+        self.assertEqual(payload["health_reason"], "codec_fallback_dimension_alignment")
+
+    def test_feed_transport_health_transitions_warning_and_error_on_sustained_skew(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "Skew Health",
+                "source": "rtsp://192.168.1.116/live/main",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
+        self.assertEqual(start_response.status_code, 200)
+
+        with patch("src.api.runtime.TRANSPORT_SKEW_WARNING_SEC", 0.01), patch(
+            "src.api.runtime.TRANSPORT_SKEW_ERROR_SEC",
+            1.0,
+        ):
+            self.dispatch_worker_event(
+                feed["feed_id"],
+                "metrics_update",
+                {
+                    "metrics": {
+                        "timestamp": time.time(),
+                        "people_in_zone": 1,
+                        "arrival_rate": 0.1,
+                        "service_rate": 0.2,
+                        "wait_time_seconds": 1.0,
+                        "detections": [],
+                        "frame_seq": 10,
+                        "pts_ms": 0.0,
+                        "server_emitted_at_ms": 0.0,
+                    }
+                },
+            )
+            time.sleep(0.015)
+            self.dispatch_worker_event(
+                feed["feed_id"],
+                "metrics_update",
+                {
+                    "metrics": {
+                        "timestamp": time.time(),
+                        "people_in_zone": 1,
+                        "arrival_rate": 0.1,
+                        "service_rate": 0.2,
+                        "wait_time_seconds": 1.0,
+                        "detections": [],
+                        "frame_seq": 11,
+                        "pts_ms": 0.0,
+                        "server_emitted_at_ms": 0.0,
+                    }
+                },
+            )
+
+            warning_transport = self.client.get(f"/api/feeds/{feed['feed_id']}/transport").json()["data"]
+            self.assertEqual(warning_transport["webrtc"]["health_state"], "warning")
+            self.assertEqual(warning_transport["webrtc"]["health_reason"], "metadata_video_skew_above_120ms")
+
+        with patch("src.api.runtime.TRANSPORT_SKEW_WARNING_SEC", 0.01), patch(
+            "src.api.runtime.TRANSPORT_SKEW_ERROR_SEC",
+            0.02,
+        ):
+            time.sleep(0.025)
+            self.dispatch_worker_event(
+                feed["feed_id"],
+                "metrics_update",
+                {
+                    "metrics": {
+                        "timestamp": time.time(),
+                        "people_in_zone": 1,
+                        "arrival_rate": 0.1,
+                        "service_rate": 0.2,
+                        "wait_time_seconds": 1.0,
+                        "detections": [],
+                        "frame_seq": 12,
+                        "pts_ms": 0.0,
+                        "server_emitted_at_ms": 0.0,
+                    }
+                },
+            )
+
+            error_transport = self.client.get(f"/api/feeds/{feed['feed_id']}/transport").json()["data"]
+            self.assertEqual(error_transport["webrtc"]["health_state"], "error")
+            self.assertEqual(error_transport["webrtc"]["health_reason"], "metadata_video_skew_above_120ms")
 
     def test_feed_webrtc_offer_returns_not_found_for_missing_feed(self) -> None:
         response = self.client.post(
@@ -1089,8 +1245,48 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertEqual(offer_response.status_code, 409)
         self.assertEqual(
             offer_response.json()["detail"],
-            "WebRTC preview currently supports RTSP feed sources only.",
+            "WebRTC transport unavailable: publisher_not_ready",
         )
+
+    def test_feed_webrtc_offer_accepts_non_rtsp_annotated_source_when_ready(self) -> None:
+        response = self.client.post(
+            "/api/feeds",
+            json={
+                "name": "USB Annotated WebRTC",
+                "source": "0",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        feed = response.json()["data"]
+
+        start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
+        self.assertEqual(start_response.status_code, 200)
+
+        record = app.state.registry._feeds[feed["feed_id"]]
+        record.published_webrtc_path = f"ann-{feed['feed_id']}"
+        record.published_webrtc_ready = True
+        record.published_webrtc_reason = None
+
+        answer_sdp = "v=0\r\na=sendonly\r\n\r\n"
+        with patch(
+            "src.api.app.run_mediamtx_webrtc_offer",
+            return_value=answer_sdp,
+        ) as mocked_offer:
+            offer_response = self.client.post(
+                f"/api/feeds/{feed['feed_id']}/webrtc/offer",
+                json={
+                    "offer": {
+                        "type": "offer",
+                        "sdp": "v=0\r\na=recvonly\r\n\r\n",
+                    }
+                },
+            )
+
+        self.assertEqual(offer_response.status_code, 200)
+        payload = offer_response.json()["data"]
+        self.assertEqual(payload["answer"]["type"], "answer")
+        self.assertEqual(payload["answer"]["sdp"], answer_sdp)
+        mocked_offer.assert_called_once()
 
     def test_feed_webrtc_offer_proxies_sdp_without_mutation(self) -> None:
         response = self.client.post(
@@ -1111,7 +1307,12 @@ class TestQueueVisionApi(unittest.TestCase):
         offer_sdp = "v=0\r\na=recvonly\r\n\r\n"
         answer_sdp = "v=0\r\na=sendonly\r\n\r\n"
 
-        with patch("src.api.app.ensure_mediamtx_path_configuration") as mocked_path_config, patch(
+        record = app.state.registry._feeds[feed["feed_id"]]
+        record.published_webrtc_path = f"ann-{feed['feed_id']}"
+        record.published_webrtc_ready = True
+        record.published_webrtc_reason = None
+
+        with patch(
             "src.api.app.run_mediamtx_webrtc_offer",
             return_value=answer_sdp,
         ) as mocked_offer:
@@ -1129,14 +1330,8 @@ class TestQueueVisionApi(unittest.TestCase):
         payload = offer_response.json()["data"]
         self.assertEqual(payload["answer"]["type"], "answer")
         self.assertEqual(payload["answer"]["sdp"], answer_sdp)
-        mocked_path_config.assert_called_once_with(
-            path_name=feed["feed_id"],
-            source="rtsp://viewer:secret@192.168.1.99/live/main",
-            control_api_base_url=api_app.MEDIAMTX_CONTROL_API_BASE_URL,
-            timeout_seconds=api_app.MEDIAMTX_WEBRTC_TIMEOUT_SEC,
-        )
         mocked_offer.assert_called_once_with(
-            path_name=feed["feed_id"],
+            path_name=f"ann-{feed['feed_id']}",
             offer_sdp=offer_sdp,
             whep_base_url=api_app.MEDIAMTX_WHEP_BASE_URL,
             timeout_seconds=api_app.MEDIAMTX_WEBRTC_TIMEOUT_SEC,
@@ -1156,7 +1351,12 @@ class TestQueueVisionApi(unittest.TestCase):
         start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
         self.assertEqual(start_response.status_code, 200)
 
-        with patch("src.api.app.ensure_mediamtx_path_configuration"), patch(
+        record = app.state.registry._feeds[feed["feed_id"]]
+        record.published_webrtc_path = f"ann-{feed['feed_id']}"
+        record.published_webrtc_ready = True
+        record.published_webrtc_reason = None
+
+        with patch(
             "src.api.app.run_mediamtx_webrtc_offer",
             side_effect=api_app.MediaMTXConnectionError("MediaMTX is unreachable."),
         ):
@@ -1173,37 +1373,6 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertEqual(offer_response.status_code, 503)
         self.assertEqual(offer_response.json()["detail"], "MediaMTX is unreachable.")
 
-    def test_feed_webrtc_offer_maps_mediamtx_path_configuration_connection_errors(self) -> None:
-        response = self.client.post(
-            "/api/feeds",
-            json={
-                "name": "Gateway Config Offline",
-                "source": "rtsp://192.168.1.103/live/main",
-            },
-        )
-        self.assertEqual(response.status_code, 201)
-        feed = response.json()["data"]
-
-        start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
-        self.assertEqual(start_response.status_code, 200)
-
-        with patch(
-            "src.api.app.ensure_mediamtx_path_configuration",
-            side_effect=api_app.MediaMTXConnectionError("MediaMTX Control API is unreachable."),
-        ):
-            offer_response = self.client.post(
-                f"/api/feeds/{feed['feed_id']}/webrtc/offer",
-                json={
-                    "offer": {
-                        "type": "offer",
-                        "sdp": "v=0\r\na=recvonly\r\n",
-                    }
-                },
-            )
-
-        self.assertEqual(offer_response.status_code, 503)
-        self.assertEqual(offer_response.json()["detail"], "MediaMTX Control API is unreachable.")
-
     def test_feed_webrtc_offer_maps_mediamtx_upstream_errors(self) -> None:
         response = self.client.post(
             "/api/feeds",
@@ -1218,7 +1387,12 @@ class TestQueueVisionApi(unittest.TestCase):
         start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
         self.assertEqual(start_response.status_code, 200)
 
-        with patch("src.api.app.ensure_mediamtx_path_configuration"), patch(
+        record = app.state.registry._feeds[feed["feed_id"]]
+        record.published_webrtc_path = f"ann-{feed['feed_id']}"
+        record.published_webrtc_ready = True
+        record.published_webrtc_reason = None
+
+        with patch(
             "src.api.app.run_mediamtx_webrtc_offer",
             side_effect=api_app.MediaMTXUpstreamError(status_code=500, detail="EOF"),
         ):
@@ -1236,40 +1410,6 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertEqual(
             offer_response.json()["detail"],
             "MediaMTX WebRTC upstream error (500): EOF",
-        )
-
-    def test_feed_webrtc_offer_maps_mediamtx_path_configuration_upstream_errors(self) -> None:
-        response = self.client.post(
-            "/api/feeds",
-            json={
-                "name": "Gateway Config Invalid",
-                "source": "rtsp://192.168.1.104/live/main",
-            },
-        )
-        self.assertEqual(response.status_code, 201)
-        feed = response.json()["data"]
-
-        start_response = self.client.post(f"/api/feeds/{feed['feed_id']}/start")
-        self.assertEqual(start_response.status_code, 200)
-
-        with patch(
-            "src.api.app.ensure_mediamtx_path_configuration",
-            side_effect=api_app.MediaMTXUpstreamError(status_code=400, detail="invalid path config"),
-        ):
-            offer_response = self.client.post(
-                f"/api/feeds/{feed['feed_id']}/webrtc/offer",
-                json={
-                    "offer": {
-                        "type": "offer",
-                        "sdp": "v=0\r\na=recvonly\r\n",
-                    }
-                },
-            )
-
-        self.assertEqual(offer_response.status_code, 502)
-        self.assertEqual(
-            offer_response.json()["detail"],
-            "MediaMTX WebRTC upstream error (400): invalid path config",
         )
 
     def test_feed_webrtc_offer_rejects_blank_sdp(self) -> None:
@@ -1297,78 +1437,6 @@ class TestQueueVisionApi(unittest.TestCase):
         )
 
         self.assertEqual(offer_response.status_code, 422)
-
-    def test_feed_stream_yields_mjpeg_chunks(self) -> None:
-        response = self.client.post(
-            "/api/feeds",
-            json={
-                "name": "Camera Stream",
-                "source": "rtsp://192.168.1.97/live/main",
-            },
-        )
-        self.assertEqual(response.status_code, 201)
-        feed = response.json()["data"]
-
-        registry = app.state.registry
-        subscribe_mock = AsyncMock(return_value="ok")
-        next_frame_mock = AsyncMock(side_effect=[(1, b"jpeg-frame-bytes"), StopAsyncIteration()])
-        unsubscribe_mock = AsyncMock(return_value=None)
-
-        with patch.object(registry, "subscribe_feed_stream", subscribe_mock), patch.object(
-            registry,
-            "next_feed_stream_frame",
-            next_frame_mock,
-        ), patch.object(registry, "unsubscribe_feed_stream", unsubscribe_mock):
-            with self.client.stream("GET", f"/api/feeds/{feed['feed_id']}/stream") as stream_response:
-                self.assertEqual(stream_response.status_code, 200)
-                self.assertEqual(
-                    stream_response.headers["content-type"],
-                    "multipart/x-mixed-replace; boundary=frame",
-                )
-                chunk = next(stream_response.iter_bytes())
-
-        self.assertIn(b"--frame", chunk)
-        self.assertIn(b"Content-Type: image/jpeg", chunk)
-        self.assertIn(b"jpeg-frame-bytes", chunk)
-        subscribe_mock.assert_awaited_once_with(feed["feed_id"], owner_user_id=None)
-        next_frame_mock.assert_awaited()
-        unsubscribe_mock.assert_awaited_once_with(feed["feed_id"])
-
-    def test_feed_stream_closes_when_running_feed_has_no_frames(self) -> None:
-        response = self.client.post(
-            "/api/feeds",
-            json={
-                "name": "Camera Stalled Stream",
-                "source": "rtsp://192.168.1.98/live/main",
-            },
-        )
-        self.assertEqual(response.status_code, 201)
-        feed = response.json()["data"]
-
-        registry = app.state.registry
-        subscribe_mock = AsyncMock(return_value="ok")
-        next_frame_mock = AsyncMock(side_effect=[None, None, None, None])
-        get_feed_mock = AsyncMock(return_value=SimpleNamespace(status="running"))
-        unsubscribe_mock = AsyncMock(return_value=None)
-
-        with patch.object(registry, "subscribe_feed_stream", subscribe_mock), patch.object(
-            registry,
-            "next_feed_stream_frame",
-            next_frame_mock,
-        ), patch.object(registry, "get_feed", get_feed_mock), patch.object(
-            registry,
-            "unsubscribe_feed_stream",
-            unsubscribe_mock,
-        ), patch("src.api.app.MJPEG_STREAM_IDLE_TIMEOUT_SEC", 0.01):
-            with self.client.stream("GET", f"/api/feeds/{feed['feed_id']}/stream") as stream_response:
-                self.assertEqual(stream_response.status_code, 200)
-                chunks = list(stream_response.iter_bytes())
-
-        self.assertEqual(chunks, [])
-        subscribe_mock.assert_awaited_once_with(feed["feed_id"], owner_user_id=None)
-        self.assertGreater(next_frame_mock.await_count, 0)
-        self.assertGreater(get_feed_mock.await_count, 0)
-        unsubscribe_mock.assert_awaited_once_with(feed["feed_id"])
 
     def test_feed_config_persists_across_registry_restart(self) -> None:
         created_response = self.client.post(
@@ -2222,3 +2290,4 @@ class TestQueueVisionApi(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

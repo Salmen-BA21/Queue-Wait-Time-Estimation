@@ -120,6 +120,28 @@ DASHBOARD_FRAME_EMIT_INTERVAL_SEC: float = float(
 DASHBOARD_EVENT_POLL_INTERVAL_SEC: float = float(
     os.getenv("QUEUE_DASHBOARD_POLL_INTERVAL_SEC", "0.1"),
 )
+ANNOTATED_WEBRTC_PUBLISH_ENABLED: bool = _env_flag("QUEUE_ANNOTATED_WEBRTC_PUBLISH_ENABLED", False)
+ANNOTATED_WEBRTC_RTSP_HOST: str = os.getenv("QUEUE_ANNOTATED_WEBRTC_RTSP_HOST", "127.0.0.1").strip() or "127.0.0.1"
+ANNOTATED_WEBRTC_RTSP_PORT: int = max(1, min(65535, _env_int("QUEUE_ANNOTATED_WEBRTC_RTSP_PORT", 8554)))
+ANNOTATED_WEBRTC_FPS: int = max(1, min(60, _env_int("QUEUE_ANNOTATED_WEBRTC_FPS", 15)))
+ANNOTATED_WEBRTC_FFMPEG_BINARY: str = os.getenv("QUEUE_ANNOTATED_WEBRTC_FFMPEG_BINARY", "ffmpeg").strip() or "ffmpeg"
+PUBLISHED_WEBRTC_PUBLISH_ENABLED: bool = _env_flag(
+    "QUEUE_PUBLISHED_WEBRTC_PUBLISH_ENABLED",
+    ANNOTATED_WEBRTC_PUBLISH_ENABLED,
+)
+PUBLISHED_WEBRTC_RTSP_HOST: str = (
+    os.getenv("QUEUE_PUBLISHED_WEBRTC_RTSP_HOST", ANNOTATED_WEBRTC_RTSP_HOST).strip()
+    or ANNOTATED_WEBRTC_RTSP_HOST
+)
+PUBLISHED_WEBRTC_RTSP_PORT: int = max(
+    1,
+    min(65535, _env_int("QUEUE_PUBLISHED_WEBRTC_RTSP_PORT", ANNOTATED_WEBRTC_RTSP_PORT)),
+)
+PUBLISHED_WEBRTC_FPS: int = max(1, min(60, _env_int("QUEUE_PUBLISHED_WEBRTC_FPS", ANNOTATED_WEBRTC_FPS)))
+PUBLISHED_WEBRTC_FFMPEG_BINARY: str = (
+    os.getenv("QUEUE_PUBLISHED_WEBRTC_FFMPEG_BINARY", ANNOTATED_WEBRTC_FFMPEG_BINARY).strip()
+    or ANNOTATED_WEBRTC_FFMPEG_BINARY
+)
 
 
 # ─── WebRTC Preview / MediaMTX ─────────────────────────────
@@ -211,6 +233,14 @@ class AppConfig:
     dashboard_frame_channel_host: Optional[str] = None
     dashboard_frame_channel_port: Optional[int] = None
     dashboard_frame_channel_token: Optional[str] = None
+    annotated_webrtc_enable: bool = False
+    annotated_webrtc_path: Optional[str] = None
+    annotated_webrtc_rtsp_host: Optional[str] = None
+    annotated_webrtc_rtsp_port: Optional[int] = None
+    annotated_webrtc_fps: int = PUBLISHED_WEBRTC_FPS
+    annotated_webrtc_ffmpeg_binary: str = PUBLISHED_WEBRTC_FFMPEG_BINARY
+    pipeline_engine: str = os.getenv("QUEUE_PIPELINE_ENGINE", "opencv").strip().lower() or "opencv"
+    gstreamer_rtsp_latency_ms: int = max(0, _env_int("QUEUE_GSTREAMER_RTSP_LATENCY_MS", 150))
     show_tracker_ids: bool = False
     headless: bool = False
 

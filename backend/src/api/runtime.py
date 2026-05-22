@@ -17,9 +17,10 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Literal, Protocol, TextIO, TypedDict, cast
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import quote, urlparse, urlunparse
 from uuid import uuid4
 
+import requests
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 
@@ -61,9 +62,9 @@ from src.database import (
 from src.config import (
     DASHBOARD_EVENT_POLL_INTERVAL_SEC,
     DEFAULT_CONFIDENCE,
-    DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY,
     DEFAULT_DETECTOR_IMAGE_SIZE,
-    DEFAULT_PROCESS_EVERY_N_FRAMES,
+    MEDIAMTX_CONTROL_API_BASE_URL,
+    MEDIAMTX_WEBRTC_TIMEOUT_SEC,
 )
 
 
@@ -71,10 +72,24 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 UPLOAD_DIR = (BACKEND_DIR / "data" / "uploads").resolve()
 RUNTIME_LOG_DIR = (BACKEND_DIR / "data" / "runtime").resolve()
 DEFAULT_LOG_LEVEL = "INFO"
-DEFAULT_RESIZE_SCALE = 0.8
+DEFAULT_RESIZE_SCALE = 1.0
+_raw_worker_process_stride = os.getenv("QUEUE_WORKER_PROCESS_EVERY_N_FRAMES", "2").strip()
+try:
+    _parsed_worker_process_stride = int(_raw_worker_process_stride)
+except ValueError:
+    _parsed_worker_process_stride = 2
 DEFAULT_WORKER_PROCESS_EVERY_N_FRAMES = max(
     1,
-    int(os.getenv("QUEUE_WORKER_PROCESS_EVERY_N_FRAMES", str(DEFAULT_PROCESS_EVERY_N_FRAMES))),
+    _parsed_worker_process_stride,
+)
+_raw_worker_dashboard_jpeg_quality = os.getenv("QUEUE_WORKER_DASHBOARD_JPEG_QUALITY", "55").strip()
+try:
+    _parsed_worker_dashboard_jpeg_quality = int(_raw_worker_dashboard_jpeg_quality)
+except ValueError:
+    _parsed_worker_dashboard_jpeg_quality = 55
+DEFAULT_WORKER_DASHBOARD_FRAME_JPEG_QUALITY = max(
+    30,
+    min(95, _parsed_worker_dashboard_jpeg_quality),
 )
 DEFAULT_WORKER_DETECTOR_IMAGE_SIZE = max(320, min(640, DEFAULT_DETECTOR_IMAGE_SIZE))
 _raw_worker_confidence = os.getenv("QUEUE_WORKER_DETECTOR_CONFIDENCE", str(DEFAULT_CONFIDENCE)).strip()
@@ -84,6 +99,57 @@ except ValueError:
     _parsed_worker_confidence = DEFAULT_CONFIDENCE
 DEFAULT_WORKER_CONFIDENCE = max(0.05, min(0.95, _parsed_worker_confidence))
 DEFAULT_WORKER_INFERENCE_DEVICE = os.getenv("QUEUE_INFERENCE_DEVICE", "auto").strip() or "auto"
+DEFAULT_ANNOTATED_WEBRTC_PUBLISH_ENABLED = (
+    os.getenv(
+        "QUEUE_PUBLISHED_WEBRTC_PUBLISH_ENABLED",
+        os.getenv("QUEUE_ANNOTATED_WEBRTC_PUBLISH_ENABLED", "1"),
+    ).strip().lower()
+    in {"1", "true", "yes", "on"}
+)
+DEFAULT_ANNOTATED_WEBRTC_RTSP_HOST = (
+    os.getenv(
+        "QUEUE_PUBLISHED_WEBRTC_RTSP_HOST",
+        os.getenv("QUEUE_ANNOTATED_WEBRTC_RTSP_HOST", "127.0.0.1"),
+    ).strip()
+    or "127.0.0.1"
+)
+_raw_annotated_rtsp_port = os.getenv(
+    "QUEUE_PUBLISHED_WEBRTC_RTSP_PORT",
+    os.getenv("QUEUE_ANNOTATED_WEBRTC_RTSP_PORT", "8554"),
+).strip()
+try:
+    _parsed_annotated_rtsp_port = int(_raw_annotated_rtsp_port)
+except ValueError:
+    _parsed_annotated_rtsp_port = 8554
+DEFAULT_ANNOTATED_WEBRTC_RTSP_PORT = max(
+    1,
+    min(65535, _parsed_annotated_rtsp_port),
+)
+_raw_annotated_fps = os.getenv(
+    "QUEUE_PUBLISHED_WEBRTC_FPS",
+    os.getenv("QUEUE_ANNOTATED_WEBRTC_FPS", "15"),
+).strip()
+try:
+    _parsed_annotated_fps = int(_raw_annotated_fps)
+except ValueError:
+    _parsed_annotated_fps = 15
+DEFAULT_ANNOTATED_WEBRTC_FPS = max(
+    1,
+    min(60, _parsed_annotated_fps),
+)
+DEFAULT_ANNOTATED_WEBRTC_FFMPEG_BINARY = os.getenv(
+    "QUEUE_PUBLISHED_WEBRTC_FFMPEG_BINARY",
+    os.getenv("QUEUE_ANNOTATED_WEBRTC_FFMPEG_BINARY", "ffmpeg"),
+).strip() or "ffmpeg"
+DEFAULT_WORKER_PIPELINE_ENGINE = os.getenv("QUEUE_PIPELINE_ENGINE", "opencv").strip().lower() or "opencv"
+if DEFAULT_WORKER_PIPELINE_ENGINE not in {"opencv", "gstreamer_hybrid"}:
+    DEFAULT_WORKER_PIPELINE_ENGINE = "opencv"
+_raw_gstreamer_rtsp_latency_ms = os.getenv("QUEUE_GSTREAMER_RTSP_LATENCY_MS", "150").strip()
+try:
+    _parsed_gstreamer_rtsp_latency_ms = int(_raw_gstreamer_rtsp_latency_ms)
+except ValueError:
+    _parsed_gstreamer_rtsp_latency_ms = 150
+DEFAULT_WORKER_GSTREAMER_RTSP_LATENCY_MS = max(0, _parsed_gstreamer_rtsp_latency_ms)
 DEFAULT_FRAME_CHANNEL_BIND_HOST = os.getenv("QUEUE_DASHBOARD_FRAME_CHANNEL_BIND_HOST", "127.0.0.1").strip() or "127.0.0.1"
 MAX_FRAME_CHANNEL_FRAME_BYTES = max(
     64 * 1024,
@@ -92,6 +158,18 @@ MAX_FRAME_CHANNEL_FRAME_BYTES = max(
 FRAME_CHANNEL_ACTIVITY_TIMEOUT_SEC = max(
     0.5,
     float(os.getenv("QUEUE_DASHBOARD_FRAME_CHANNEL_ACTIVITY_TIMEOUT_SEC", "2.0")),
+)
+TRANSPORT_SKEW_THRESHOLD_MS = max(
+    1.0,
+    float(os.getenv("QUEUE_TRANSPORT_SKEW_THRESHOLD_MS", "120.0")),
+)
+TRANSPORT_SKEW_WARNING_SEC = max(
+    0.0,
+    float(os.getenv("QUEUE_TRANSPORT_SKEW_WARNING_SEC", "3.0")),
+)
+TRANSPORT_SKEW_ERROR_SEC = max(
+    TRANSPORT_SKEW_WARNING_SEC,
+    float(os.getenv("QUEUE_TRANSPORT_SKEW_ERROR_SEC", "8.0")),
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -165,6 +243,87 @@ def sanitize_source(source: str) -> str:
         netloc = f"{netloc}:{parsed.port}"
 
     return urlunparse(parsed._replace(netloc=netloc))
+
+
+def build_published_webrtc_path_name(feed_id: str) -> str:
+    """Build a stable MediaMTX path name for unified worker-published WebRTC streams."""
+    normalized = "".join(
+        char if char.isalnum() or char in {"-", "_", "."} else "-"
+        for char in feed_id.strip().lower()
+    ).strip("-")
+    if not normalized:
+        return "ann-feed"
+    return f"ann-{normalized}"
+
+
+def _normalize_publisher_reason(reason: str | None) -> str | None:
+    """Normalize legacy/worker reason values to the unified transport vocabulary."""
+    if reason is None:
+        return None
+    normalized = reason.strip().lower()
+    if normalized in {"annotated_publisher_not_ready", "publisher_not_ready"}:
+        return "publisher_not_ready"
+    if normalized in {"annotated_publisher_unavailable", "publisher_unavailable"}:
+        return "publisher_unavailable"
+    return normalized
+
+
+def configure_mediamtx_published_path(path_name: str) -> None:
+    """Configure MediaMTX to accept worker-published frames on a canonical path."""
+    if not path_name.strip():
+        raise ValueError("MediaMTX path name must not be blank.")
+
+    encoded_path = quote(path_name.strip(), safe="")
+    base_url = MEDIAMTX_CONTROL_API_BASE_URL.rstrip("/")
+    patch_endpoint = f"{base_url}/v3/config/paths/patch/{encoded_path}"
+    add_endpoint = f"{base_url}/v3/config/paths/add/{encoded_path}"
+    
+    # Configure path to accept publishing from worker
+    # Use minimal configuration - just set source to "publisher" to allow external publishing
+    path_payload = {
+        "source": "publisher",  # Allow external publishers (worker FFmpeg)
+    }
+
+    try:
+        # Try to patch existing path first
+        patch_response = requests.patch(
+            patch_endpoint,
+            json=path_payload,
+            timeout=MEDIAMTX_WEBRTC_TIMEOUT_SEC,
+        )
+        
+        if patch_response.status_code == 200:
+            LOGGER.debug("MediaMTX path %s configured for worker publishing", path_name)
+            return
+        
+        if patch_response.status_code != 404:
+            LOGGER.warning(
+                "MediaMTX path patch failed (status %d): %s",
+                patch_response.status_code,
+                patch_response.text[:200],
+            )
+            # Continue to try adding the path
+        
+        # Path doesn't exist, create it
+        add_response = requests.post(
+            add_endpoint,
+            json=path_payload,
+            timeout=MEDIAMTX_WEBRTC_TIMEOUT_SEC,
+        )
+        
+        if add_response.status_code >= 400:
+            LOGGER.error(
+                "MediaMTX path creation failed (status %d): %s",
+                add_response.status_code,
+                add_response.text[:200],
+            )
+        else:
+            LOGGER.info("MediaMTX path %s created for worker publishing", path_name)
+            
+    except requests.Timeout:
+        LOGGER.warning("MediaMTX Control API timed out while configuring published path %s", path_name)
+    except requests.RequestException as exc:
+        LOGGER.warning("MediaMTX Control API error while configuring published path %s: %s", path_name, exc)
 
 
 def utc_now() -> datetime:
@@ -674,9 +833,11 @@ class WorkerFrameChannelServer:
         self,
         *,
         on_frame: Callable[[str, bytes], None],
+        on_event: Callable[[str, dict[str, Any]], None] | None = None,
         bind_host: str = DEFAULT_FRAME_CHANNEL_BIND_HOST,
     ) -> None:
         self._on_frame = on_frame
+        self._on_event = on_event
         self._bind_host = bind_host
         self._server_socket: socket.socket | None = None
         self._server_host: str | None = None
@@ -821,19 +982,40 @@ class WorkerFrameChannelServer:
                     if self._token_feeds.get(token) != feed_id:
                         return
 
-                frame_len_raw = self._recv_exact(conn, 4)
-                if frame_len_raw is None:
+                # Read message type byte (0x01 for frames, 0x02 for events)
+                msg_type_raw = self._recv_exact(conn, 1)
+                if msg_type_raw is None:
+                    return
+                
+                msg_type = msg_type_raw[0]
+
+                # Read message length
+                msg_len_raw = self._recv_exact(conn, 4)
+                if msg_len_raw is None:
                     return
 
-                frame_len = struct.unpack(">I", frame_len_raw)[0]
-                if frame_len <= 0 or frame_len > MAX_FRAME_CHANNEL_FRAME_BYTES:
+                msg_len = struct.unpack(">I", msg_len_raw)[0]
+                if msg_len <= 0 or msg_len > MAX_FRAME_CHANNEL_FRAME_BYTES:
                     return
 
-                frame_bytes = self._recv_exact(conn, frame_len)
-                if frame_bytes is None:
+                msg_bytes = self._recv_exact(conn, msg_len)
+                if msg_bytes is None:
                     return
 
-                self._on_frame(feed_id, frame_bytes)
+                # Route to appropriate handler based on message type
+                if msg_type == 0x01:
+                    # Frame message
+                    self._on_frame(feed_id, msg_bytes)
+                elif msg_type == 0x02:
+                    # Event message
+                    if self._on_event is not None:
+                        try:
+                            event_dict = json.loads(msg_bytes.decode("utf-8"))
+                            if isinstance(event_dict, dict):
+                                self._on_event(feed_id, event_dict)
+                        except (json.JSONDecodeError, UnicodeDecodeError):
+                            # Ignore malformed event messages
+                            pass
         finally:
             try:
                 conn.close()
@@ -998,6 +1180,10 @@ class SubprocessFeedWorkerRunner:
             "--events-file",
             str(event_path),
             "--headless",
+            "--pipeline-engine",
+            DEFAULT_WORKER_PIPELINE_ENGINE,
+            "--gstreamer-rtsp-latency-ms",
+            str(DEFAULT_WORKER_GSTREAMER_RTSP_LATENCY_MS),
         ]
 
         if (
@@ -1009,13 +1195,30 @@ class SubprocessFeedWorkerRunner:
                 [
                     "--dashboard-render-frames",
                     "--dashboard-frame-jpeg-quality",
-                    str(DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY),
+                    str(DEFAULT_WORKER_DASHBOARD_FRAME_JPEG_QUALITY),
                     "--dashboard-frame-channel-host",
                     record.dashboard_frame_channel_host,
                     "--dashboard-frame-channel-port",
                     str(record.dashboard_frame_channel_port),
                     "--dashboard-frame-channel-token",
                     record.dashboard_frame_channel_token,
+                ]
+            )
+
+        if DEFAULT_ANNOTATED_WEBRTC_PUBLISH_ENABLED and record.published_webrtc_path:
+            command.extend(
+                [
+                    "--annotated-webrtc-enable",
+                    "--annotated-webrtc-path",
+                    record.published_webrtc_path,
+                    "--annotated-webrtc-rtsp-host",
+                    DEFAULT_ANNOTATED_WEBRTC_RTSP_HOST,
+                    "--annotated-webrtc-rtsp-port",
+                    str(DEFAULT_ANNOTATED_WEBRTC_RTSP_PORT),
+                    "--annotated-webrtc-fps",
+                    str(DEFAULT_ANNOTATED_WEBRTC_FPS),
+                    "--annotated-webrtc-ffmpeg-binary",
+                    DEFAULT_ANNOTATED_WEBRTC_FFMPEG_BINARY,
                 ]
             )
 
@@ -1070,8 +1273,20 @@ class FeedRecord:
     zone: ZonePolygon | None = None
     latest_metrics: dict | None = None
     backend_annotations_active: bool = False
-    annotated_webrtc_path: str | None = None
-    annotated_webrtc_ready: bool = False
+    published_webrtc_path: str | None = None
+    published_webrtc_ready: bool = False
+    published_webrtc_reason: str | None = None
+    transport_end_to_end_latency_ms: float | None = None
+    transport_metadata_video_skew_ms: float | None = None
+    transport_dropped_frame_ratio: float | None = None
+    transport_health_state: Literal["ok", "warning", "error"] | None = None
+    transport_health_reason: str | None = None
+    transport_compatibility_reason: str | None = None
+    transport_pipeline_mode: str | None = None
+    transport_skew_exceeded_since_monotonic: float | None = None
+    transport_last_frame_seq: int | None = None
+    transport_frames_seen: int = 0
+    transport_frames_dropped: int = 0
     dashboard_frame_channel_host: str | None = None
     dashboard_frame_channel_port: int | None = None
     dashboard_frame_channel_token: str | None = None
@@ -1087,45 +1302,30 @@ class FeedRecord:
         return sanitize_source(self.source)
 
     def to_transport_capabilities(self) -> FeedTransportCapabilities:
-        """Build transport readiness details used by frontend playback routing."""
-        is_rtsp_source = self.source.lower().startswith("rtsp://")
+        """Build transport readiness details for the unified WebRTC pipeline."""
         is_running = self.status == "running"
-
-        mjpeg_ready = self.status in {"running", "initializing"}
-        mjpeg_reason: str | None = None
-        if not mjpeg_ready:
-            mjpeg_reason = "feed_not_running"
-
-        webrtc_enabled = False
-        webrtc_ready = False
-        webrtc_mode: Literal["annotated", "direct", "none"] = "none"
-        webrtc_path_name: str | None = None
+        webrtc_path_name = self.published_webrtc_path or self.feed_id
+        webrtc_enabled = bool(webrtc_path_name)
+        webrtc_ready = bool(is_running and self.published_webrtc_ready)
         webrtc_reason: str | None = None
 
         if not is_running:
             webrtc_reason = "feed_not_running"
-        elif not is_rtsp_source:
-            webrtc_reason = "rtsp_source_required"
-        else:
-            webrtc_enabled = True
-            webrtc_ready = True
-            webrtc_mode = "direct"
-            webrtc_path_name = self.feed_id
+        elif not webrtc_ready:
+            webrtc_reason = self.published_webrtc_reason or "publisher_not_ready"
 
         return FeedTransportCapabilities.model_validate(
             {
-                "backend_annotations": self.backend_annotations_active,
                 "webrtc": {
                     "enabled": webrtc_enabled,
                     "ready": webrtc_ready,
-                    "source_mode": webrtc_mode,
                     "path_name": webrtc_path_name,
                     "reason": webrtc_reason,
-                },
-                "mjpeg": {
-                    "enabled": True,
-                    "ready": mjpeg_ready,
-                    "reason": mjpeg_reason,
+                    "end_to_end_latency_ms": self.transport_end_to_end_latency_ms,
+                    "metadata_video_skew_ms": self.transport_metadata_video_skew_ms,
+                    "dropped_frame_ratio": self.transport_dropped_frame_ratio,
+                    "health_state": self.transport_health_state or ("warning" if self.transport_compatibility_reason else None),
+                    "health_reason": self.transport_health_reason or self.transport_compatibility_reason,
                 },
             }
         )
@@ -1309,7 +1509,10 @@ class FeedRegistry:
         self._frame_streams = FeedFrameStreamManager()
         self._frame_channel: WorkerFrameChannelServer | None = None
         if isinstance(self._runner, SubprocessFeedWorkerRunner):
-            self._frame_channel = WorkerFrameChannelServer(on_frame=self._on_frame_channel_frame)
+            self._frame_channel = WorkerFrameChannelServer(
+                on_frame=self._on_frame_channel_frame,
+                on_event=self._on_frame_channel_event,
+            )
         self._loop: asyncio.AbstractEventLoop | None = None
         self._feeds: dict[str, FeedRecord] = {}
         self._lock = asyncio.Lock()
@@ -1360,6 +1563,29 @@ class FeedRegistry:
             except Exception:
                 LOGGER.debug(
                     "Failed to ingest worker frame for feed %s.",
+                    feed_id,
+                    exc_info=True,
+                )
+
+        future.add_done_callback(_consume_result)
+
+    def _on_frame_channel_event(self, feed_id: str, event_dict: dict[str, Any]) -> None:
+        """Handle events received via socket channel."""
+        loop = self._loop
+        if loop is None or loop.is_closed():
+            return
+
+        future = asyncio.run_coroutine_threadsafe(
+            self._dispatch_worker_event(feed_id, event_dict),
+            loop,
+        )
+
+        def _consume_result(done_future) -> None:  # noqa: ANN001
+            try:
+                done_future.result()
+            except Exception:
+                LOGGER.debug(
+                    "Failed to dispatch worker event for feed %s.",
                     feed_id,
                     exc_info=True,
                 )
@@ -1678,9 +1904,24 @@ class FeedRegistry:
 
             record.status = "initializing"
             record.backend_annotations_active = False
-            record.annotated_webrtc_path = None
-            record.annotated_webrtc_ready = False
+            record.published_webrtc_path = build_published_webrtc_path_name(record.feed_id)
+            if DEFAULT_ANNOTATED_WEBRTC_PUBLISH_ENABLED:
+                record.published_webrtc_reason = _normalize_publisher_reason("publisher_not_ready")
+            else:
+                record.published_webrtc_reason = _normalize_publisher_reason("publisher_unavailable")
+            record.published_webrtc_ready = False
             record.last_worker_frame_at_monotonic = None
+            record.transport_end_to_end_latency_ms = None
+            record.transport_metadata_video_skew_ms = None
+            record.transport_dropped_frame_ratio = None
+            record.transport_health_state = None
+            record.transport_health_reason = None
+            record.transport_compatibility_reason = None
+            record.transport_pipeline_mode = None
+            record.transport_skew_exceeded_since_monotonic = None
+            record.transport_last_frame_seq = None
+            record.transport_frames_seen = 0
+            record.transport_frames_dropped = 0
             record.last_error = None
             record.last_warning = None
             record.last_warning_code = None
@@ -1730,6 +1971,22 @@ class FeedRegistry:
             self._clear_frame_channel_binding(feed_id)
             await self._mark_feed_error(feed_id, message)
             raise FeedStartError(message) from exc
+
+        # Configure MediaMTX path for unified worker publishing if needed.
+        if record.published_webrtc_path:
+            try:
+                await asyncio.to_thread(
+                    configure_mediamtx_published_path,
+                    record.published_webrtc_path,
+                )
+            except Exception as exc:
+                LOGGER.warning(
+                    "Failed to configure MediaMTX path for feed %s: %s",
+                    feed_id,
+                    exc,
+                )
+                # Don't fail the feed start, just log the warning
+                # The worker will emit transport_status events indicating the issue
 
         async with self._lock:
             current = self._feeds.get(feed_id)
@@ -1793,13 +2050,16 @@ class FeedRegistry:
 
             current.status = "stopped"
             current.backend_annotations_active = False
-            current.annotated_webrtc_path = None
-            current.annotated_webrtc_ready = False
+            current.published_webrtc_path = None
+            current.published_webrtc_ready = False
+            current.published_webrtc_reason = None
             current.last_worker_frame_at_monotonic = None
             current.dashboard_frame_channel_host = None
             current.dashboard_frame_channel_port = None
             current.dashboard_frame_channel_token = None
             current.last_error = None
+            current.transport_compatibility_reason = None
+            current.transport_pipeline_mode = None
             current.updated_at = utc_now()
             stopped_model = current.to_model()
 
@@ -2003,26 +2263,30 @@ class FeedRegistry:
         feed_id: str,
         *,
         owner_user_id: int | None = None,
-    ) -> tuple[Literal["ok", "not_found", "not_running", "unsupported_source"], str | None]:
-        """Resolve an authenticated RTSP source for WebRTC preview handshakes."""
+    ) -> tuple[
+        Literal["ok", "not_found", "not_running", "not_ready"],
+        str | None,
+        str | None,
+    ]:
+        """Resolve a unified WebRTC published path for preview handshakes."""
         async with self._lock:
             record = self._feeds.get(feed_id)
             if record is None:
-                return "not_found", None
+                return "not_found", None, None
             if not self._is_record_visible_to_owner_scope(record, owner_user_id):
-                return "not_found", None
+                return "not_found", None, None
 
             if record.status != "running":
-                return "not_running", None
+                return "not_running", None, None
 
-            source = record.source
-            username = record.rtsp_username
-            password = record.rtsp_password
+            published_path = record.published_webrtc_path
+            published_ready = record.published_webrtc_ready
+            published_reason = record.published_webrtc_reason
 
-        if not source.lower().startswith("rtsp://"):
-            return "unsupported_source", None
+        if published_path and published_ready:
+            return "ok", published_path, None
 
-        return "ok", _build_authenticated_rtsp_source(source, username, password)
+        return "not_ready", None, _normalize_publisher_reason(published_reason) or "publisher_not_ready"
 
     async def subscribe_feed_stream(
         self,
@@ -2188,9 +2452,21 @@ class FeedRegistry:
 
             record.status = "error"
             record.backend_annotations_active = False
-            record.annotated_webrtc_path = None
-            record.annotated_webrtc_ready = False
+            record.published_webrtc_path = None
+            record.published_webrtc_ready = False
+            record.published_webrtc_reason = None
             record.last_worker_frame_at_monotonic = None
+            record.transport_end_to_end_latency_ms = None
+            record.transport_metadata_video_skew_ms = None
+            record.transport_dropped_frame_ratio = None
+            record.transport_health_state = None
+            record.transport_health_reason = None
+            record.transport_compatibility_reason = None
+            record.transport_pipeline_mode = None
+            record.transport_skew_exceeded_since_monotonic = None
+            record.transport_last_frame_seq = None
+            record.transport_frames_seen = 0
+            record.transport_frames_dropped = 0
             record.dashboard_frame_channel_host = None
             record.dashboard_frame_channel_port = None
             record.dashboard_frame_channel_token = None
@@ -2222,6 +2498,7 @@ class FeedRegistry:
                 return
 
             owner_user_id = record.manager_user_id
+            should_broadcast_feed_update = False
 
             now_monotonic = time.monotonic()
             backend_annotations_active = bool(
@@ -2236,11 +2513,77 @@ class FeedRegistry:
             )
             record.latest_metrics = metrics_without_frame.model_dump(mode="python")
 
+            now_ms = time.time() * 1000.0
+            end_to_end_latency_ms: float | None = None
+            if metrics.server_emitted_at_ms is not None:
+                end_to_end_latency_ms = max(0.0, now_ms - float(metrics.server_emitted_at_ms))
+
+            metadata_video_skew_ms: float | None = None
+            if metrics.pts_ms is not None:
+                metadata_video_skew_ms = abs(now_ms - float(metrics.pts_ms))
+
+            if metrics.frame_seq is not None:
+                if record.transport_last_frame_seq is not None and metrics.frame_seq > record.transport_last_frame_seq:
+                    dropped = max(0, metrics.frame_seq - record.transport_last_frame_seq - 1)
+                    record.transport_frames_dropped += dropped
+                record.transport_last_frame_seq = metrics.frame_seq
+                record.transport_frames_seen += 1
+
+            total_frames = record.transport_frames_seen + record.transport_frames_dropped
+            dropped_frame_ratio: float | None = None
+            if total_frames > 0:
+                dropped_frame_ratio = record.transport_frames_dropped / total_frames
+
+            previous_health_state = record.transport_health_state
+            previous_health_reason = record.transport_health_reason
+            next_health_state: Literal["ok", "warning", "error"] | None = None
+            next_health_reason: str | None = None
+
+            if metadata_video_skew_ms is not None:
+                if metadata_video_skew_ms > TRANSPORT_SKEW_THRESHOLD_MS:
+                    if record.transport_skew_exceeded_since_monotonic is None:
+                        record.transport_skew_exceeded_since_monotonic = now_monotonic
+                    exceed_duration_sec = now_monotonic - record.transport_skew_exceeded_since_monotonic
+                    if exceed_duration_sec >= TRANSPORT_SKEW_ERROR_SEC:
+                        next_health_state = "error"
+                    elif exceed_duration_sec >= TRANSPORT_SKEW_WARNING_SEC:
+                        next_health_state = "warning"
+                    else:
+                        next_health_state = "ok"
+                    next_health_reason = (
+                        f"metadata_video_skew_above_{int(TRANSPORT_SKEW_THRESHOLD_MS)}ms"
+                        if next_health_state in {"warning", "error"}
+                        else None
+                    )
+                else:
+                    record.transport_skew_exceeded_since_monotonic = None
+                    next_health_state = "ok"
+                    next_health_reason = None
+
+            record.transport_end_to_end_latency_ms = end_to_end_latency_ms
+            record.transport_metadata_video_skew_ms = metadata_video_skew_ms
+            record.transport_dropped_frame_ratio = dropped_frame_ratio
+            record.transport_health_state = next_health_state
+            record.transport_health_reason = next_health_reason
+
+            if previous_health_state != next_health_state or previous_health_reason != next_health_reason:
+                record.updated_at = utc_now()
+                should_broadcast_feed_update = True
+                model = record.to_model()
+
         await self._broadcaster.broadcast_metrics_event(
             feed_id=feed_id,
             metrics=metrics_without_frame,
             owner_user_id=owner_user_id,
         )
+
+        if should_broadcast_feed_update:
+            await self._persist_record(record)
+            await self._broadcaster.broadcast_feed_event(
+                action="updated",
+                feed=model,
+                owner_user_id=owner_user_id,
+            )
 
     async def _apply_alert_fired(self, feed_id: str, alert: AlertModel) -> None:
         async with self._lock:
@@ -2275,6 +2618,77 @@ class FeedRegistry:
             timestamp=timestamp,
             owner_user_id=owner_user_id,
         )
+
+    async def _apply_transport_status(
+        self,
+        feed_id: str,
+        *,
+        published_webrtc_ready: bool | None = None,
+        published_webrtc_path: str | None = None,
+        reason: str | None = None,
+        compatibility_reason: str | None = None,
+        pipeline_mode: str | None = None,
+        performance: dict[str, Any] | None = None,
+    ) -> None:
+        should_broadcast = False
+        model: VideoFeed | None = None
+        owner_user_id: int | None = None
+
+        async with self._lock:
+            record = self._feeds.get(feed_id)
+            if record is None:
+                return
+
+            owner_user_id = record.manager_user_id
+
+            if published_webrtc_path is not None and record.published_webrtc_path != published_webrtc_path:
+                record.published_webrtc_path = published_webrtc_path
+                should_broadcast = True
+
+            if published_webrtc_ready is not None and record.published_webrtc_ready != published_webrtc_ready:
+                record.published_webrtc_ready = published_webrtc_ready
+                should_broadcast = True
+
+            normalized_reason = _normalize_publisher_reason(reason)
+            if normalized_reason is not None and record.published_webrtc_reason != normalized_reason:
+                record.published_webrtc_reason = normalized_reason
+                should_broadcast = True
+            elif published_webrtc_ready is True and normalized_reason is None and record.published_webrtc_reason is not None:
+                record.published_webrtc_reason = None
+                should_broadcast = True
+
+            normalized_compatibility_reason = (
+                compatibility_reason.strip().lower()
+                if isinstance(compatibility_reason, str) and compatibility_reason.strip()
+                else None
+            )
+            if record.transport_compatibility_reason != normalized_compatibility_reason:
+                record.transport_compatibility_reason = normalized_compatibility_reason
+                should_broadcast = True
+
+            normalized_pipeline_mode = (
+                pipeline_mode.strip().lower()
+                if isinstance(pipeline_mode, str) and pipeline_mode.strip()
+                else None
+            )
+            if record.transport_pipeline_mode != normalized_pipeline_mode:
+                record.transport_pipeline_mode = normalized_pipeline_mode
+                should_broadcast = True
+
+            if performance:
+                LOGGER.info("feed %s transport perf: %s", feed_id, json.dumps(performance, sort_keys=True))
+
+            if should_broadcast:
+                record.updated_at = utc_now()
+                model = record.to_model()
+
+        if should_broadcast and model is not None:
+            await self._persist_record(record)
+            await self._broadcaster.broadcast_feed_event(
+                action="updated",
+                feed=model,
+                owner_user_id=owner_user_id,
+            )
 
     async def _drain_worker_events(self, feed_id: str, handle: FeedWorkerHandle) -> None:
         events = self._read_worker_events(handle)
@@ -2364,6 +2778,42 @@ class FeedRegistry:
                 message=message,
                 timestamp=coerce_datetime(timestamp),
             )
+            return
+
+        if event_type == "transport_status":
+            ready_value = payload.get("published_webrtc_ready")
+            if ready_value is None:
+                ready_value = payload.get("annotated_webrtc_ready")
+            path_value = payload.get("published_webrtc_path")
+            if path_value is None:
+                path_value = payload.get("annotated_webrtc_path")
+            reason_value = payload.get("reason")
+            compatibility_reason_value = payload.get("compatibility_reason")
+            pipeline_mode_value = payload.get("pipeline_mode")
+            performance_value = payload.get("performance")
+            ready = ready_value if isinstance(ready_value, bool) else None
+            path = path_value if isinstance(path_value, str) else None
+            reason = reason_value if isinstance(reason_value, str) else None
+            compatibility_reason = (
+                compatibility_reason_value
+                if isinstance(compatibility_reason_value, str)
+                else None
+            )
+            pipeline_mode = (
+                pipeline_mode_value
+                if isinstance(pipeline_mode_value, str)
+                else None
+            )
+            performance = performance_value if isinstance(performance_value, dict) else None
+            await self._apply_transport_status(
+                feed_id,
+                published_webrtc_ready=ready,
+                published_webrtc_path=path,
+                reason=reason,
+                compatibility_reason=compatibility_reason,
+                pipeline_mode=pipeline_mode,
+                performance=performance,
+            )
 
     async def _monitor_feed(self, feed_id: str, handle: FeedWorkerHandle) -> None:
         while True:
@@ -2395,9 +2845,21 @@ class FeedRegistry:
                     record.last_error = self._runner.exit_details(handle, exit_code)
 
                 record.backend_annotations_active = False
-                record.annotated_webrtc_path = None
-                record.annotated_webrtc_ready = False
+                record.published_webrtc_path = None
+                record.published_webrtc_ready = False
+                record.published_webrtc_reason = None
                 record.last_worker_frame_at_monotonic = None
+                record.transport_end_to_end_latency_ms = None
+                record.transport_metadata_video_skew_ms = None
+                record.transport_dropped_frame_ratio = None
+                record.transport_health_state = None
+                record.transport_health_reason = None
+                record.transport_compatibility_reason = None
+                record.transport_pipeline_mode = None
+                record.transport_skew_exceeded_since_monotonic = None
+                record.transport_last_frame_seq = None
+                record.transport_frames_seen = 0
+                record.transport_frames_dropped = 0
                 record.dashboard_frame_channel_host = None
                 record.dashboard_frame_channel_port = None
                 record.dashboard_frame_channel_token = None
@@ -2418,3 +2880,4 @@ class FeedRegistry:
                 owner_user_id=record.manager_user_id,
             )
             return
+

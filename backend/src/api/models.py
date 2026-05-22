@@ -13,7 +13,6 @@ EventType = Literal["snapshot", "feed_status", "metrics_update", "alert_fired", 
 ModelSize = Literal["n", "s", "m", "l", "x"]
 RTSPTransport = Literal["tcp", "udp"]
 WebRTCSessionType = Literal["offer", "answer"]
-WebRTCTransportSourceMode = Literal["annotated", "direct", "none"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 BatchLaunchMode = Literal["save_only", "create_and_start"]
 BatchLaunchItemStatus = Literal["created", "started", "failed"]
@@ -326,6 +325,9 @@ class QueueMetricsModel(BaseModel):
     detections: list[list[float]] | None = None
     render_frame_jpeg_base64: str | None = None
     backend_annotations_active: bool = False
+    frame_seq: int | None = Field(default=None, ge=0)
+    pts_ms: float | None = Field(default=None, ge=0.0)
+    server_emitted_at_ms: float | None = Field(default=None, ge=0.0)
 
 
 class FeedWebRTCTransportCapability(BaseModel):
@@ -333,25 +335,19 @@ class FeedWebRTCTransportCapability(BaseModel):
 
     enabled: bool = False
     ready: bool = False
-    source_mode: WebRTCTransportSourceMode = "none"
     path_name: str | None = None
     reason: str | None = None
-
-
-class FeedMJPEGTransportCapability(BaseModel):
-    """MJPEG transport readiness for a single feed."""
-
-    enabled: bool = True
-    ready: bool = False
-    reason: str | None = None
+    end_to_end_latency_ms: float | None = None
+    metadata_video_skew_ms: float | None = None
+    dropped_frame_ratio: float | None = None
+    health_state: Literal["ok", "warning", "error"] | None = None
+    health_reason: str | None = None
 
 
 class FeedTransportCapabilities(BaseModel):
     """Frontend-facing transport capability contract for one feed."""
 
-    backend_annotations: bool = False
     webrtc: FeedWebRTCTransportCapability = Field(default_factory=FeedWebRTCTransportCapability)
-    mjpeg: FeedMJPEGTransportCapability = Field(default_factory=FeedMJPEGTransportCapability)
 
 
 class AlertModel(BaseModel):

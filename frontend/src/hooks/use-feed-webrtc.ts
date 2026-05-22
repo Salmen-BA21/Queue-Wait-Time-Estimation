@@ -75,10 +75,14 @@ export function useFeedWebRtc({ feedId, enabled }: { feedId: string; enabled: bo
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
   const reconnectAttemptRef = useRef(0);
+  const frameCallbackIdRef = useRef<number | null>(null);
+  const statsIntervalRef = useRef<number | null>(null);
 
   const [streamReady, setStreamReady] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [playoutTimestampMs, setPlayoutTimestampMs] = useState<number | null>(null);
+  const [estimatedPlayoutTimestampMs, setEstimatedPlayoutTimestampMs] = useState<number | null>(null);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -105,8 +109,26 @@ export function useFeedWebRtc({ feedId, enabled }: { feedId: string; enabled: bo
         reconnectTimerRef.current = null;
       }
     };
+    const clearTimingCollectors = () => {
+      const video = videoRef.current;
+      if (
+        frameCallbackIdRef.current !== null
+        && video
+        && typeof video.cancelVideoFrameCallback === "function"
+      ) {
+        video.cancelVideoFrameCallback(frameCallbackIdRef.current);
+      } else if (frameCallbackIdRef.current !== null && typeof window.cancelAnimationFrame === "function") {
+        window.cancelAnimationFrame(frameCallbackIdRef.current);
+      }
+      frameCallbackIdRef.current = null;
+      if (statsIntervalRef.current !== null) {
+        window.clearInterval(statsIntervalRef.current);
+        statsIntervalRef.current = null;
+      }
+    };
 
     const cleanupPeer = () => {
+      clearTimingCollectors();
       const peer = peerRef.current;
       peerRef.current = null;
       if (peer) {
@@ -117,6 +139,53 @@ export function useFeedWebRtc({ feedId, enabled }: { feedId: string; enabled: bo
 
       mediaStreamRef.current = null;
       clearVideoStream(videoRef.current);
+      setPlayoutTimestampMs(null);
+      setEstimatedPlayoutTimestampMs(null);
+    };
+
+    const startTimingCollectors = (peer: RTCPeerConnection) => {
+      const video = videoRef.current;
+      if (!video) {
+        return;
+      }
+
+      const hasRequestVideoFrameCallback = typeof video.requestVideoFrameCallback === "function";
+      if (hasRequestVideoFrameCallback) {
+        const tick = (_now: number, metadata: VideoFrameCallbackMetadata) => {
+          setPlayoutTimestampMs(metadata.expectedDisplayTime);
+          frameCallbackIdRef.current = video.requestVideoFrameCallback(tick);
+        };
+        frameCallbackIdRef.current = video.requestVideoFrameCallback(tick);
+      } else {
+        const rafTick = () => {
+          setPlayoutTimestampMs(performance.timeOrigin + performance.now());
+          frameCallbackIdRef.current = window.requestAnimationFrame(rafTick);
+        };
+        frameCallbackIdRef.current = window.requestAnimationFrame(rafTick);
+      }
+
+      statsIntervalRef.current = window.setInterval(async () => {
+        try {
+          const stats = await peer.getStats();
+          let bestTimestampMs: number | null = null;
+          stats.forEach((report) => {
+            if (report.type !== "inbound-rtp") {
+              return;
+            }
+            const candidate = report as RTCInboundRtpStreamStats & { estimatedPlayoutTimestamp?: number };
+            if (typeof candidate.estimatedPlayoutTimestamp === "number" && Number.isFinite(candidate.estimatedPlayoutTimestamp)) {
+              if (bestTimestampMs === null || candidate.estimatedPlayoutTimestamp > bestTimestampMs) {
+                bestTimestampMs = candidate.estimatedPlayoutTimestamp;
+              }
+            }
+          });
+          if (bestTimestampMs !== null) {
+            setEstimatedPlayoutTimestampMs(bestTimestampMs);
+          }
+        } catch {
+          // Ignore stats failures; fallback timing path will remain active.
+        }
+      }, 1000);
     };
 
     const scheduleReconnect = (error: unknown) => {
@@ -152,6 +221,7 @@ export function useFeedWebRtc({ feedId, enabled }: { feedId: string; enabled: bo
         reconnectAttemptRef.current = 0;
         setConnectionError(null);
         setStreamReady(true);
+        startTimingCollectors(peer);
       };
 
       peer.onconnectionstatechange = () => {
@@ -239,5 +309,7 @@ export function useFeedWebRtc({ feedId, enabled }: { feedId: string; enabled: bo
     isConnecting,
     isSupported,
     connectionError,
+    playoutTimestampMs,
+    estimatedPlayoutTimestampMs,
   };
 }

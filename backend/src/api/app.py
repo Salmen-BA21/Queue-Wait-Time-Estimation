@@ -29,7 +29,7 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse
 
 from src import __version__
 from src.auth import (
@@ -138,7 +138,6 @@ from src.config import (
     AUTH_COOKIE_SECURE,
     AUTH_ENFORCE_API,
     AUTH_MIN_PASSWORD_LENGTH,
-    MEDIAMTX_CONTROL_API_BASE_URL,
     MEDIAMTX_WEBRTC_PREVIEW_ENABLED,
     MEDIAMTX_WEBRTC_TIMEOUT_SEC,
     MEDIAMTX_WHEP_BASE_URL,
@@ -153,11 +152,6 @@ from src.webhook_client import WebhookClient
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 UPLOAD_DIR = BACKEND_DIR / "data" / "uploads"
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv"}
-MJPEG_STREAM_IDLE_TIMEOUT_SEC = max(
-    2.0,
-    float(os.getenv("QUEUE_DASHBOARD_MJPEG_IDLE_TIMEOUT_SEC", "12.0")),
-)
-
 DEFAULT_CORS_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -300,77 +294,6 @@ def run_onvif_stream_resolution(
         ) from exc
 
     return get_rtsp_urls_from_onvif_device(device, username=username, password=password)
-
-
-def ensure_mediamtx_path_configuration(
-    *,
-    path_name: str,
-    source: str,
-    control_api_base_url: str,
-    timeout_seconds: float,
-) -> None:
-    """Ensure a MediaMTX path exists and points to the RTSP source."""
-    if not path_name.strip():
-        raise ValueError("MediaMTX path name must not be blank.")
-
-    encoded_path = quote(path_name.strip(), safe="")
-    base_url = control_api_base_url.rstrip("/")
-    patch_endpoint = f"{base_url}/v3/config/paths/patch/{encoded_path}"
-    add_endpoint = f"{base_url}/v3/config/paths/add/{encoded_path}"
-    path_payload = {
-        "source": source,
-        "sourceOnDemand": True,
-        "sourceOnDemandStartTimeout": "10s",
-        "sourceOnDemandCloseAfter": "10s",
-        "rtspTransport": "tcp",
-    }
-
-    try:
-        patch_response = requests.patch(
-            patch_endpoint,
-            json=path_payload,
-            timeout=timeout_seconds,
-        )
-    except requests.Timeout as exc:
-        raise MediaMTXConnectionError(
-            "MediaMTX Control API timed out while preparing the stream path."
-        ) from exc
-    except requests.RequestException as exc:
-        raise MediaMTXConnectionError(
-            "MediaMTX Control API could not be reached while preparing the stream path."
-        ) from exc
-
-    if patch_response.status_code == 200:
-        return
-
-    if patch_response.status_code != 404:
-        detail = extract_mediamtx_error_detail(patch_response)
-        raise MediaMTXUpstreamError(
-            status_code=patch_response.status_code,
-            detail=f"path patch failed: {detail}",
-        )
-
-    try:
-        add_response = requests.post(
-            add_endpoint,
-            json=path_payload,
-            timeout=timeout_seconds,
-        )
-    except requests.Timeout as exc:
-        raise MediaMTXConnectionError(
-            "MediaMTX Control API timed out while creating the stream path."
-        ) from exc
-    except requests.RequestException as exc:
-        raise MediaMTXConnectionError(
-            "MediaMTX Control API could not be reached while creating the stream path."
-        ) from exc
-
-    if add_response.status_code >= 400:
-        detail = extract_mediamtx_error_detail(add_response)
-        raise MediaMTXUpstreamError(
-            status_code=add_response.status_code,
-            detail=f"path creation failed: {detail}",
-        )
 
 
 def run_mediamtx_webrtc_offer(
@@ -1556,7 +1479,7 @@ async def create_feed_webrtc_offer(
     if not MEDIAMTX_WEBRTC_PREVIEW_ENABLED:
         raise HTTPException(status_code=503, detail="WebRTC preview is disabled on this backend.")
 
-    source_status, source = await get_registry().resolve_feed_webrtc_source(
+    source_status, source_or_path, status_reason = await get_registry().resolve_feed_webrtc_source(
         feed_id,
         owner_user_id=owner_user_id,
     )
@@ -1567,12 +1490,10 @@ async def create_feed_webrtc_offer(
             status_code=409,
             detail="Feed must be running before creating a WebRTC preview session.",
         )
-    if source_status == "unsupported_source":
-        raise HTTPException(
-            status_code=409,
-            detail="WebRTC preview currently supports RTSP feed sources only.",
-        )
-    if source is None:
+    if source_status == "not_ready":
+        reason = status_reason or "webrtc_not_ready"
+        raise HTTPException(status_code=409, detail=f"WebRTC transport unavailable: {reason}")
+    if source_or_path is None:
         raise HTTPException(status_code=500, detail="WebRTC source resolution failed unexpectedly.")
 
     transport = await get_registry().get_feed_transport_capabilities(
@@ -1593,14 +1514,6 @@ async def create_feed_webrtc_offer(
     path_name = build_mediamtx_path_name(webrtc_transport.path_name or feed_id)
 
     try:
-        if webrtc_transport.source_mode == "direct":
-            await asyncio.to_thread(
-                ensure_mediamtx_path_configuration,
-                path_name=path_name,
-                source=source,
-                control_api_base_url=MEDIAMTX_CONTROL_API_BASE_URL,
-                timeout_seconds=MEDIAMTX_WEBRTC_TIMEOUT_SEC,
-            )
         answer_sdp = await asyncio.to_thread(
             run_mediamtx_webrtc_offer,
             path_name=path_name,
@@ -1639,73 +1552,6 @@ async def get_feed_snapshot(
     return ApiResponse(
         data=snapshot,
         message="Feed snapshot captured successfully." if snapshot.captured else "Feed snapshot capture failed.",
-    )
-
-
-@app.get("/api/feeds/{feed_id}/stream")
-async def stream_feed(
-    feed_id: str,
-    current_user: AuthenticatedUser | None = Depends(require_manager_for_api),
-) -> StreamingResponse:
-    registry = get_registry()
-    owner_user_id = resolve_feed_owner_scope(current_user)
-    stream_status = await registry.subscribe_feed_stream(feed_id, owner_user_id=owner_user_id)
-    if stream_status == "not_found":
-        raise HTTPException(status_code=404, detail="Feed not found.")
-    if stream_status == "not_running":
-        raise HTTPException(status_code=409, detail="Feed must be running before opening the stream.")
-
-    async def iter_mjpeg():
-        last_frame_index = 0
-        no_frame_since = 0.0
-        loop = asyncio.get_running_loop()
-        try:
-            while True:
-                try:
-                    frame = await registry.next_feed_stream_frame(
-                        feed_id,
-                        after_frame_index=last_frame_index,
-                        timeout_seconds=1.5,
-                    )
-                except StopAsyncIteration:
-                    break
-
-                if frame is None:
-                    feed = await registry.get_feed(feed_id, owner_user_id=owner_user_id)
-                    if feed is None or feed.status not in {"running", "initializing"}:
-                        break
-
-                    if no_frame_since <= 0:
-                        no_frame_since = loop.time()
-                    elif (loop.time() - no_frame_since) >= MJPEG_STREAM_IDLE_TIMEOUT_SEC:
-                        # Avoid indefinitely pending multipart responses when a
-                        # feed is marked running but no frames are arriving.
-                        break
-
-                    await asyncio.sleep(0.05)
-                    continue
-
-                no_frame_since = 0.0
-                last_frame_index, jpeg_bytes = frame
-                yield (
-                    b"--frame\r\n"
-                    b"Content-Type: image/jpeg\r\n"
-                    + f"Content-Length: {len(jpeg_bytes)}\r\n\r\n".encode("ascii")
-                    + jpeg_bytes
-                    + b"\r\n"
-                )
-        finally:
-            await registry.unsubscribe_feed_stream(feed_id)
-
-    return StreamingResponse(
-        iter_mjpeg(),
-        media_type="multipart/x-mixed-replace; boundary=frame",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-            "Expires": "0",
-            "X-Accel-Buffering": "no",
-        },
     )
 
 

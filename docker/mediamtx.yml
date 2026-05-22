@@ -16,6 +16,9 @@ rtspAddress: :8554
 rtspTransports: [udp, tcp]
 rtpAddress: :8000
 rtcpAddress: :8001
+readTimeout: 20s
+writeTimeout: 20s
+writeQueueSize: 2048
 
 hls: yes
 hlsAddress: :8888
@@ -37,3 +40,11 @@ paths:
   cam_19:
     source: rtsp://admin:Datadoit_1234@192.168.1.23:554/profile2
     sourceProtocol: tcp
+  
+  test-rtsp-camera:
+    source: publisher
+    sourceOnDemand: false
+  
+  test-mp4-stream:
+    source: publisher
+    sourceOnDemand: false

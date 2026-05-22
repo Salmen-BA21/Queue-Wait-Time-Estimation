@@ -14,14 +14,18 @@ import argparse
 import json
 import logging
 import math
+import shutil
+import shlex
 import socket
 import struct
+import subprocess
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from queue import Empty, Full, Queue
 from threading import Event, Thread
+from urllib.parse import urlparse, urlunparse
 
 import cv2
 import numpy as np
@@ -39,6 +43,11 @@ from src.config import (
     DEFAULT_REALTIME_FILE_PLAYBACK,
     DASHBOARD_EVENT_EMIT_INTERVAL_SEC,
     DASHBOARD_FRAME_EMIT_INTERVAL_SEC,
+    PUBLISHED_WEBRTC_PUBLISH_ENABLED,
+    PUBLISHED_WEBRTC_RTSP_HOST,
+    PUBLISHED_WEBRTC_RTSP_PORT,
+    PUBLISHED_WEBRTC_FPS,
+    PUBLISHED_WEBRTC_FFMPEG_BINARY,
     WINDOW_NAME,
     N8N_WEBHOOK_URL,
     N8N_WEBHOOK_SECRET,
@@ -62,18 +71,31 @@ logger: logging.Logger  # assigned in main()
 class DashboardEventWriter:
     """Writes line-delimited dashboard events for the API runtime to tail."""
 
-    def __init__(self, path: str | None) -> None:
+    def __init__(self, path: str | None, frame_channel: "DashboardFrameChannelClient | None" = None) -> None:
         self._stream = None
+        self._frame_channel = frame_channel
         if path:
             event_path = Path(path)
             event_path.parent.mkdir(parents=True, exist_ok=True)
             self._stream = event_path.open("a", encoding="utf-8", buffering=1)
 
     def emit(self, event: str, payload: dict[str, object]) -> None:
+        record = {"event": event, "payload": payload}
+        
+        # Try to send via socket first (low latency)
+        if self._frame_channel is not None and self._frame_channel.configured:
+            try:
+                self._frame_channel.send_event(record)
+                # Socket send succeeded, no need for file fallback
+                return
+            except Exception:
+                # Socket send failed, fall back to file writing
+                pass
+        
+        # Fallback to file writing if socket is unavailable
         if self._stream is None:
             return
 
-        record = {"event": event, "payload": payload}
         self._stream.write(json.dumps(record) + "\n")
         self._stream.flush()
 
@@ -102,7 +124,8 @@ class DashboardFrameChannelClient:
         if self._socket is None and not self._connect():
             return
 
-        payload = struct.pack(">I", len(frame_bytes)) + frame_bytes
+        # Prepend message type byte (0x01 for frames) and length
+        payload = struct.pack(">BI", 0x01, len(frame_bytes)) + frame_bytes
         sock = self._socket
         if sock is None:
             return
@@ -110,6 +133,29 @@ class DashboardFrameChannelClient:
         try:
             sock.sendall(payload)
         except OSError:
+            self._close_socket()
+
+    def send_event(self, event_dict: dict) -> None:
+        """Send an event message over the socket channel."""
+        if not self.configured:
+            return
+
+        if self._socket is None and not self._connect():
+            return
+
+        try:
+            # Serialize event to JSON
+            event_json = json.dumps(event_dict)
+            event_bytes = event_json.encode("utf-8")
+            
+            # Prepend message type byte (0x02 for events) and length
+            payload = struct.pack(">BI", 0x02, len(event_bytes)) + event_bytes
+            sock = self._socket
+            if sock is None:
+                return
+
+            sock.sendall(payload)
+        except (OSError, UnicodeEncodeError):
             self._close_socket()
 
     def close(self) -> None:
@@ -148,6 +194,558 @@ class DashboardFrameChannelClient:
             pass
         finally:
             self._socket = None
+
+
+class PublishedWebRtcPublisher:
+    """Publish unified backend frames to a MediaMTX RTSP path using FFmpeg."""
+
+    def __init__(self, cfg: AppConfig, event_writer: DashboardEventWriter) -> None:
+        self._enabled = bool(cfg.annotated_webrtc_enable)
+        self._path = (cfg.annotated_webrtc_path or "").strip()
+        self._host = (cfg.annotated_webrtc_rtsp_host or "").strip()
+        self._port = int(cfg.annotated_webrtc_rtsp_port) if cfg.annotated_webrtc_rtsp_port else None
+        self._target_fps = max(1, int(cfg.annotated_webrtc_fps))
+        self._ffmpeg_binary = (cfg.annotated_webrtc_ffmpeg_binary or "ffmpeg").strip() or "ffmpeg"
+        self._event_writer = event_writer
+        self._process: subprocess.Popen | None = None
+        self._frame_size: tuple[int, int] | None = None
+        self._last_ready: bool | None = None
+        self._last_reason: str | None = None
+        self._last_compatibility_reason: str | None = None
+
+    @property
+    def configured(self) -> bool:
+        return self._enabled and bool(self._path and self._host and self._port)
+
+    @property
+    def path(self) -> str | None:
+        return self._path or None
+
+    @property
+    def ready(self) -> bool:
+        return self._process is not None and self._process.poll() is None
+
+    def _resolve_codec_policy(self, *, width: int, height: int) -> tuple[list[str], str | None]:
+        """Return baseline-compatible codec args and fallback reason if needed."""
+        args: list[str] = [
+            "-c:v",
+            "libx264",
+            "-profile:v",
+            "baseline",
+            "-level:v",
+            "3.1",
+            "-preset",
+            "ultrafast",  # Changed from veryfast to ultrafast for lower latency
+            "-tune",
+            "zerolatency",
+            "-pix_fmt",
+            "yuv420p",
+            "-x264-params", "bframes=0:force-cfr=1:nal-hrd=cbr",  # Force constant frame rate, no B-frames
+        ]
+        reason: str | None = None
+        if (width % 2) != 0 or (height % 2) != 0:
+            args.extend(["-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2"])
+            reason = "codec_fallback_dimension_alignment"
+        return args, reason
+
+    def start_if_needed(self, frame: np.ndarray) -> None:
+        if not self.configured:
+            if self._enabled:
+                self._emit_status(
+                    ready=False,
+                    reason="publisher_unavailable",
+                    compatibility_reason="codec_fallback_publisher_unconfigured",
+                )
+            return
+        if self.ready:
+            return
+
+        height, width = frame.shape[:2]
+        if shutil.which(self._ffmpeg_binary) is None:
+            logger.error("FFmpeg binary not found for publish pipeline: %s", self._ffmpeg_binary)
+            self._emit_status(
+                ready=False,
+                reason="publisher_unavailable",
+                compatibility_reason="codec_fallback_encoder_missing",
+            )
+            return
+        self._frame_size = (width, height)
+        command, compatibility_reason = self._build_command(width=width, height=height)
+        logger.info(f"Starting annotated WebRTC publisher: {' '.join(command)}")
+        try:
+            self._process = subprocess.Popen(
+                command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                shell=False,
+            )
+            logger.info(f"FFmpeg process started with PID {self._process.pid}")
+            
+            # Log FFmpeg stderr in a separate thread to avoid blocking
+            import threading
+            def log_ffmpeg_output():
+                if self._process and self._process.stderr:
+                    for line in iter(self._process.stderr.readline, b''):
+                        if line:
+                            logger.warning(f"FFmpeg: {line.decode('utf-8', errors='ignore').strip()}")
+            
+            stderr_thread = threading.Thread(target=log_ffmpeg_output, daemon=True)
+            stderr_thread.start()
+            
+        except OSError as exc:
+            logger.error(f"Failed to start FFmpeg process: {exc}")
+            self._process = None
+            self._emit_status(
+                ready=False,
+                reason="publisher_unavailable",
+                compatibility_reason="codec_fallback_encoder_missing",
+            )
+            return
+
+        if self.ready:
+            logger.info("Annotated WebRTC publisher is ready")
+            self._emit_status(ready=True, reason=None, compatibility_reason=compatibility_reason)
+        else:
+            logger.warning("Annotated WebRTC publisher started but not ready")
+            self._emit_status(
+                ready=False,
+                reason="publisher_not_ready",
+                compatibility_reason=compatibility_reason,
+            )
+
+    def send_frame(self, frame: np.ndarray) -> None:
+        if not self.configured:
+            return
+
+        self.start_if_needed(frame)
+        process = self._process
+        if process is None or process.poll() is not None:
+            self._emit_status(
+                ready=False,
+                reason="publisher_not_ready",
+                compatibility_reason=self._last_compatibility_reason,
+            )
+            return
+
+        expected_size = self._frame_size
+        if expected_size is None:
+            return
+        if (frame.shape[1], frame.shape[0]) != expected_size:
+            self.close()
+            self.start_if_needed(frame)
+            process = self._process
+            if process is None or process.poll() is not None:
+                self._emit_status(
+                    ready=False,
+                    reason="publisher_not_ready",
+                    compatibility_reason=self._last_compatibility_reason,
+                )
+                return
+
+        stdin = process.stdin
+        if stdin is None:
+            self._emit_status(
+                ready=False,
+                reason="publisher_not_ready",
+                compatibility_reason=self._last_compatibility_reason,
+            )
+            return
+
+        try:
+            stdin.write(frame.tobytes())
+            stdin.flush()
+        except (BrokenPipeError, OSError):
+            self.close()
+            self._emit_status(
+                ready=False,
+                reason="publisher_not_ready",
+                compatibility_reason=self._last_compatibility_reason,
+            )
+
+    def close(self) -> None:
+        process = self._process
+        self._process = None
+        if process is None:
+            return
+
+        try:
+            if process.stdin:
+                process.stdin.close()
+        except OSError:
+            pass
+
+        try:
+            process.terminate()
+            process.wait(timeout=2.0)
+        except Exception:
+            try:
+                process.kill()
+            except OSError:
+                pass
+
+    def _build_command(self, *, width: int, height: int) -> tuple[list[str], str | None]:
+        path = self._path.lstrip("/")
+        rtsp_url = f"rtsp://{self._host}:{self._port}/{path}"
+        codec_policy_args, compatibility_reason = self._resolve_codec_policy(width=width, height=height)
+        
+        return [
+            self._ffmpeg_binary,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-nostdin",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "bgr24",
+            "-s",
+            f"{width}x{height}",
+            "-r",
+            str(self._target_fps),
+            "-i",
+            "-",
+            "-an",
+            *codec_policy_args,
+            "-g", str(self._target_fps),  # Keyframe every 1 second
+            "-bf", "0",  # No B-frames for lower latency
+            "-f", "rtsp",
+            "-rtsp_transport", "udp",  # UDP for low latency
+            "-buffer_size", "65535",  # Increase UDP buffer
+            "-pkt_size", "1316",  # Optimal packet size for UDP
+            "-max_delay", "0",  # Minimize muxing delay
+            "-flush_packets", "1",  # Flush packets immediately
+            rtsp_url,
+        ], compatibility_reason
+
+    def _emit_status(
+        self,
+        *,
+        ready: bool,
+        reason: str | None,
+        compatibility_reason: str | None = None,
+    ) -> None:
+        if (
+            self._last_reason == reason
+            and self._last_ready == ready
+            and self._last_compatibility_reason == compatibility_reason
+        ):
+            return
+        self._last_ready = ready
+        self._last_reason = reason
+        self._last_compatibility_reason = compatibility_reason
+        logger.info(f"Emitting transport_status: ready={ready}, reason={reason}, path={self.path}")
+        self._event_writer.emit(
+            "transport_status",
+            {
+                "published_webrtc_ready": ready,
+                "published_webrtc_path": self.path,
+                "reason": reason,
+                "compatibility_reason": compatibility_reason,
+            },
+        )
+
+
+class UnifiedPublishPipeline:
+    """Single publish-path abstraction used by the worker runtime."""
+
+    def __init__(self, cfg: AppConfig, event_writer: DashboardEventWriter) -> None:
+        self._publisher = PublishedWebRtcPublisher(cfg, event_writer)
+
+    @property
+    def configured(self) -> bool:
+        return self._publisher.configured
+
+    @property
+    def ready(self) -> bool:
+        return self._publisher.ready
+
+    @property
+    def path(self) -> str | None:
+        return self._publisher.path
+
+    def emit_initial_status(self, event_writer: DashboardEventWriter) -> None:
+        if not self.configured:
+            event_writer.emit(
+                "transport_status",
+                {
+                    "published_webrtc_ready": False,
+                    "published_webrtc_path": self.path,
+                    "reason": "publisher_unavailable",
+                },
+            )
+            return
+        event_writer.emit(
+            "transport_status",
+            {
+                "published_webrtc_ready": False,
+                "published_webrtc_path": self.path,
+                "reason": "publisher_not_ready",
+            },
+        )
+
+    def publish_frame(self, frame: np.ndarray) -> None:
+        if not self.configured:
+            return
+        self._publisher.send_frame(frame)
+
+    def close(self) -> None:
+        self._publisher.close()
+
+
+# Backward-compatible internal alias during naming transition.
+AnnotatedWebRtcPublisher = PublishedWebRtcPublisher
+
+
+@dataclass(frozen=True)
+class GStreamerHybridGraphSpec:
+    """Precomputed graph details for the hybrid analyzer/publish topology."""
+
+    mode: str
+    source_kind: str
+    pipeline: str
+    command: list[str]
+    compatibility_reason: str | None = None
+
+
+class GStreamerPublishProcess:
+    """Manage a gst-launch subprocess lifecycle for publish branch."""
+
+    def __init__(self) -> None:
+        self._process: subprocess.Popen | None = None
+        self._last_error: str | None = None
+
+    @property
+    def running(self) -> bool:
+        return self._process is not None and self._process.poll() is None
+
+    @property
+    def last_error(self) -> str | None:
+        return self._last_error
+
+    def start(self, command: list[str]) -> bool:
+        self.stop()
+        try:
+            self._process = subprocess.Popen(
+                command,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                shell=False,
+            )
+        except OSError as exc:
+            self._last_error = str(exc)
+            self._process = None
+            return False
+        self._last_error = None
+        return self.running
+
+    def stop(self) -> None:
+        process = self._process
+        self._process = None
+        if process is None:
+            return
+        try:
+            process.terminate()
+            process.wait(timeout=2.0)
+        except Exception:
+            try:
+                process.kill()
+            except OSError:
+                pass
+
+    def poll(self) -> int | None:
+        if self._process is None:
+            return None
+        return self._process.poll()
+
+
+class GStreamerHybridEngine:
+    """Builds a hybrid single-ingest graph and reports availability/compatibility."""
+
+    def __init__(self, cfg: AppConfig) -> None:
+        self._cfg = cfg
+
+    @staticmethod
+    def is_available() -> bool:
+        return shutil.which("gst-launch-1.0") is not None
+
+    def _build_rtsp_source_uri(self, source_text: str) -> str:
+        parsed = urlparse(source_text)
+        if parsed.scheme.lower() != "rtsp":
+            return source_text
+        if parsed.username is not None or parsed.password is not None:
+            return source_text
+        username = (self._cfg.rtsp_username or "").strip()
+        password = (self._cfg.rtsp_password or "").strip()
+        if not username and not password:
+            return source_text
+        host = parsed.hostname or ""
+        netloc = host
+        if parsed.port is not None:
+            netloc = f"{netloc}:{parsed.port}"
+        user_part = username or ""
+        pass_part = f":{password}" if password else ""
+        netloc = f"{user_part}{pass_part}@{netloc}"
+        return urlunparse(parsed._replace(netloc=netloc))
+
+    def build_graph_spec(self, *, source: str | int, publish_path: str | None) -> GStreamerHybridGraphSpec:
+        source_text = str(source).strip()
+        source_kind = "rtsp" if source_text.lower().startswith("rtsp://") else "file_or_device"
+        path = (publish_path or "ann-feed").strip("/")
+        rtsp_target = f"rtsp://{self._cfg.annotated_webrtc_rtsp_host}:{self._cfg.annotated_webrtc_rtsp_port}/{path}"
+        latency = max(0, int(self._cfg.gstreamer_rtsp_latency_ms))
+
+        if source_kind == "rtsp":
+            source_uri = self._build_rtsp_source_uri(source_text)
+            ingest = (
+                f"rtspsrc location=\"{source_uri}\" protocols=tcp latency={latency} ! "
+                "rtph264depay ! h264parse ! avdec_h264 ! videoconvert"
+            )
+        else:
+            ingest = (
+                f"filesrc location=\"{source_text}\" ! decodebin ! videoconvert"
+                if not source_text.isdigit()
+                else f"v4l2src device=/dev/video{source_text} ! videoconvert"
+            )
+
+        graph = (
+            f"{ingest} ! tee name=t "
+            "t. ! queue leaky=downstream max-size-buffers=8 ! videoconvert ! appsink name=analyzer_sink sync=false emit-signals=true max-buffers=2 drop=true "
+            "t. ! queue ! videoconvert ! x264enc tune=zerolatency speed-preset=veryfast key-int-max=30 bframes=0 byte-stream=true "
+            "! video/x-h264,profile=baseline ! rtspclientsink protocols=tcp "
+            f"location=\"{rtsp_target}\""
+        )
+        command = ["gst-launch-1.0", "-e", *shlex.split(graph, posix=False)]
+        return GStreamerHybridGraphSpec(
+            mode="gstreamer_hybrid",
+            source_kind=source_kind,
+            pipeline=graph,
+            command=command,
+        )
+
+
+class GStreamerHybridStream:
+    """OpenCV/GStreamer capture bound to a single ingest graph with appsink."""
+
+    def __init__(self, graph_pipeline: str, fallback_fps: float = 30.0) -> None:
+        self._pipeline = graph_pipeline
+        self._cap: cv2.VideoCapture | None = None
+        self._width = 0
+        self._height = 0
+        self._fps = fallback_fps
+
+    def open(self) -> "GStreamerHybridStream":
+        self._cap = cv2.VideoCapture(self._pipeline, cv2.CAP_GSTREAMER)
+        if self._cap is None or not self._cap.isOpened():
+            raise RuntimeError("Cannot open GStreamer hybrid pipeline via OpenCV CAP_GSTREAMER.")
+        ok, frame = self._cap.read()
+        if ok and frame is not None:
+            self._height, self._width = frame.shape[:2]
+        if self._cap is not None:
+            fps_value = float(self._cap.get(cv2.CAP_PROP_FPS))
+            if fps_value > 0:
+                self._fps = fps_value
+        return self
+
+    def probe(self) -> bool:
+        cap = cv2.VideoCapture(self._pipeline, cv2.CAP_GSTREAMER)
+        ok = cap is not None and cap.isOpened()
+        if cap is not None:
+            cap.release()
+        return ok
+
+    def close(self) -> None:
+        if self._cap is not None:
+            self._cap.release()
+            self._cap = None
+
+    def __enter__(self) -> "GStreamerHybridStream":
+        return self.open()
+
+    def __exit__(self, *_exc) -> None:  # noqa: ANN001
+        self.close()
+
+    @property
+    def fps(self) -> float:
+        return self._fps
+
+    @property
+    def resolution(self) -> tuple[int, int]:
+        return (self._width, self._height)
+
+    def frames(self):
+        if self._cap is None:
+            return
+        while True:
+            ok, frame = self._cap.read()
+            if not ok or frame is None:
+                break
+            yield frame
+
+
+class PipelineEngineSelector:
+    """Resolves requested engine and emits transport diagnostics."""
+
+    def __init__(self, cfg: AppConfig, event_writer: DashboardEventWriter, publish_pipeline: UnifiedPublishPipeline) -> None:
+        self._cfg = cfg
+        self._event_writer = event_writer
+        self._publish_pipeline = publish_pipeline
+        self.selected_mode = "opencv"
+        self.compatibility_reason: str | None = None
+        self.graph_spec: GStreamerHybridGraphSpec | None = None
+        self._gst_process = GStreamerPublishProcess()
+        self._requested_mode = "opencv"
+
+    def resolve(self) -> None:
+        requested = (self._cfg.pipeline_engine or "opencv").strip().lower()
+        self._requested_mode = requested
+        if requested != "gstreamer_hybrid":
+            self.selected_mode = "opencv"
+            return
+
+        if not GStreamerHybridEngine.is_available():
+            self.selected_mode = "opencv"
+            self.compatibility_reason = "gstreamer_unavailable_fallback_opencv"
+            return
+
+        engine = GStreamerHybridEngine(self._cfg)
+        self.graph_spec = engine.build_graph_spec(
+            source=self._cfg.source,
+            publish_path=self._publish_pipeline.path,
+        )
+        self.selected_mode = "gstreamer_hybrid"
+        self.compatibility_reason = "gstreamer_authoritative_ingest"
+
+    def start_runtime(self) -> None:
+        # Authoritative ingest mode is handled by OpenCV CAP_GSTREAMER stream creation.
+        return
+
+    def tick(self) -> None:
+        return
+
+    def close(self) -> None:
+        self._gst_process.stop()
+
+    def emit_status(self) -> None:
+        if self.selected_mode == "gstreamer_hybrid":
+            published_ready = True
+            reason = None
+        else:
+            published_ready = self._publish_pipeline.ready if self._publish_pipeline.configured else False
+            reason = None if self._publish_pipeline.ready else (
+                "publisher_not_ready" if self._publish_pipeline.configured else "publisher_unavailable"
+            )
+        self._event_writer.emit(
+            "transport_status",
+            {
+                "published_webrtc_ready": published_ready,
+                "published_webrtc_path": self._publish_pipeline.path,
+                "reason": reason,
+                "compatibility_reason": self.compatibility_reason,
+                "pipeline_mode": self.selected_mode,
+                "pipeline_graph": self.graph_spec.pipeline if self.graph_spec is not None else None,
+            },
+        )
 
 
 @dataclass(frozen=True)
@@ -557,6 +1155,67 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional shared token used to authenticate the binary dashboard frame channel.",
     )
     parser.add_argument(
+        "--published-webrtc-enable",
+        "--annotated-webrtc-enable",
+        action="store_true",
+        default=PUBLISHED_WEBRTC_PUBLISH_ENABLED,
+        help=(
+            "Enable worker-side published WebRTC publishing via MediaMTX RTSP relay. "
+            f"(default: {PUBLISHED_WEBRTC_PUBLISH_ENABLED})"
+        ),
+    )
+    parser.add_argument(
+        "--published-webrtc-path",
+        "--annotated-webrtc-path",
+        type=str,
+        default=None,
+        help="MediaMTX path name used for published WebRTC relay publishing.",
+    )
+    parser.add_argument(
+        "--published-webrtc-rtsp-host",
+        "--annotated-webrtc-rtsp-host",
+        type=str,
+        default=PUBLISHED_WEBRTC_RTSP_HOST,
+        help=f"MediaMTX RTSP host for published relay publishing. (default: {PUBLISHED_WEBRTC_RTSP_HOST})",
+    )
+    parser.add_argument(
+        "--published-webrtc-rtsp-port",
+        "--annotated-webrtc-rtsp-port",
+        type=int,
+        default=PUBLISHED_WEBRTC_RTSP_PORT,
+        help=f"MediaMTX RTSP port for published relay publishing. (default: {PUBLISHED_WEBRTC_RTSP_PORT})",
+    )
+    parser.add_argument(
+        "--published-webrtc-fps",
+        "--annotated-webrtc-fps",
+        type=int,
+        default=PUBLISHED_WEBRTC_FPS,
+        help=f"Target FPS for published relay publishing. (default: {PUBLISHED_WEBRTC_FPS})",
+    )
+    parser.add_argument(
+        "--published-webrtc-ffmpeg-binary",
+        "--annotated-webrtc-ffmpeg-binary",
+        type=str,
+        default=PUBLISHED_WEBRTC_FFMPEG_BINARY,
+        help=(
+            "FFmpeg executable used for published WebRTC relay publishing. "
+            f"(default: {PUBLISHED_WEBRTC_FFMPEG_BINARY})"
+        ),
+    )
+    parser.add_argument(
+        "--pipeline-engine",
+        type=str,
+        choices=["opencv", "gstreamer_hybrid"],
+        default="opencv",
+        help="Worker ingest engine mode. (default: opencv)",
+    )
+    parser.add_argument(
+        "--gstreamer-rtsp-latency-ms",
+        type=int,
+        default=150,
+        help="Requested rtspsrc latency for GStreamer hybrid graph. (default: 150)",
+    )
+    parser.add_argument(
         "--headless",
         action="store_true",
         help="Run without opening any GUI windows (cv2.imshow). (default: False)",
@@ -616,13 +1275,52 @@ def run(cfg: AppConfig) -> None:
         image_size=cfg.detector_imgsz if cfg.detector_imgsz > 0 else None,
     )
 
-    stream = open_video_source(
-        cfg.source,
-        rtsp_username=cfg.rtsp_username,
-        rtsp_password=cfg.rtsp_password,
-        rtsp_reconnect=cfg.rtsp_reconnect if cfg.rtsp_reconnect is not None else None,
-        rtsp_transport=cfg.rtsp_transport if cfg.rtsp_transport else None,
+    webhook_client = WebhookClient(N8N_WEBHOOK_URL, webhook_secret=N8N_WEBHOOK_SECRET) if cfg.webhook_enabled else None
+    webhook_dispatcher = AsyncWebhookDispatcher(webhook_client) if webhook_client else None
+    frame_channel = DashboardFrameChannelClient(
+        host=cfg.dashboard_frame_channel_host,
+        port=cfg.dashboard_frame_channel_port,
+        token=cfg.dashboard_frame_channel_token,
     )
+    event_writer = DashboardEventWriter(cfg.events_file, frame_channel=frame_channel)
+    publish_pipeline = UnifiedPublishPipeline(cfg, event_writer)
+    engine_selector = PipelineEngineSelector(cfg, event_writer, publish_pipeline)
+    engine_selector.resolve()
+    engine_selector.start_runtime()
+    if cfg.annotated_webrtc_enable:
+        publish_pipeline.emit_initial_status(event_writer)
+    engine_selector.emit_status()
+
+    stream = None
+    if engine_selector.selected_mode == "gstreamer_hybrid" and engine_selector.graph_spec is not None:
+        try:
+            stream = GStreamerHybridStream(engine_selector.graph_spec.pipeline)
+        except RuntimeError:
+            stream = None
+    if stream is None:
+        if engine_selector.selected_mode == "gstreamer_hybrid":
+            engine_selector.selected_mode = "opencv"
+            engine_selector.compatibility_reason = "gstreamer_launch_failed_fallback_ffmpeg"
+            engine_selector.emit_status()
+        stream = open_video_source(
+            cfg.source,
+            rtsp_username=cfg.rtsp_username,
+            rtsp_password=cfg.rtsp_password,
+            rtsp_reconnect=cfg.rtsp_reconnect if cfg.rtsp_reconnect is not None else None,
+            rtsp_transport=cfg.rtsp_transport if cfg.rtsp_transport else None,
+        )
+    elif isinstance(stream, GStreamerHybridStream) and not stream.probe():
+        engine_selector.selected_mode = "opencv"
+        engine_selector.compatibility_reason = "gstreamer_launch_failed_fallback_ffmpeg"
+        engine_selector.emit_status()
+        stream = open_video_source(
+            cfg.source,
+            rtsp_username=cfg.rtsp_username,
+            rtsp_password=cfg.rtsp_password,
+            rtsp_reconnect=cfg.rtsp_reconnect if cfg.rtsp_reconnect is not None else None,
+            rtsp_transport=cfg.rtsp_transport if cfg.rtsp_transport else None,
+        )
+
     with stream:
         tracker = ObjectTracker(frame_rate=int(stream.fps))
         zone_mgr = ZoneManager(
@@ -636,14 +1334,6 @@ def run(cfg: AppConfig) -> None:
             ThresholdConfig(
                 queue_length_warning=cfg.queue_length_warning,
             )
-        )
-        webhook_client = WebhookClient(N8N_WEBHOOK_URL, webhook_secret=N8N_WEBHOOK_SECRET) if cfg.webhook_enabled else None
-        webhook_dispatcher = AsyncWebhookDispatcher(webhook_client) if webhook_client else None
-        event_writer = DashboardEventWriter(cfg.events_file)
-        frame_channel = DashboardFrameChannelClient(
-            host=cfg.dashboard_frame_channel_host,
-            port=cfg.dashboard_frame_channel_port,
-            token=cfg.dashboard_frame_channel_token,
         )
 
         # Multi-stream identity for webhook payloads; fallback to source string
@@ -693,6 +1383,8 @@ def run(cfg: AppConfig) -> None:
         detect_ms_window = 0.0
         track_ms_window = 0.0
         analyze_ms_window = 0.0
+        dashboard_encode_ms_window = 0.0
+        dashboard_emitted_frames_window = 0
 
         logger.info(
             "Entering main loop. Press 'q' to quit. (process_every_n_frames=%d, detector_imgsz=%s, realtime_file_playback=%s)",
@@ -800,9 +1492,12 @@ def run(cfg: AppConfig) -> None:
 
                 # 7. Periodic logging and event emission
                 now = time.monotonic()
+                engine_selector.tick()
                 if (
-                    cfg.dashboard_render_frames
-                    and frame_channel.configured
+                    (
+                        (cfg.dashboard_render_frames and frame_channel.configured)
+                        or publish_pipeline.configured
+                    )
                     and (now - last_dashboard_frame_time) >= DASHBOARD_FRAME_EMIT_INTERVAL_SEC
                 ):
                     if rendered_display_frame is not None:
@@ -826,16 +1521,34 @@ def run(cfg: AppConfig) -> None:
                                 fy=cfg.resize_scale,
                             )
 
-                    encoded_ok, encoded_frame = cv2.imencode(
-                        ".jpg",
-                        render_frame,
-                        [int(cv2.IMWRITE_JPEG_QUALITY), dashboard_jpeg_quality],
-                    )
-                    if encoded_ok:
-                        frame_channel.send_frame(encoded_frame.tobytes())
+                    if cfg.dashboard_render_frames and frame_channel.configured:
+                        encode_started_at = time.perf_counter()
+                        encoded_ok, encoded_frame = cv2.imencode(
+                            ".jpg",
+                            render_frame,
+                            [int(cv2.IMWRITE_JPEG_QUALITY), dashboard_jpeg_quality],
+                        )
+                        encode_elapsed_ms = (time.perf_counter() - encode_started_at) * 1000.0
+                        dashboard_encode_ms_window += encode_elapsed_ms
+                        if encoded_ok:
+                            frame_channel.send_frame(encoded_frame.tobytes())
+
+                    if publish_pipeline.configured and engine_selector.selected_mode != "gstreamer_hybrid":
+                        publish_pipeline.publish_frame(render_frame)
+
+                    dashboard_emitted_frames_window += 1
                     last_dashboard_frame_time = now
 
                 if (now - last_dashboard_event_time) >= DASHBOARD_EVENT_EMIT_INTERVAL_SEC:
+                    elapsed_window = max(now - window_started_at, 1e-6)
+                    emitted_fps = dashboard_emitted_frames_window / elapsed_window
+                    queue_age_ms = max(0.0, (now - last_dashboard_frame_time) * 1000.0)
+                    frame_age_ms = max(0.0, (time.time() - event_timestamp) * 1000.0)
+                    avg_encode_ms = (
+                        dashboard_encode_ms_window / dashboard_emitted_frames_window
+                        if dashboard_emitted_frames_window
+                        else 0.0
+                    )
 
                     event_writer.emit(
                         "metrics_update",
@@ -843,8 +1556,15 @@ def run(cfg: AppConfig) -> None:
                             "metrics": _dashboard_metrics_payload(
                                 metrics,
                                 event_timestamp,
+                                frame_count,
                                 detections,
-                            )
+                            ),
+                            "performance": {
+                                "dashboard_emit_fps": emitted_fps,
+                                "dashboard_jpeg_encode_ms": avg_encode_ms,
+                                "queue_age_ms": queue_age_ms,
+                                "end_to_end_frame_age_ms": frame_age_ms,
+                            },
                         },
                     )
                     last_dashboard_event_time = now
@@ -892,6 +1612,49 @@ def run(cfg: AppConfig) -> None:
                         avg_track_ms=avg_track_ms,
                         avg_analyze_ms=avg_analyze_ms,
                     )
+                    logger.info(
+                        "transport_perf emit_fps=%.2f encode_ms=%.2f queue_age_ms=%.2f e2e_frame_age_ms=%.2f",
+                        dashboard_emitted_frames_window / elapsed,
+                        dashboard_encode_ms_window / dashboard_emitted_frames_window if dashboard_emitted_frames_window else 0.0,
+                        max(0.0, (now - last_dashboard_frame_time) * 1000.0),
+                        max(0.0, (time.time() - event_timestamp) * 1000.0),
+                    )
+                    event_writer.emit(
+                        "transport_status",
+                        {
+                            "published_webrtc_ready": (
+                                engine_selector.selected_mode == "gstreamer_hybrid"
+                                or (publish_pipeline.ready if publish_pipeline.configured else False)
+                            ),
+                            "published_webrtc_path": publish_pipeline.path,
+                            "reason": (
+                                None
+                                if engine_selector.selected_mode == "gstreamer_hybrid"
+                                else (
+                                    None
+                                    if publish_pipeline.ready
+                                    else ("publisher_not_ready" if publish_pipeline.configured else "publisher_unavailable")
+                                )
+                            ),
+                            "compatibility_reason": engine_selector.compatibility_reason,
+                            "pipeline_mode": engine_selector.selected_mode,
+                            "pipeline_graph": (
+                                engine_selector.graph_spec.pipeline
+                                if engine_selector.graph_spec is not None
+                                else None
+                            ),
+                            "performance": {
+                                "dashboard_emit_fps": dashboard_emitted_frames_window / elapsed,
+                                "dashboard_jpeg_encode_ms": (
+                                    dashboard_encode_ms_window / dashboard_emitted_frames_window
+                                    if dashboard_emitted_frames_window
+                                    else 0.0
+                                ),
+                                "queue_age_ms": max(0.0, (now - last_dashboard_frame_time) * 1000.0),
+                                "end_to_end_frame_age_ms": max(0.0, (time.time() - event_timestamp) * 1000.0),
+                            },
+                        },
+                    )
                     last_log_time = now
                     window_started_at = now
                     last_logged_frame_count = frame_count
@@ -899,6 +1662,8 @@ def run(cfg: AppConfig) -> None:
                     detect_ms_window = 0.0
                     track_ms_window = 0.0
                     analyze_ms_window = 0.0
+                    dashboard_encode_ms_window = 0.0
+                    dashboard_emitted_frames_window = 0
 
                 # 8. Periodic webhook sending to n8n
                 if webhook_dispatcher and (now - last_webhook_time) >= WEBHOOK_SEND_INTERVAL_SEC:
@@ -921,6 +1686,8 @@ def run(cfg: AppConfig) -> None:
                 webhook_dispatcher.stop()
             if webhook_client:
                 webhook_client.close()
+            engine_selector.close()
+            publish_pipeline.close()
             event_writer.close()
             frame_channel.close()
 
@@ -1018,6 +1785,7 @@ def _log_metrics(
 def _dashboard_metrics_payload(
     m: QueueMetrics,
     timestamp: float,
+    frame_seq: int,
     detections: sv.Detections | None = None,
 ) -> dict[str, object]:
     """Convert runtime metrics into the frontend websocket contract."""
@@ -1043,6 +1811,9 @@ def _dashboard_metrics_payload(
         "service_rate": m.service_rate,
         "wait_time_seconds": m.estimated_wait_sec,
         "detections": det_list,
+        "frame_seq": frame_seq,
+        "pts_ms": timestamp * 1000.0,
+        "server_emitted_at_ms": time.time() * 1000.0,
     }
 
 
@@ -1101,6 +1872,14 @@ def main() -> None:
         dashboard_frame_channel_host=args.dashboard_frame_channel_host,
         dashboard_frame_channel_port=args.dashboard_frame_channel_port,
         dashboard_frame_channel_token=args.dashboard_frame_channel_token,
+        annotated_webrtc_enable=bool(args.published_webrtc_enable),
+        annotated_webrtc_path=args.published_webrtc_path,
+        annotated_webrtc_rtsp_host=args.published_webrtc_rtsp_host,
+        annotated_webrtc_rtsp_port=args.published_webrtc_rtsp_port,
+        annotated_webrtc_fps=max(1, int(args.published_webrtc_fps)),
+        annotated_webrtc_ffmpeg_binary=args.published_webrtc_ffmpeg_binary,
+        pipeline_engine=(args.pipeline_engine or "opencv").strip().lower(),
+        gstreamer_rtsp_latency_ms=max(0, int(args.gstreamer_rtsp_latency_ms)),
         show_tracker_ids=bool(args.show_tracker_ids),
         headless=args.headless,
     )
@@ -1111,6 +1890,8 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
 
 
 

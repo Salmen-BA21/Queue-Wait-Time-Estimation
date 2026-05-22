@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useFeedWebRtc } from "@/hooks/use-feed-webrtc";
-import { getFeedMjpegStreamUrl, resolveApiUrl, type VideoFeed } from "@/lib/api";
+import { resolveApiUrl, type VideoFeed } from "@/lib/api";
 
 export type FeedGridAction = "start" | "stop" | "restart" | "delete";
 type FeedTransportState =
@@ -15,8 +15,17 @@ type FeedTransportState =
   | "worker-loading"
   | "webrtc-connecting"
   | "webrtc-live"
-  | "mjpeg-live"
   | "preview";
+
+type BufferedMetricsSample = {
+  frameSeq: number;
+  ptsMs: number;
+  serverEmittedAtMs: number;
+  detections: number[][];
+};
+
+const METADATA_BUFFER_TTL_MS = 4000;
+const OVERLAY_MAX_SKEW_MS = 120;
 
 function mapFeedStatus(status: "created" | "initializing" | "running" | "stopped" | "error") {
   if (status === "running") {
@@ -109,7 +118,6 @@ function FeedTransportSurface({
   uiStatus,
   peopleInZone,
   waitTimeSeconds,
-  detections,
   isStopping,
   onOpenViewer,
 }: {
@@ -117,36 +125,31 @@ function FeedTransportSurface({
   uiStatus: "online" | "offline" | "warning";
   peopleInZone: number;
   waitTimeSeconds: number | undefined | null;
-  detections?: number[][] | null;
   isStopping: boolean;
   onOpenViewer?: () => void;
 }) {
   const [playbackFailed, setPlaybackFailed] = useState(false);
   const [videoDims, setVideoDims] = useState<{ width: number; height: number } | null>(null);
-  const [streamAttempt, setStreamAttempt] = useState(0);
-  const [streamErrorCount, setStreamErrorCount] = useState(0);
-  const [mjpegFrameLoaded, setMjpegFrameLoaded] = useState(false);
-  const previousStatusRef = useRef(feed.status);
-  const lastForcedReconnectAtRef = useRef(0);
+  const [syncedDetections, setSyncedDetections] = useState<number[][]>([]);
+  const metadataBufferRef = useRef<BufferedMetricsSample[]>([]);
+  const lastBufferedFrameSeqRef = useRef<number | null>(null);
+  const clockOffsetMsRef = useRef<number | null>(null);
 
   useEffect(() => {
     setPlaybackFailed(false);
-    setMjpegFrameLoaded(false);
-    previousStatusRef.current = feed.status;
-    lastForcedReconnectAtRef.current = 0;
+    setSyncedDetections([]);
+    metadataBufferRef.current = [];
+    lastBufferedFrameSeqRef.current = null;
+    clockOffsetMsRef.current = null;
   }, [feed.feed_id, feed.preview_path, feed.status]);
 
   const transportActive = uiStatus !== "offline" && !isStopping;
   const hasWorkerMetrics = Boolean(feed.latest_metrics);
   const transportCapabilities = feed.transport ?? null;
   const webrtcCapability = transportCapabilities?.webrtc;
-  const backendAnnotationsActive = Boolean(
-    transportCapabilities?.backend_annotations ?? feed.latest_metrics?.backend_annotations_active,
-  );
   const canUseWebRtc = Boolean(
     webrtcCapability?.enabled
-    && webrtcCapability?.ready
-    && webrtcCapability?.source_mode !== "none",
+    && webrtcCapability?.ready,
   );
   const shouldShowWorkerLoading = transportActive
     && (feed.status === "initializing" || (feed.status === "running" && !hasWorkerMetrics));
@@ -156,107 +159,115 @@ function FeedTransportSurface({
   const {
     videoRef: webRtcVideoRef,
     streamReady: webRtcReady,
-    connectionError: webRtcConnectionError,
     isSupported: webRtcSupported,
+    playoutTimestampMs,
+    estimatedPlayoutTimestampMs,
   } = useFeedWebRtc({
     feedId: feed.feed_id,
     enabled: shouldAttemptWebRtc,
   });
   const showWebRtcFrame = shouldAttemptWebRtc && webRtcSupported && webRtcReady;
-  const shouldUseMjpegFallback = !shouldAttemptWebRtc
-    || !webRtcSupported
-    || Boolean(webRtcConnectionError);
-  const shouldUseMjpegStream = transportActive
-    && feed.status === "running"
-    && shouldUseMjpegFallback;
-  const streamUrl = shouldUseMjpegStream
-    ? `${getFeedMjpegStreamUrl(feed.feed_id)}?attempt=${streamAttempt}`
-    : null;
 
   useEffect(() => {
-    const previousStatus = previousStatusRef.current;
-    const enteredRunning = previousStatus !== "running" && feed.status === "running";
+    const metrics = feed.latest_metrics;
+    if (!metrics) {
+      return;
+    }
+    if (
+      typeof metrics.frame_seq !== "number"
+      || typeof metrics.pts_ms !== "number"
+      || typeof metrics.server_emitted_at_ms !== "number"
+      || !Array.isArray(metrics.detections)
+    ) {
+      return;
+    }
 
-    if (shouldUseMjpegStream && enteredRunning) {
-      const now = Date.now();
-      const reconnectCooldownMs = 1_500;
-      if (now - lastForcedReconnectAtRef.current >= reconnectCooldownMs) {
-        lastForcedReconnectAtRef.current = now;
-        setPlaybackFailed(false);
-        setStreamErrorCount(0);
-        setStreamAttempt((attempt) => attempt + 1);
+    if (lastBufferedFrameSeqRef.current === metrics.frame_seq) {
+      return;
+    }
+
+    lastBufferedFrameSeqRef.current = metrics.frame_seq;
+    const nowMs = performance.timeOrigin + performance.now();
+    const sample: BufferedMetricsSample = {
+      frameSeq: metrics.frame_seq,
+      ptsMs: metrics.pts_ms,
+      serverEmittedAtMs: metrics.server_emitted_at_ms,
+      detections: metrics.detections,
+    };
+
+    const measuredOffset = nowMs - metrics.server_emitted_at_ms;
+    if (Number.isFinite(measuredOffset)) {
+      const previous = clockOffsetMsRef.current;
+      clockOffsetMsRef.current = previous == null
+        ? measuredOffset
+        : (previous * 0.85) + (measuredOffset * 0.15);
+    }
+
+    metadataBufferRef.current = [
+      ...metadataBufferRef.current.filter((item) => nowMs - item.serverEmittedAtMs <= METADATA_BUFFER_TTL_MS),
+      sample,
+    ];
+  }, [feed.latest_metrics]);
+
+  useEffect(() => {
+    if (!showWebRtcFrame) {
+      setSyncedDetections([]);
+      return;
+    }
+
+    const nowMs = performance.timeOrigin + performance.now();
+    const playoutMs = estimatedPlayoutTimestampMs
+      ?? playoutTimestampMs
+      ?? (
+        clockOffsetMsRef.current != null
+          ? nowMs - clockOffsetMsRef.current
+          : null
+      );
+    if (playoutMs == null) {
+      setSyncedDetections([]);
+      return;
+    }
+
+    const samples = metadataBufferRef.current;
+    if (samples.length === 0) {
+      setSyncedDetections([]);
+      return;
+    }
+
+    let best: BufferedMetricsSample | null = null;
+    let bestSkewMs = Number.POSITIVE_INFINITY;
+    for (const sample of samples) {
+      const skew = Math.abs(sample.ptsMs - playoutMs);
+      if (skew < bestSkewMs) {
+        bestSkewMs = skew;
+        best = sample;
       }
     }
 
-    previousStatusRef.current = feed.status;
-  }, [feed.status, shouldUseMjpegStream]);
-
-  useEffect(() => {
-    if (!shouldUseMjpegStream) {
-      setStreamAttempt(0);
-      setStreamErrorCount(0);
-      setMjpegFrameLoaded(false);
-      lastForcedReconnectAtRef.current = 0;
+    if (!best || bestSkewMs > OVERLAY_MAX_SKEW_MS) {
+      setSyncedDetections([]);
       return;
     }
 
-    if (streamErrorCount === 0) {
-      return;
-    }
-
-    const retryDelayMs = Math.min(15_000, 1_000 * 2 ** Math.max(streamErrorCount - 1, 0));
-    const retryId = window.setTimeout(() => {
-      setPlaybackFailed(false);
-      setStreamAttempt((attempt) => attempt + 1);
-    }, retryDelayMs);
-
-    return () => {
-      window.clearTimeout(retryId);
-    };
-  }, [shouldUseMjpegStream, streamErrorCount]);
-
-  useEffect(() => {
-    setMjpegFrameLoaded(false);
-  }, [streamUrl]);
-
-  useEffect(() => {
-    if (!streamUrl || playbackFailed || mjpegFrameLoaded) {
-      return;
-    }
-
-    const stallId = window.setTimeout(() => {
-      setPlaybackFailed(true);
-      setStreamErrorCount((count) => count + 1);
-    }, 12_000);
-
-    return () => {
-      window.clearTimeout(stallId);
-    };
-  }, [streamUrl, playbackFailed, mjpegFrameLoaded, streamAttempt]);
+    setSyncedDetections(best.detections);
+  }, [showWebRtcFrame, estimatedPlayoutTimestampMs, playoutTimestampMs]);
 
   const previewUrl = feed.preview_path ? resolveApiUrl(feed.preview_path) : null;
-  const shouldRenderMjpegStream = Boolean(streamUrl) && !playbackFailed;
-  const showMjpegFrame = shouldRenderMjpegStream && mjpegFrameLoaded;
   const showWebRtcLoadingState = shouldAttemptWebRtc
     && !showWebRtcFrame
-    && !showMjpegFrame;
-  const showMjpegLoadingState = shouldRenderMjpegStream && !showMjpegFrame;
-  const showLoadingState = (shouldShowWorkerLoading || showWebRtcLoadingState || showMjpegLoadingState)
+    && !playbackFailed;
+  const showLoadingState = (shouldShowWorkerLoading || showWebRtcLoadingState)
     && !showWebRtcFrame
-    && !showMjpegFrame;
+    && !playbackFailed;
   const showPreview = transportActive
     && !shouldShowWorkerLoading
     && !showWebRtcFrame
-    && !showMjpegFrame
-    && !shouldRenderMjpegStream
+    && !showWebRtcLoadingState
     && Boolean(previewUrl)
     && !playbackFailed;
   const transportState: FeedTransportState = (() => {
     if (showWebRtcFrame) {
       return "webrtc-live";
-    }
-    if (showMjpegFrame) {
-      return "mjpeg-live";
     }
     if (showPreview) {
       return "preview";
@@ -269,17 +280,10 @@ function FeedTransportSurface({
     }
     return "idle";
   })();
-  const shouldSuppressClientDetectionsOnWebRtc = Boolean(
-    transportState === "webrtc-live"
-    && backendAnnotationsActive
-    && webrtcCapability?.source_mode === "annotated",
-  );
   const transportDebugLabel = (() => {
     switch (transportState) {
       case "webrtc-live":
-        return webrtcCapability?.source_mode === "annotated" ? "WEBRTC ANN" : "WEBRTC DIR";
-      case "mjpeg-live":
-        return shouldAttemptWebRtc ? "MJPEG FB" : "MJPEG";
+        return "WEBRTC";
       case "preview":
         return "PREVIEW";
       case "webrtc-connecting":
@@ -292,8 +296,6 @@ function FeedTransportSurface({
   })();
   const transportDebugBadgeClassName = transportState === "webrtc-live"
     ? "border-emerald-300/50 bg-emerald-500/20 text-emerald-100"
-    : transportState === "mjpeg-live"
-    ? "border-amber-300/50 bg-amber-500/20 text-amber-100"
     : "border-border/70 bg-background/80 text-foreground/80";
   const zonePoints = feed.zone?.points ?? [];
   const zonePolygonPoints = videoDims
@@ -305,11 +307,6 @@ function FeedTransportSurface({
   const onVideoLoad = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const video = e.currentTarget;
     setVideoDims({ width: video.videoWidth, height: video.videoHeight });
-  };
-
-  const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    const image = e.currentTarget;
-    setVideoDims({ width: image.naturalWidth, height: image.naturalHeight });
   };
 
   return (
@@ -352,59 +349,29 @@ function FeedTransportSurface({
               />
             </svg>
           )}
-        </>
-      ) : shouldRenderMjpegStream ? (
-        <>
-          <img
-            key={streamUrl}
-            className="h-full w-full object-cover"
-            src={streamUrl ?? undefined}
-            alt={`${feed.name} live frame`}
-            onLoad={(event) => {
-              setPlaybackFailed(false);
-              setStreamErrorCount(0);
-              setMjpegFrameLoaded(true);
-              onImageLoad(event);
-            }}
-            onError={() => {
-              setPlaybackFailed(true);
-              setMjpegFrameLoaded(false);
-              setStreamErrorCount((count) => count + 1);
-            }}
-          />
-          {!mjpegFrameLoaded && (
-            <div className="absolute inset-0 flex h-full w-full flex-col items-center justify-center gap-2 bg-background/70 px-4 text-center">
-              <Loader2 className="h-7 w-7 animate-spin text-primary/60" />
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground/80">
-                Preparing live stream
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                Waiting for the first analyzed frame from the backend worker.
-              </p>
-            </div>
-          )}
-          {/* Zone polygon overlay only – detection boxes are already drawn by the backend pipeline */}
-          {videoDims && zonePolygonPoints && (
-            <svg
-              className="absolute inset-0 h-full w-full pointer-events-none"
-              viewBox={`0 0 ${videoDims.width} ${videoDims.height}`}
-              preserveAspectRatio="xMidYMid slice"
-            >
-              <polygon
-                points={zonePolygonPoints}
-                className="fill-cyan-400/10 stroke-cyan-300"
-                strokeWidth={3}
-                vectorEffect="non-scaling-stroke"
+          {videoDims && syncedDetections.map((detection, index) => {
+            const [x1, y1, x2, y2] = detection;
+            if (![x1, y1, x2, y2].every((value) => Number.isFinite(value))) {
+              return null;
+            }
+            const left = Math.max(0, Math.min(videoDims.width, x1));
+            const top = Math.max(0, Math.min(videoDims.height, y1));
+            const width = Math.max(0, Math.min(videoDims.width, x2) - left);
+            const height = Math.max(0, Math.min(videoDims.height, y2) - top);
+            return (
+              <div
+                key={`${index}-${left}-${top}-${width}-${height}`}
+                data-testid="detection-box"
+                className="absolute border-2 border-lime-300/90 bg-lime-300/10"
+                style={{
+                  left: `${(left / videoDims.width) * 100}%`,
+                  top: `${(top / videoDims.height) * 100}%`,
+                  width: `${(width / videoDims.width) * 100}%`,
+                  height: `${(height / videoDims.height) * 100}%`,
+                }}
               />
-              <polyline
-                points={zonePolygonPoints}
-                className="stroke-cyan-100/70"
-                strokeWidth={1}
-                fill="none"
-                vectorEffect="non-scaling-stroke"
-              />
-            </svg>
-          )}
+            );
+          })}
         </>
       ) : transportState === "preview" ? (
         <>
@@ -543,7 +510,6 @@ function FeedGridComponent({
           const uiStatus = mapFeedStatus(feed.status);
           const peopleInZone = feed.latest_metrics?.people_in_zone ?? 0;
           const wait_time_seconds = feed.latest_metrics?.wait_time_seconds;
-          const detections = feed.latest_metrics?.detections;
           const currentAction = activeFeedAction?.feedId === feed.feed_id ? activeFeedAction.action : null;
           const isFeedActionPending = activeFeedAction?.feedId === feed.feed_id;
           const canStart = feed.status === "created" || feed.status === "stopped" || feed.status === "error";
@@ -561,7 +527,6 @@ function FeedGridComponent({
                 uiStatus={uiStatus}
                 peopleInZone={peopleInZone}
                 waitTimeSeconds={wait_time_seconds}
-                detections={detections}
                 isStopping={currentAction === "stop"}
                 onOpenViewer={() => setExpandedFeedId(feed.feed_id)}
               />
@@ -711,7 +676,6 @@ function FeedGridComponent({
               uiStatus={mapFeedStatus(expandedFeed.status)}
               peopleInZone={expandedFeed.latest_metrics?.people_in_zone ?? 0}
               waitTimeSeconds={expandedFeed.latest_metrics?.wait_time_seconds}
-              detections={expandedFeed.latest_metrics?.detections}
               isStopping={
                 activeFeedAction?.feedId === expandedFeed.feed_id && activeFeedAction.action === "stop"
               }

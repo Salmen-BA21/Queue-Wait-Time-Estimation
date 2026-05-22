@@ -108,29 +108,25 @@ export interface QueueMetrics {
   queue_stable: boolean;
   detections?: number[][] | null;
   render_frame_jpeg_base64?: string | null;
-  backend_annotations_active?: boolean;
+  frame_seq?: number | null;
+  pts_ms?: number | null;
+  server_emitted_at_ms?: number | null;
 }
-
-export type FeedWebRtcSourceMode = "annotated" | "direct" | "none";
 
 export interface FeedWebRtcTransportCapability {
   enabled: boolean;
   ready: boolean;
-  source_mode: FeedWebRtcSourceMode;
   path_name: string | null;
   reason: string | null;
-}
-
-export interface FeedMjpegTransportCapability {
-  enabled: boolean;
-  ready: boolean;
-  reason: string | null;
+  end_to_end_latency_ms?: number | null;
+  metadata_video_skew_ms?: number | null;
+  dropped_frame_ratio?: number | null;
+  health_state?: "ok" | "warning" | "error" | null;
+  health_reason?: string | null;
 }
 
 export interface FeedTransportCapabilities {
-  backend_annotations: boolean;
   webrtc: FeedWebRtcTransportCapability;
-  mjpeg: FeedMjpegTransportCapability;
 }
 
 export interface QueueAlert {
@@ -776,10 +772,6 @@ export function submitFeedWebRtcOffer(feedId: string, input: FeedWebRtcOfferInpu
 
 export function getFeedTransportCapabilities(feedId: string): Promise<FeedTransportCapabilities> {
   return fetchApi<FeedTransportCapabilities>(`/api/feeds/${feedId}/transport`);
-}
-
-export function getFeedMjpegStreamUrl(feedId: string): string {
-  return buildUrl(`/api/feeds/${feedId}/stream`);
 }
 
 export function discoverOnvifDevices(input?: ONVIFDiscoveryInput): Promise<ONVIFDevice[]> {
