@@ -675,6 +675,7 @@ def run(cfg: AppConfig) -> None:
         last_warning_message: str | None = None
         last_warning_webhook_time = 0.0
         frame_count = 0
+        frame_seq = 0
         dashboard_jpeg_quality = int(np.clip(cfg.dashboard_frame_jpeg_quality, 30, 95))
 
         last_detections: sv.Detections | None = None
@@ -836,6 +837,7 @@ def run(cfg: AppConfig) -> None:
                     last_dashboard_frame_time = now
 
                 if (now - last_dashboard_event_time) >= DASHBOARD_EVENT_EMIT_INTERVAL_SEC:
+                    frame_seq += 1
 
                     event_writer.emit(
                         "metrics_update",
@@ -844,6 +846,8 @@ def run(cfg: AppConfig) -> None:
                                 metrics,
                                 event_timestamp,
                                 detections,
+                                frame_seq=frame_seq,
+                                frame_ts_monotonic_ms=time.monotonic() * 1000.0,
                             )
                         },
                     )
@@ -1019,6 +1023,9 @@ def _dashboard_metrics_payload(
     m: QueueMetrics,
     timestamp: float,
     detections: sv.Detections | None = None,
+    *,
+    frame_seq: int | None = None,
+    frame_ts_monotonic_ms: float | None = None,
 ) -> dict[str, object]:
     """Convert runtime metrics into the frontend websocket contract."""
 
@@ -1043,6 +1050,9 @@ def _dashboard_metrics_payload(
         "service_rate": m.service_rate,
         "wait_time_seconds": m.estimated_wait_sec,
         "detections": det_list,
+        "frame_seq": frame_seq,
+        "frame_ts_monotonic_ms": frame_ts_monotonic_ms,
+        "overlay_version": 1,
     }
 
 

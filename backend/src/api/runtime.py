@@ -7,6 +7,7 @@ import base64
 import json
 import logging
 import os
+from collections import deque
 import socket
 import struct
 import subprocess
@@ -64,6 +65,8 @@ from src.config import (
     DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY,
     DEFAULT_DETECTOR_IMAGE_SIZE,
     DEFAULT_PROCESS_EVERY_N_FRAMES,
+    RTSP_WEBRTC_STRICT_MODE,
+    WEBRTC_SYNC_OVERLAY_ENABLED,
 )
 
 
@@ -330,8 +333,9 @@ class FeedFrameStreamState:
 class FeedFrameStreamManager:
     """Maintains one persistent frame buffer loop per feed for MJPEG streaming."""
 
-    def __init__(self, *, jpeg_quality: int = 80) -> None:
-        self._jpeg_quality = jpeg_quality
+    def __init__(self, *, jpeg_quality: int | None = None) -> None:
+        from src.config import MJPEG_JPEG_QUALITY_DEFAULT
+        self._jpeg_quality = jpeg_quality if jpeg_quality is not None else MJPEG_JPEG_QUALITY_DEFAULT
         self._states: dict[str, FeedFrameStreamState] = {}
         self._lock = asyncio.Lock()
 
@@ -592,13 +596,23 @@ class FeedFrameStreamManager:
         is_rtsp_source = state.source.lower().startswith("rtsp://")
         is_live_source = is_rtsp_source or state.source.isdigit()
 
-        # For file sources, throttle the capture loop to the video's native FPS so
-        # the MJPEG stream plays back at real speed and doesn't burn CPU looping.
-        frame_interval = (
-            self._fps_to_frame_interval(capture.get(cv2.CAP_PROP_FPS))
-            if not is_live_source and capture.isOpened()
-            else 0.0
-        )
+        from src.config import MJPEG_TARGET_FPS
+        from src.mjpeg_streamer import FrameEncoder, FrameRateManager
+
+        encoder = FrameEncoder(default_quality=self._jpeg_quality)
+        rate_manager = FrameRateManager(target_fps=MJPEG_TARGET_FPS)
+
+        # For file sources, throttle the capture loop using the minimum FPS between
+        # the video's native FPS and the target FPS ceiling to avoid speeding up playback.
+        if not is_live_source and capture.isOpened():
+            native_fps = capture.get(cv2.CAP_PROP_FPS)
+            if native_fps <= 0:
+                native_fps = 25.0
+            effective_fps = min(native_fps, float(MJPEG_TARGET_FPS))
+            frame_interval = 1.0 / effective_fps
+        else:
+            frame_interval = 0.0
+
         last_frame_time = time.monotonic()
 
         try:
@@ -609,7 +623,11 @@ class FeedFrameStreamManager:
                     capture.release()
                     capture = self._open_capture(state)
                     if not is_live_source and capture.isOpened():
-                        frame_interval = self._fps_to_frame_interval(capture.get(cv2.CAP_PROP_FPS))
+                        native_fps = capture.get(cv2.CAP_PROP_FPS)
+                        if native_fps <= 0:
+                            native_fps = 25.0
+                        effective_fps = min(native_fps, float(MJPEG_TARGET_FPS))
+                        frame_interval = 1.0 / effective_fps
                     continue
 
                 ok, frame = capture.read()
@@ -627,19 +645,21 @@ class FeedFrameStreamManager:
                     continue
 
                 failure_count = 0
-                encoded_ok, buffer = cv2.imencode(
-                    ".jpg",
-                    frame,
-                    [int(cv2.IMWRITE_JPEG_QUALITY), self._jpeg_quality],
-                )
-                if not encoded_ok:
+
+                # Pacing check for live sources: skip frame encoding/emission if the interval hasn't elapsed.
+                if is_live_source:
+                    if not rate_manager.should_emit():
+                        continue
+
+                encoded_frame = encoder.encode(frame)
+                if encoded_frame is None:
                     time.sleep(0.01)
                     continue
 
                 frame_height, frame_width = frame.shape[:2]
 
                 with state.condition:
-                    state.latest_frame = buffer.tobytes()
+                    state.latest_frame = encoded_frame
                     state.frame_index += 1
                     state.width = frame_width
                     state.height = frame_height
@@ -1079,6 +1099,7 @@ class FeedRecord:
     last_error: str | None = None
     last_warning: str | None = None
     last_warning_code: str | None = None
+    overlay_packets: deque[dict[str, Any]] = field(default_factory=lambda: deque(maxlen=90), repr=False)
     worker: FeedWorkerHandle | None = field(default=None, repr=False)
     session_id: int | None = None
 
@@ -1123,9 +1144,13 @@ class FeedRecord:
                     "reason": webrtc_reason,
                 },
                 "mjpeg": {
-                    "enabled": True,
+                    "enabled": not (is_rtsp_source and is_running),
                     "ready": mjpeg_ready,
-                    "reason": mjpeg_reason,
+                    "reason": (
+                        "strict_webrtc_rtsp_mode"
+                        if (is_rtsp_source and is_running)
+                        else mjpeg_reason
+                    ),
                 },
             }
         )
@@ -2229,6 +2254,18 @@ class FeedRegistry:
                 and (now_monotonic - record.last_worker_frame_at_monotonic) <= FRAME_CHANNEL_ACTIVITY_TIMEOUT_SEC
             )
             record.backend_annotations_active = backend_annotations_active
+            if WEBRTC_SYNC_OVERLAY_ENABLED:
+                frame_seq = metrics_without_frame.frame_seq
+                frame_ts = metrics_without_frame.frame_ts_monotonic_ms
+                if frame_seq is not None and frame_ts is not None:
+                    record.overlay_packets.append(
+                        {
+                            "frame_seq": int(frame_seq),
+                            "frame_ts_monotonic_ms": float(frame_ts),
+                            "timestamp": float(metrics_without_frame.timestamp),
+                            "detections": metrics_without_frame.detections,
+                        }
+                    )
             metrics_without_frame = metrics_without_frame.model_copy(
                 update={
                     "backend_annotations_active": backend_annotations_active,

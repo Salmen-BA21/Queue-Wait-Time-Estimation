@@ -324,6 +324,9 @@ class QueueMetricsModel(BaseModel):
     service_rate: float = Field(ge=0.0)
     wait_time_seconds: float | None = Field(default=None, ge=0.0)
     detections: list[list[float]] | None = None
+    frame_seq: int | None = Field(default=None, ge=0)
+    frame_ts_monotonic_ms: float | None = Field(default=None, ge=0.0)
+    overlay_version: int | None = Field(default=None, ge=1)
     render_frame_jpeg_base64: str | None = None
     backend_annotations_active: bool = False
 
@@ -374,6 +377,9 @@ class VideoFeed(BaseModel):
     name: str
     source: str
     preview_path: str | None = None
+    dashboard_frame_channel_host: str | None = None
+    dashboard_frame_channel_port: int | None = None
+    dashboard_frame_channel_token: str | None = None
     model_size: ModelSize = "n"
     status: FeedStatus
     created_at: datetime

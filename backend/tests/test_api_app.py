@@ -993,8 +993,9 @@ class TestQueueVisionApi(unittest.TestCase):
         self.assertEqual(payload["webrtc"]["source_mode"], "direct")
         self.assertEqual(payload["webrtc"]["path_name"], feed["feed_id"])
         self.assertIsNone(payload["webrtc"]["reason"])
-        self.assertTrue(payload["mjpeg"]["enabled"])
+        self.assertFalse(payload["mjpeg"]["enabled"])
         self.assertTrue(payload["mjpeg"]["ready"])
+        self.assertEqual(payload["mjpeg"]["reason"], "strict_webrtc_rtsp_mode")
 
     def test_feed_transport_reports_non_rtsp_webrtc_unavailable(self) -> None:
         response = self.client.post(

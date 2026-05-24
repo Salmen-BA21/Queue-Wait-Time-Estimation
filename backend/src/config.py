@@ -104,9 +104,86 @@ def _env_int(name: str, default: int) -> int:
 DEFAULT_REALTIME_FILE_PLAYBACK: bool = _env_flag("QUEUE_REALTIME_FILE_PLAYBACK", True)
 ID_ABSENCE_GRACE_SEC: float = max(0.0, _env_float("QUEUE_ID_ABSENCE_GRACE_SEC", 1.0))
 
-DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY: int = int(
-    os.getenv("QUEUE_DASHBOARD_JPEG_QUALITY", "70"),
-)
+# ─── MJPEG Streaming Optimization Config ───────────────────────
+_DEFAULT_FPS = 15
+_DEFAULT_QUALITY_MIN = 20
+_DEFAULT_QUALITY_MAX = 80
+_DEFAULT_QUALITY_DEF = 30
+
+MJPEG_TARGET_FPS: int = _env_int("MJPEG_TARGET_FPS", _DEFAULT_FPS)
+MJPEG_JPEG_QUALITY_MIN: int = _env_int("MJPEG_JPEG_QUALITY_MIN", _DEFAULT_QUALITY_MIN)
+MJPEG_JPEG_QUALITY_MAX: int = _env_int("MJPEG_JPEG_QUALITY_MAX", _DEFAULT_QUALITY_MAX)
+
+_raw_mjpeg_quality_def = os.getenv("MJPEG_JPEG_QUALITY_DEFAULT")
+if _raw_mjpeg_quality_def is not None:
+    try:
+        MJPEG_JPEG_QUALITY_DEFAULT = int(_raw_mjpeg_quality_def)
+    except ValueError:
+        MJPEG_JPEG_QUALITY_DEFAULT = _DEFAULT_QUALITY_DEF
+else:
+    MJPEG_JPEG_QUALITY_DEFAULT = _env_int("QUEUE_DASHBOARD_JPEG_QUALITY", _DEFAULT_QUALITY_DEF)
+
+def validate_mjpeg_config() -> None:
+    import logging
+    logger = logging.getLogger(__name__)
+    global MJPEG_TARGET_FPS, MJPEG_JPEG_QUALITY_MIN, MJPEG_JPEG_QUALITY_MAX, MJPEG_JPEG_QUALITY_DEFAULT
+
+    if MJPEG_TARGET_FPS <= 0 or MJPEG_TARGET_FPS > 60:
+        logger.warning(
+            "Invalid MJPEG_TARGET_FPS: %s. Falling back to default (%s).",
+            MJPEG_TARGET_FPS,
+            _DEFAULT_FPS,
+        )
+        MJPEG_TARGET_FPS = _DEFAULT_FPS
+
+    if MJPEG_JPEG_QUALITY_MIN < 1 or MJPEG_JPEG_QUALITY_MIN > 100:
+        logger.warning(
+            "Invalid MJPEG_JPEG_QUALITY_MIN: %s. Falling back to default (%s).",
+            MJPEG_JPEG_QUALITY_MIN,
+            _DEFAULT_QUALITY_MIN,
+        )
+        MJPEG_JPEG_QUALITY_MIN = _DEFAULT_QUALITY_MIN
+
+    if MJPEG_JPEG_QUALITY_MAX < 1 or MJPEG_JPEG_QUALITY_MAX > 100:
+        logger.warning(
+            "Invalid MJPEG_JPEG_QUALITY_MAX: %s. Falling back to default (%s).",
+            MJPEG_JPEG_QUALITY_MAX,
+            _DEFAULT_QUALITY_MAX,
+        )
+        MJPEG_JPEG_QUALITY_MAX = _DEFAULT_QUALITY_MAX
+
+    if MJPEG_JPEG_QUALITY_DEFAULT < 1 or MJPEG_JPEG_QUALITY_DEFAULT > 100:
+        logger.warning(
+            "Invalid MJPEG_JPEG_QUALITY_DEFAULT: %s. Falling back to default (%s).",
+            MJPEG_JPEG_QUALITY_DEFAULT,
+            _DEFAULT_QUALITY_DEF,
+        )
+        MJPEG_JPEG_QUALITY_DEFAULT = _DEFAULT_QUALITY_DEF
+
+    if MJPEG_JPEG_QUALITY_MIN > MJPEG_JPEG_QUALITY_MAX:
+        logger.warning(
+            "MJPEG_JPEG_QUALITY_MIN (%s) cannot exceed MJPEG_JPEG_QUALITY_MAX (%s). Resetting to default bounds (%s-%s).",
+            MJPEG_JPEG_QUALITY_MIN,
+            MJPEG_JPEG_QUALITY_MAX,
+            _DEFAULT_QUALITY_MIN,
+            _DEFAULT_QUALITY_MAX,
+        )
+        MJPEG_JPEG_QUALITY_MIN = _DEFAULT_QUALITY_MIN
+        MJPEG_JPEG_QUALITY_MAX = _DEFAULT_QUALITY_MAX
+
+    if not (MJPEG_JPEG_QUALITY_MIN <= MJPEG_JPEG_QUALITY_DEFAULT <= MJPEG_JPEG_QUALITY_MAX):
+        logger.warning(
+            "MJPEG_JPEG_QUALITY_DEFAULT (%s) is out of bounds [%s, %s]. Resetting to %s.",
+            MJPEG_JPEG_QUALITY_DEFAULT,
+            MJPEG_JPEG_QUALITY_MIN,
+            MJPEG_JPEG_QUALITY_MAX,
+            MJPEG_JPEG_QUALITY_MIN,
+        )
+        MJPEG_JPEG_QUALITY_DEFAULT = MJPEG_JPEG_QUALITY_MIN
+
+validate_mjpeg_config()
+
+DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY: int = MJPEG_JPEG_QUALITY_DEFAULT
 # Dashboard low-latency controls
 # Emit metrics/update events frequently so web overlays track detections closely.
 DASHBOARD_EVENT_EMIT_INTERVAL_SEC: float = float(
@@ -133,6 +210,8 @@ MEDIAMTX_WEBRTC_TIMEOUT_SEC: float = max(
     1.0,
     _env_float("MEDIAMTX_WEBRTC_TIMEOUT_SEC", 8.0),
 )
+RTSP_WEBRTC_STRICT_MODE: bool = _env_flag("QUEUEVISION_RTSP_WEBRTC_STRICT_MODE", False)
+WEBRTC_SYNC_OVERLAY_ENABLED: bool = _env_flag("QUEUEVISION_WEBRTC_SYNC_OVERLAY_ENABLED", False)
 
 
 # ─── RTSP Camera ──────────────────────────────────────────────

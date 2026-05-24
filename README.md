@@ -167,6 +167,21 @@ MediaMTX defaults used by the backend:
 - Control API: `http://127.0.0.1:9997`
 - RTSP relay: `rtsp://127.0.0.1:8554/<stream_name>`
 
+Working terminal flow for the RTSP camera preview:
+
+```powershell
+Set-Location "C:\Users\Salmen Ben Ammar\Desktop\Stage_PFE\backend"
+python -m scripts.launch_webrtc_preview --source "rtsp://admin:Datadoit_1234@192.168.1.23:554/profile2" --model-size s --watch
+```
+
+If you only want to launch the relay player directly:
+
+```powershell
+& "C:\Users\Salmen Ben Ammar\Desktop\Stage_PFE\.venv\Scripts\ffplay.exe" -fflags nobuffer -flags low_delay -framedrop -rtsp_transport tcp rtsp://127.0.0.1:8554/<feed_id>
+```
+
+Use the `<feed_id>` printed by the helper in the previous command.
+
 ## IP Camera Discovery
 
 The ONVIF discovery and stream-resolution helpers live in `backend/src/onvif_client.py`.

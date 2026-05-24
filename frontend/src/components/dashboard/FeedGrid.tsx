@@ -15,8 +15,11 @@ type FeedTransportState =
   | "worker-loading"
   | "webrtc-connecting"
   | "webrtc-live"
+  | "webrtc-failed"
   | "mjpeg-live"
   | "preview";
+
+const WEBRTC_SYNC_OVERLAY_ENABLED = String(import.meta.env.VITE_WEBRTC_SYNC_OVERLAY_ENABLED ?? "false").toLowerCase() === "true";
 
 function mapFeedStatus(status: "created" | "initializing" | "running" | "stopped" | "error") {
   if (status === "running") {
@@ -126,17 +129,28 @@ function FeedTransportSurface({
   const [streamAttempt, setStreamAttempt] = useState(0);
   const [streamErrorCount, setStreamErrorCount] = useState(0);
   const [mjpegFrameLoaded, setMjpegFrameLoaded] = useState(false);
+  const [syncedDetections, setSyncedDetections] = useState<number[][]>([]);
   const previousStatusRef = useRef(feed.status);
   const lastForcedReconnectAtRef = useRef(0);
+  const overlayPacketsRef = useRef<Array<{ tsMs: number; frameSeq: number; detections: number[][] }>>([]);
+  const syncOffsetMsRef = useRef<number | null>(null);
+  const syncMissCountRef = useRef(0);
+  const syncLoopRef = useRef<number | null>(null);
 
   useEffect(() => {
     setPlaybackFailed(false);
     setMjpegFrameLoaded(false);
+    setSyncedDetections([]);
     previousStatusRef.current = feed.status;
     lastForcedReconnectAtRef.current = 0;
+    overlayPacketsRef.current = [];
+    syncOffsetMsRef.current = null;
+    syncMissCountRef.current = 0;
   }, [feed.feed_id, feed.preview_path, feed.status]);
 
   const transportActive = uiStatus !== "offline" && !isStopping;
+  const isRtspSource = feed.source.trim().toLowerCase().startsWith("rtsp://");
+  const strictRtspWebRtc = isRtspSource && feed.status === "running";
   const hasWorkerMetrics = Boolean(feed.latest_metrics);
   const transportCapabilities = feed.transport ?? null;
   const webrtcCapability = transportCapabilities?.webrtc;
@@ -163,9 +177,11 @@ function FeedTransportSurface({
     enabled: shouldAttemptWebRtc,
   });
   const showWebRtcFrame = shouldAttemptWebRtc && webRtcSupported && webRtcReady;
-  const shouldUseMjpegFallback = !shouldAttemptWebRtc
+  const shouldUseMjpegFallback = !strictRtspWebRtc && (
+    !shouldAttemptWebRtc
     || !webRtcSupported
-    || Boolean(webRtcConnectionError);
+    || Boolean(webRtcConnectionError)
+  );
   const shouldUseMjpegStream = transportActive
     && feed.status === "running"
     && shouldUseMjpegFallback;
@@ -234,6 +250,105 @@ function FeedTransportSurface({
     };
   }, [streamUrl, playbackFailed, mjpegFrameLoaded, streamAttempt]);
 
+  useEffect(() => {
+    const metrics = feed.latest_metrics;
+    if (!WEBRTC_SYNC_OVERLAY_ENABLED || !metrics) {
+      return;
+    }
+    if (!Array.isArray(metrics.detections) || metrics.detections.length === 0) {
+      return;
+    }
+    if (typeof metrics.timestamp !== "number" || !Number.isFinite(metrics.timestamp)) {
+      return;
+    }
+    const frameSeq = typeof metrics.frame_seq === "number" ? metrics.frame_seq : -1;
+    const tsMs = metrics.timestamp * 1000;
+    const detections = metrics.detections.map((row) => [...row]);
+    const packet = { tsMs, frameSeq, detections };
+    const packets = overlayPacketsRef.current;
+    const last = packets[packets.length - 1];
+    if (last && packet.frameSeq >= 0 && last.frameSeq === packet.frameSeq) {
+      return;
+    }
+    packets.push(packet);
+    if (packets.length > 90) {
+      packets.shift();
+    }
+  }, [feed.latest_metrics]);
+
+  useEffect(() => {
+    if (!WEBRTC_SYNC_OVERLAY_ENABLED || !showWebRtcFrame) {
+      if (syncLoopRef.current !== null) {
+        window.cancelAnimationFrame(syncLoopRef.current);
+        syncLoopRef.current = null;
+      }
+      setSyncedDetections([]);
+      return;
+    }
+
+    const syncWindowMs = 110;
+    const maxMissBeforeHide = 5;
+    let cancelled = false;
+
+    const loop = () => {
+      if (cancelled) {
+        return;
+      }
+
+      const video = webRtcVideoRef.current;
+      const packets = overlayPacketsRef.current;
+      if (!video || packets.length === 0) {
+        syncLoopRef.current = window.requestAnimationFrame(loop);
+        return;
+      }
+
+      const latestPacket = packets[packets.length - 1];
+      const candidateOffset = latestPacket.tsMs - (video.currentTime * 1000);
+      if (Number.isFinite(candidateOffset)) {
+        const prev = syncOffsetMsRef.current;
+        syncOffsetMsRef.current = prev === null ? candidateOffset : (prev * 0.9) + (candidateOffset * 0.1);
+      }
+
+      const offset = syncOffsetMsRef.current;
+      if (offset === null) {
+        syncLoopRef.current = window.requestAnimationFrame(loop);
+        return;
+      }
+
+      const targetTs = (video.currentTime * 1000) + offset;
+      let best: (typeof packets)[number] | null = null;
+      let bestDistance = Number.POSITIVE_INFINITY;
+      for (const packet of packets) {
+        const distance = Math.abs(packet.tsMs - targetTs);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          best = packet;
+        }
+      }
+
+      if (best && bestDistance <= syncWindowMs) {
+        syncMissCountRef.current = 0;
+        setSyncedDetections(best.detections);
+      } else {
+        syncMissCountRef.current += 1;
+        if (syncMissCountRef.current >= maxMissBeforeHide) {
+          setSyncedDetections([]);
+        }
+      }
+
+      syncLoopRef.current = window.requestAnimationFrame(loop);
+    };
+
+    syncLoopRef.current = window.requestAnimationFrame(loop);
+    return () => {
+      cancelled = true;
+      if (syncLoopRef.current !== null) {
+        window.cancelAnimationFrame(syncLoopRef.current);
+        syncLoopRef.current = null;
+      }
+    };
+  }, [showWebRtcFrame, webRtcVideoRef]);
+
   const previewUrl = feed.preview_path ? resolveApiUrl(feed.preview_path) : null;
   const shouldRenderMjpegStream = Boolean(streamUrl) && !playbackFailed;
   const showMjpegFrame = shouldRenderMjpegStream && mjpegFrameLoaded;
@@ -241,6 +356,10 @@ function FeedTransportSurface({
     && !showWebRtcFrame
     && !showMjpegFrame;
   const showMjpegLoadingState = shouldRenderMjpegStream && !showMjpegFrame;
+  const showWebRtcFailedState = strictRtspWebRtc
+    && shouldAttemptWebRtc
+    && !showWebRtcFrame
+    && Boolean(webRtcConnectionError);
   const showLoadingState = (shouldShowWorkerLoading || showWebRtcLoadingState || showMjpegLoadingState)
     && !showWebRtcFrame
     && !showMjpegFrame;
@@ -254,6 +373,9 @@ function FeedTransportSurface({
   const transportState: FeedTransportState = (() => {
     if (showWebRtcFrame) {
       return "webrtc-live";
+    }
+    if (showWebRtcFailedState) {
+      return "webrtc-failed";
     }
     if (showMjpegFrame) {
       return "mjpeg-live";
@@ -280,6 +402,8 @@ function FeedTransportSurface({
         return webrtcCapability?.source_mode === "annotated" ? "WEBRTC ANN" : "WEBRTC DIR";
       case "mjpeg-live":
         return shouldAttemptWebRtc ? "MJPEG FB" : "MJPEG";
+      case "webrtc-failed":
+        return "WEBRTC ERR";
       case "preview":
         return "PREVIEW";
       case "webrtc-connecting":
@@ -352,6 +476,24 @@ function FeedTransportSurface({
               />
             </svg>
           )}
+          {videoDims && WEBRTC_SYNC_OVERLAY_ENABLED && syncedDetections.map((box, index) => {
+            const [x1, y1, x2, y2] = box;
+            const width = Math.max(0, x2 - x1);
+            const height = Math.max(0, y2 - y1);
+            return (
+              <div
+                key={`sync-box-${index}`}
+                data-testid="detection-box"
+                className="absolute border border-lime-300 bg-lime-300/10"
+                style={{
+                  left: `${(x1 / videoDims.width) * 100}%`,
+                  top: `${(y1 / videoDims.height) * 100}%`,
+                  width: `${(width / videoDims.width) * 100}%`,
+                  height: `${(height / videoDims.height) * 100}%`,
+                }}
+              />
+            );
+          })}
         </>
       ) : shouldRenderMjpegStream ? (
         <>
@@ -443,12 +585,14 @@ function FeedTransportSurface({
             </svg>
           )}
         </>
-      ) : transportState === "worker-loading" || transportState === "webrtc-connecting" ? (
+      ) : transportState === "worker-loading" || transportState === "webrtc-connecting" || transportState === "webrtc-failed" ? (
         <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-background/90 px-4 text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground/80">
             {feed.status === "initializing"
               ? "Initializing worker"
+              : transportState === "webrtc-failed"
+              ? "WebRTC connection failed"
               : transportState === "webrtc-connecting"
               ? "Connecting WebRTC"
               : "Preparing live stream"}
@@ -456,6 +600,8 @@ function FeedTransportSurface({
           <p className="text-[11px] text-muted-foreground">
             {feed.status === "initializing"
               ? "Starting model and tracker before the first analyzed frame is emitted."
+              : transportState === "webrtc-failed"
+              ? "Strict RTSP WebRTC mode is enabled for this feed. MJPEG fallback is disabled."
               : transportState === "webrtc-connecting"
               ? "Loading the latest backend frame while the live WebRTC stream is negotiated."
               : "Waiting for the first analyzed frame from the backend worker."}

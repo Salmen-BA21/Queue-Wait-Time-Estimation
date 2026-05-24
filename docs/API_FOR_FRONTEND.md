@@ -72,6 +72,11 @@ For running feeds, the dashboard should route transport in this order:
 3. If WebRTC is unavailable or connect fails, use MJPEG `/api/feeds/{feed_id}/stream`.
 4. Keep `/api/feeds/{feed_id}/snapshot` for zone workflows and non-live preview use, not as the primary steady-state live transport.
 
+Strict RTSP mode:
+
+- If backend `QUEUEVISION_RTSP_WEBRTC_STRICT_MODE=true`, RTSP running feeds can be treated as WebRTC-only by frontend policy.
+- In strict mode, backend transport may expose `mjpeg.enabled=false` with `mjpeg.reason="strict_webrtc_rtsp_mode"` for running RTSP feeds.
+
 ## Feed Endpoints
 
 | Method | Path | Request Body | Response `data` |
@@ -263,12 +268,15 @@ Common `reason` values include:
   "wait_time_seconds": 22.7,
   "queue_stable": true,
   "detections": [[12, 44, 130, 312, 0.94, 0, 53]],
+  "frame_seq": 182,
+  "frame_ts_monotonic_ms": 8320401.51,
+  "overlay_version": 1,
   "render_frame_jpeg_base64": null,
   "backend_annotations_active": false
 }
 ```
 
-`detections` and `render_frame_jpeg_base64` are optional fields.
+`detections`, `frame_seq`, `frame_ts_monotonic_ms`, and `render_frame_jpeg_base64` are optional fields.
 
 ## WebSocket Contract: `/ws/metrics`
 

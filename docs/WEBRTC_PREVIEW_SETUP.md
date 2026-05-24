@@ -32,6 +32,10 @@ These values are read by backend config:
 - `MEDIAMTX_WHEP_BASE_URL` (default: `http://127.0.0.1:8889`)
 - `MEDIAMTX_CONTROL_API_BASE_URL` (default: `http://127.0.0.1:9997`)
 - `MEDIAMTX_WEBRTC_TIMEOUT_SEC` (default: `8.0`)
+- `QUEUEVISION_RTSP_WEBRTC_STRICT_MODE` (default: `false`)  
+  When `true`, RTSP running feeds are WebRTC-only in transport capability (no MJPEG fallback selection).
+- `QUEUEVISION_WEBRTC_SYNC_OVERLAY_ENABLED` (default: `false`)  
+  Enables frame-sync metadata buffering for WebRTC overlay synchronization.
 
 ## MediaMTX Ports
 
@@ -62,6 +66,11 @@ Default ports in this repository setup:
   }
 }
 ```
+
+When `QUEUEVISION_RTSP_WEBRTC_STRICT_MODE=true`, running RTSP feeds return MJPEG capability with:
+
+- `mjpeg.enabled = false`
+- `mjpeg.reason = "strict_webrtc_rtsp_mode"`
 
 `webrtc.source_mode` values:
 
@@ -143,6 +152,32 @@ If dashboard falls back to MJPEG unexpectedly:
 1. Inspect API response status from `/api/feeds/{feed_id}/webrtc/offer`.
 2. Check browser support for `RTCPeerConnection`.
 3. Review backend logs for upstream timeout or MediaMTX errors.
+
+## Terminal-Only Launcher
+
+If you want to stay in the terminal and avoid the GUI, use the backend helper script:
+
+```powershell
+Set-Location "C:\Users\Salmen Ben Ammar\Desktop\Stage_PFE\backend"
+python -m scripts.launch_webrtc_preview --source "rtsp://admin:Datadoit_1234@192.168.1.23:554/profile2" --model-size s
+```
+
+To open the MediaMTX relay in a terminal player after the feed is ready:
+
+```powershell
+Set-Location "C:\Users\Salmen Ben Ammar\Desktop\Stage_PFE\backend"
+python -m scripts.launch_webrtc_preview --source "rtsp://admin:Datadoit_1234@192.168.1.23:554/profile2" --model-size s --watch
+```
+
+The helper creates or reuses a feed through the backend, starts it, waits for WebRTC readiness, and prints the MediaMTX URLs. It also uses the project-local ffplay copy at `.venv\Scripts\ffplay.exe` when available, so you do not need a separate system FFmpeg install.
+
+Known working playback commands:
+
+```powershell
+& "C:\Users\Salmen Ben Ammar\Desktop\Stage_PFE\.venv\Scripts\ffplay.exe" -fflags nobuffer -flags low_delay -framedrop -rtsp_transport tcp rtsp://127.0.0.1:8554/<feed_id>
+```
+
+Replace `<feed_id>` with the path name printed by the helper. It changes when the helper creates a new feed.
 
 ## Related Documents
 

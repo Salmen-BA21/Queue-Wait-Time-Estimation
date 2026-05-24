@@ -107,6 +107,9 @@ export interface QueueMetrics {
   wait_time_seconds: number | null;
   queue_stable: boolean;
   detections?: number[][] | null;
+  frame_seq?: number | null;
+  frame_ts_monotonic_ms?: number | null;
+  overlay_version?: number | null;
   render_frame_jpeg_base64?: string | null;
   backend_annotations_active?: boolean;
 }
