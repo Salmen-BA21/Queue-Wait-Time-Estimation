@@ -65,7 +65,7 @@ DEFAULT_LOG_INTERVAL_SEC: float = 5.0
 WINDOW_NAME: str = "Queue Estimation"
 DEFAULT_PROCESS_EVERY_N_FRAMES: int = max(
     1,
-    int(os.getenv("QUEUE_PROCESS_EVERY_N_FRAMES", "1")),
+    int(os.getenv("QUEUE_PROCESS_EVERY_N_FRAMES", "2")),
 )
 
 
@@ -105,7 +105,7 @@ DEFAULT_REALTIME_FILE_PLAYBACK: bool = _env_flag("QUEUE_REALTIME_FILE_PLAYBACK",
 ID_ABSENCE_GRACE_SEC: float = max(0.0, _env_float("QUEUE_ID_ABSENCE_GRACE_SEC", 1.0))
 
 DEFAULT_DASHBOARD_FRAME_JPEG_QUALITY: int = int(
-    os.getenv("QUEUE_DASHBOARD_JPEG_QUALITY", "70"),
+    os.getenv("QUEUE_DASHBOARD_JPEG_QUALITY", "50"),
 )
 # Dashboard low-latency controls
 # Emit metrics/update events frequently so web overlays track detections closely.
@@ -114,7 +114,7 @@ DASHBOARD_EVENT_EMIT_INTERVAL_SEC: float = float(
 )
 # Emit rendered dashboard frames on an independent cadence from metrics updates.
 DASHBOARD_FRAME_EMIT_INTERVAL_SEC: float = float(
-    os.getenv("QUEUE_DASHBOARD_FRAME_EMIT_INTERVAL_SEC", "0.067"),
+    os.getenv("QUEUE_DASHBOARD_FRAME_EMIT_INTERVAL_SEC", "0.033"),
 )
 # API runtime tailing interval for worker event files.
 DASHBOARD_EVENT_POLL_INTERVAL_SEC: float = float(

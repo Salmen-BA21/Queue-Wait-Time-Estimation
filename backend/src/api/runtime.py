@@ -71,7 +71,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 UPLOAD_DIR = (BACKEND_DIR / "data" / "uploads").resolve()
 RUNTIME_LOG_DIR = (BACKEND_DIR / "data" / "runtime").resolve()
 DEFAULT_LOG_LEVEL = "INFO"
-DEFAULT_RESIZE_SCALE = 0.8
+DEFAULT_RESIZE_SCALE = 0.5
 DEFAULT_WORKER_PROCESS_EVERY_N_FRAMES = max(
     1,
     int(os.getenv("QUEUE_WORKER_PROCESS_EVERY_N_FRAMES", str(DEFAULT_PROCESS_EVERY_N_FRAMES))),

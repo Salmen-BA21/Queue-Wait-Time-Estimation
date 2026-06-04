@@ -4,33 +4,17 @@
 \clearpage
 
 \section{Introduction}
-Sprint 2 expanded the project from a single local pipeline into a platform that can work with several camera sources. At this stage, the backend became responsible for camera onboarding, feed control, and live delivery, so the rest of the application could communicate with it in a more structured way.
+Sprint 2 expanded the project beyond a single local pipeline to support multiple camera sources. The backend was restructured to manage camera onboarding, feed control, and live delivery, providing a structured API that the frontend could depend on.
 
-\section{Sprint Objectives}
-This sprint had four main delivery goals:
-\begin{itemize}
-    \item make external camera sources usable inside the project,
-    \item expose feed management through a predictable API contract,
-    \item keep live delivery available through a fallback-aware transport strategy,
-    \item preserve feed state and recovery behavior across restarts.
-\end{itemize}
+\section{Sprint Objectives and Backlog}
+Sprint 2 transformed the backend from a single-pipeline script into a structured service layer capable of managing multiple camera sources, providing a reliable API for feed lifecycle operations, and delivering live streams with fallback awareness. The sprint objectives are captured in the user stories shown in Table~\ref{tab:sprint2_user_stories}, which outline manager needs for secure camera connectivity, automatic discovery, centralized feed management, and reliable live delivery.
 
-These goals are important because this sprint turns the backend into a reusable service layer rather than a one-off processing script.
-
-\section{Sprint Backlog}
-The Sprint 2 backlog separates manager-facing user stories from technical implementation tasks. User stories represent stakeholder needs and value; technical tasks are internal infrastructure concerns.
-
-\subsection{User Stories}
-The user stories in Sprint 2 represent manager needs for secure and automated camera integration, as shown in Table~\ref{tab:sprint2_user_stories}.
-
-\begin{table}[!htbp]
+\begin{table}[H]
     \centering
-    \footnotesize
-    \setlength{\tabcolsep}{3pt}
-    \renewcommand{\arraystretch}{0.88}
+    \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
     \begin{tabularx}{\textwidth}{|l|X|l|X|}
         \hline
-        User StoryID & User Story & TaskID & Task \\ \hline
+        User Story ID & User Story & Task ID & Task \\ \hline
         US2.1 & As a manager, I want IP camera streams connected securely so that live sources can be reused reliably. & T2.1 & Add authentication, transport control, reconnection, and snapshots for RTSP feeds. \\ \hline
         US2.2 & As a manager, I want cameras discovered automatically so that stream addresses do not need to be hardcoded. & T2.2 & Detect IP cameras and resolve their stream addresses. \\ \hline
         US2.3 & As a manager, I want feed management exposed through the API so that camera lifecycle actions are centralized. & T2.3 & Expose feed control, metadata handling, and diagnostic operations. \\ \hline
@@ -38,91 +22,66 @@ The user stories in Sprint 2 represent manager needs for secure and automated ca
     \end{tabularx}
     \caption{Sprint 2 user stories}
     \label{tab:sprint2_user_stories}
+    \endgroup
 \end{table}
-\normalsize
 
 \section{Design}
 
-\subsection{Sequence Diagrams}
-The Sprint 2 sequence for feed orchestration and live event distribution is illustrated in Figure~\ref{fig:sprint2_sequence}.
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.95\textwidth]{\detokenize{chapter4_sequence.pdf}}
-    \caption{Sprint 2 sequence diagram for feed orchestration and live event distribution.}
-    \label{fig:sprint2_sequence}
-\end{figure}
+\subsection{Backend Domain Model and Class Structure}
+The backend architecture organizes data entities hierarchically to support multi-manager and multi-feed scenarios while maintaining consistent state. The model structures manager accounts, feed configurations, video sessions, queue metrics, and alerts as a unified domain, where establishments parent both managers and feed configurations, and managers own feed definitions. This hierarchy ensures proper access scoping and state recovery across system restarts.
 
-The running sequence is straightforward: a frontend action reaches the backend, the feed state is updated, the worker process changes accordingly, and the new status is sent back to the live interface.
+The core entities and their relationships are illustrated in Figure~\ref{fig:sprint2_class_diagram}.
 
-\subsection{Backend Class Diagram}
-The Sprint 2 backend class diagram used by feed orchestration and persistence is shown in Figure~\ref{fig:sprint2_class_diagram}.
-\begin{figure}[H]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{\detokenize{optional_class_diagram.pdf}}
-    \caption{Sprint 2 backend class diagram showing the core entities used by feed orchestration and persistence.}
+    \caption{Sprint 2 backend class diagram showing core entities for feed orchestration and persistence.}
     \label{fig:sprint2_class_diagram}
 \end{figure}
 
-This structural view complements the sequence diagram by showing how the backend keeps manager accounts, feed configurations, video feeds, queue metrics, and alerts in a cohesive domain model. It is especially relevant in Sprint 2 because the chapter introduces authenticated API access, SQLite persistence, and feed-state recovery.
-
 \section{Implementation}
-\subsection{Camera Source Integration}
-This part of the sprint focuses on making external cameras usable inside the project. It supports:
-\begin{itemize}
-    \item handling camera credentials without exposing them in logs,
-    \item choosing between TCP and UDP transport depending on the situation,
-    \item checking the connection and capturing snapshots,
-    \item reconnecting automatically when the stream is interrupted.
-\end{itemize}
 
-The source-handling layer routes local files and webcams through one path and live camera streams through another, which keeps the source logic easier to maintain.
+\subsection{Source Integration and Camera Discovery}
+The source integration layer supports multiple input types and network scenarios through a unified abstraction. IP cameras are connected via RTSP with secure credential handling, configurable TCP/UDP transport selection, connection validation, and automatic reconnection on stream interruption. Local files and webcams are routed through separate pathways to reduce complexity in the core source layer.
 
-\subsection{Authenticated API Access}
-Sprint 2 also introduced session-aware access control in the backend API. Managers can only interact with the feeds that belong to their account, while administrators keep the broader management scope needed for account governance. The same identity context is applied to feed listing, feed creation, feed lifecycle actions, stream snapshots, and websocket subscriptions so the runtime respects the ownership rules defined earlier in the report.
+Camera discovery uses the ONVIF protocol to automatically identify cameras and retrieve stream information, eliminating hardcoded addresses. The implementation sends WS-Discovery probes over multicast UDP, processes ONVIF device responses, resolves media services, and requests RTSP URIs through SOAP calls. Streams are validated with OpenCV before registration to ensure connectivity. The workflow accommodates varying ONVIF implementations through a three-phase protocol: multicast UDP discovery, direct media service access for cameras that expose it, and device service indirection for cameras requiring capability queries first. This approach ensures robust discovery across heterogeneous camera deployments. The workflow was validated against a Digital Watchdog IP camera on a shared network.
 
-\subsection{Camera Discovery and Stream Setup}
-The camera discovery step is used to find available cameras automatically and recover their stream information. This avoids hardcoding stream addresses and makes onboarding easier when new IP cameras are added. In the implementation, this is not a generic object-detection step; it is a network-source discovery workflow based on ONVIF and RTSP. The backend sends WS-Discovery probes on the local network, extracts device metadata from ONVIF probe responses, resolves the advertised media service, requests RTSP stream URIs through ONVIF media SOAP calls, and then validates the selected stream with OpenCV before it is registered as a feed \cite{onvif_specs,rtsp_rfc2326,opencv_docs}.
+The discovery process is exposed through backend endpoints for probe-based detection, stream resolution, camera testing, and snapshot capture. Credentials are handled securely without log exposure, and transport configuration adapts to stream requirements based on network conditions and source type.
 
-In the practical setup, the workstation and the IP camera were connected to the same local network through a router, which made the device reachable for discovery and RTSP validation. The test source used during this stage was a Digital Watchdog IP camera, allowing the connectivity workflow to be validated against a real camera feed.
+The logical workflow of this discovery process is illustrated in Figure~\ref{fig:sprint2_camera_discovery_activity}.
 
-The resulting onboarding logic is summarized in Figure~\ref{fig:sprint2_camera_discovery_activity}.
-\begin{figure}[H]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.78\textwidth]{\detokenize{chapter4_camera_discovery_activity.pdf}}
-    \caption{Sprint 2 camera discovery activity diagram for ONVIF discovery, RTSP resolution, and stream validation.}
+    \caption{Camera discovery activity diagram: ONVIF discovery, RTSP resolution, and stream validation.}
     \label{fig:sprint2_camera_discovery_activity}
 \end{figure}
 
-The same flow is exposed through backend endpoints for ONVIF discovery, stream resolution, camera testing, and RTSP snapshots. Credentials are accepted as runtime inputs and are kept out of user-facing logs, while the RTSP transport option allows TCP or UDP to be selected depending on stream stability and latency needs.
+The protocol-level details are captured in Figure~\ref{fig:chapter4_onvif_protocol_sequence}, which illustrates the three-phase ONVIF sequence: multicast UDP discovery, direct media service access, and device service indirection.
 
-\subsection{API Layer and Data Contract}
-The API layer acts as the bridge between the backend services and the rest of the project. It provides structured inputs and outputs so the frontend can interact with the backend in a predictable way. The main groups of operations are:
-\begin{itemize}
-    \item feed management, including creation, listing, start, stop, restart, and deletion,
-    \item source onboarding, including RTSP checks, snapshots, and camera discovery,
-    \item metadata management for establishments and cashiers,
-    \item integration and health checks,
-    \item live transport support for real-time viewing.
-\end{itemize}
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=0.95\textwidth]{\detokenize{chapter4_onvif_protocol_sequence.pdf}}
+    \caption{ONVIF protocol sequence: WS-Discovery broadcast, direct media service resolution, and device service indirection.}
+    \label{fig:chapter4_onvif_protocol_sequence}
+\end{figure}
 
-\subsection{Live Video Delivery}
-To reduce viewing latency while still keeping a fallback path, Sprint 2 introduces a transport system that chooses the most suitable stream mode for each feed \cite{webrtc_w3c,ietf_rfc8830}. The backend tells the frontend whether live viewing is ready, whether WebRTC is available, and which fallback should be used when the higher-quality path cannot start. When WebRTC is available, the backend forwards the browser offer to the media server and returns the response needed to start the stream \cite{mediamtx_docs}. If the feed does not exist, is not running, or the media service cannot answer, the backend reports the condition clearly so the frontend can switch to the fallback view instead of failing silently. The configuration stays flexible through environment settings such as the media URL, control URL, timeout, and feature flag.
 
-\subsection{Runtime Control and Live Events}
-Runtime control sits inside the API orchestration layer. It keeps track of feed state, synchronizes persistence, manages the worker lifecycle, and dispatches events to the rest of the system. The live channel publishes updates such as snapshots, feed status changes, metric updates, alert notifications, and system warnings.
+\subsection{API and Live Transport}
+The backend exposes a structured REST and WebSocket API that coordinates feed management, source onboarding, metadata operations, system integration, and live event delivery. Access control is enforced at the session level: managers interact only with feeds in their account, while administrators maintain broader account governance scope. Access rules apply consistently across all operations including feed listing, creation, lifecycle control, snapshots, and real-time subscriptions.
 
-For the video surface, the system keeps a shared fallback stream so that viewing does not break when the runtime mode changes.
+Transport selection adapts to source type to minimize latency while maintaining fallback capability. IP camera feeds prioritize WebRTC for low-latency delivery, while local MP4 files use MJPEG endpoints. The backend communicates feed readiness, source type, and preferred playback paths to the frontend. For WebRTC-capable IP feeds, the backend facilitates browser offer/response negotiation through the media server. When the preferred transport is unavailable (feed down, service unreachable), the backend reports the condition explicitly, allowing the frontend to switch to fallback views rather than timing out silently. Transport configuration is externalized through environment variables for media URL, control URL, timeout, and feature flags.
 
-\subsection{Backend Persistence Architecture}
-The backend persistence architecture is implemented in SQLite, with a schema that preserves establishments, checkout counters, feed configurations, video sessions, alerts, users, refresh sessions, and auth audit records. This storage design supports both operational recovery and historical analysis, while the runtime layer uses it to restore stale sessions and preserve manager metadata across restarts.
+Runtime control coordinates feed state, persistence synchronization, worker lifecycle management, and event dispatch through the live channel, which broadcasts snapshots, feed status changes, metric updates, alerts, and warnings. For local MP4 videos, a shared MJPEG stream ensures viewing continuity during runtime mode transitions.
 
-\subsection{Persistence and Recovery}
-The persistence layer stores feed configuration, metadata, video sessions, and archived alerts in SQLite. When the backend starts, it reloads saved feeds and safely resets any stale running sessions so the system begins from a consistent state.
+\subsection{Persistence, State Recovery, and System Resilience}
+The persistence layer uses SQLite to maintain establishments, managers, feed configurations, video sessions, alert history, and system state. The schema organizes entities hierarchically—establishments parent both managers and feed configurations; managers own feed definitions; sessions link back to establishments—ensuring proper access scoping and state isolation across restarts.
+
+On startup, the persistence layer reloads saved feed definitions and resets any open sessions to a consistent state. This recovery mechanism prevents orphaned sessions and ensures feeds restore to their last known configuration without state inconsistency. The key architectural insight is that reliable connectivity extends beyond reaching a camera to maintaining application state across stream failures, transport mode switches, and system restarts. By explicitly managing recovery state and fallback conditions, the sprint ensured the backend could tolerate transient failures and resume operation reliably, a requirement critical for operational deployments.
 
 \section{Conclusion}
-By the end of Sprint 2, the backend could onboard cameras, manage feed state, and send live updates to the frontend without depending on hardcoded source details. That made the web UI work in Sprint 3 much easier to integrate.
+Sprint 2 transformed the backend into a structured service layer capable of discovering and managing multiple camera sources, maintaining consistent feed state, and delivering live events reliably to the frontend. The sprint addressed three critical challenges: integrating heterogeneous camera types through ONVIF discovery and RTSP connectivity, maintaining access control and state consistency across multi-manager deployments, and implementing transport fallback strategies that ensure live delivery resilience.
 
-\section{Sprint Retrospective}
-This sprint clarified the role of the backend as the integration hub. It now handles camera identity, live transport, recovery, metadata, and state synchronization in one place, which reduces coupling in the rest of the system.
+The architectural achievement was recognizing that backend reliability requires more than connectivity—it demands explicit state recovery, transport flexibility, and graceful degradation when preferred transport becomes unavailable. By embedding these capabilities into the core backend design, Sprint 2 established a foundation that enabled straightforward frontend integration and positioned the system for operational deployment.
 
-The main lesson is that connectivity is not only about reaching the camera. It is also about preserving a usable application state when streams fail, restart, or need to switch transport modes.
+

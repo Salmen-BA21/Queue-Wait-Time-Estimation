@@ -6,7 +6,7 @@
 \section{Introduction}
 This chapter situates the Queue Wait-Time Estimation System in its operational and organizational context. It explains why queue monitoring remains important for service organizations and why a complete technical solution is needed instead of isolated counting tools.
 
-It also sets the baseline used throughout the report: the collaboration with DataDoIt, the problem statement, the comparison with existing approaches, the solution scope, and the Scrum organization of the work. These points matter because the later technical chapters rely on them.
+It also sets the baseline used throughout the report: the collaboration with DataDoIt, the problem statement, the comparison with existing approaches, the solution scope, and the Scrum organization of the work.
 
 \section{Host Organization}
 
@@ -14,27 +14,14 @@ It also sets the baseline used throughout the report: the collaboration with Dat
 This end-of-studies project was carried out with DataDoIt, a data-driven sustainability consulting firm headquartered at Elghazal Technopark in Tunis, Tunisia. DataDoIt works on projects that connect data science and sustainability for governments, municipalities, and enterprises across the EMEA region. Its services cover decarbonization strategy, ESG reporting, smart resource analytics, and circular economy implementation. The company uses the motto Measure It, Optimize It, Do It to describe a working method based on analysis, planning, and deployment. At the time of the project, it had delivered more than 15 active projects across 6 sectors, with a reported average ROI of 2.3x and a 94\% client retention rate.
 
 The collaboration provided a concrete setting for work centered on data collection, real-time monitoring, and automated analytics, and these concerns directly shaped the design and scope of the project, with the DataDoIt company logo shown in Figure~\ref{fig:datadoit_logo}.
-\begin{figure}[H]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.4\textwidth]{datadoit_logo.png}
     \caption{DataDoIt company logo}
     \label{fig:datadoit_logo}
 \end{figure}
 
-The collaboration perimeter that framed the project is summarized in Table~\ref{tab:datadoit_perimeter}.
-\begin{table}[H]
-    \centering
-    \begin{tabularx}{\textwidth}{|l|X|}
-        \hline
-        Dimension & Scope in this project \\ \hline
-        Business context & Queue management in service scenarios where waiting time and staffing decisions are operationally sensitive. \\ \hline
-        Engineering constraints & Multi-source video ingestion, variable visual conditions, low-latency monitoring, and integration with automation channels. \\ \hline
-        Expected outputs & Actionable queue indicators, wait-time estimation, and alert-ready payloads for external workflows. \\ \hline
-        Validation mode & Iterative sprint reviews using implementation evidence from backend modules, API contracts, frontend behavior, and automation tests. \\ \hline
-    \end{tabularx}
-    \caption{Collaboration perimeter with DataDoIt}
-    \label{tab:datadoit_perimeter}
-\end{table}
+The collaboration perimeter that framed the project centered on queue management in service scenarios, multi-source video ingestion, low-latency monitoring, actionable queue indicators, and iterative validation across backend, API, frontend, and automation layers.
 
 \subsection{Sectors of Activity}
 DataDoIt delivers sustainability solutions across six mission-critical sectors where data-driven environmental performance has direct operational and financial implications:
@@ -52,7 +39,7 @@ DataDoIt delivers sustainability solutions across six mission-critical sectors w
 \subsection{Project Context}
 Manual queue supervision is often subjective, hard to scale, and dependent on continuous attention. In many settings, teams react only after congestion appears instead of anticipating it with measurable indicators.
 
-This project addresses that gap by turning camera streams into decision-oriented telemetry. The target output is not limited to occupancy counts, but includes people in zone, arrival rate, service rate, adaptive wait-time estimates, and alert states that can be consumed by monitoring and automation layers.
+This project addresses that gap by turning camera streams into decision-oriented telemetry. The target output includes people in zone, arrival rate, service rate, adaptive wait-time estimates, and alert states for monitoring and automation layers.
 
 \subsection{Problem Statement}
 Current operational practices and basic counting tools still have recurring limitations:
@@ -63,9 +50,10 @@ Current operational practices and basic counting tools still have recurring limi
     \item they are often disconnected from automated response workflows.
 \end{itemize}
 
-As a result, interventions such as staff reallocation, lane opening, or escalation can be delayed or triggered on incomplete signals. The problem is therefore both analytical and integration-related: it is not enough to produce robust indicators; they also need to be delivered through actionable channels, and Table~\ref{tab:painpoint_to_requirement} maps these pain points to system-level requirements.
-\begin{table}[!htbp]
+As a result, interventions such as staff reallocation, lane opening, or escalation can be delayed or triggered on incomplete signals. The problem is both analytical and integration-related, and Table~\ref{tab:painpoint_to_requirement} maps these pain points to system-level requirements.
+\begin{table}[H]
     \centering
+    \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
     \begin{tabularx}{\textwidth}{|X|X|X|}
         \hline
         Observed pain point & Operational impact & Required system capability \\ \hline
@@ -76,6 +64,7 @@ As a result, interventions such as staff reallocation, lane opening, or escalati
     \end{tabularx}
     \caption{From operational pain points to system-level requirements}
     \label{tab:painpoint_to_requirement}
+    \endgroup
 \end{table}
 
 \subsection{Study of Existing Approaches}
@@ -94,12 +83,10 @@ Open-source tools built on YOLO detection and tracking, such as those provided b
 
 \subsubsection{Positioning of the Proposed Solution}
 The proposed solution is positioned against the main existing approach families in Table~\ref{tab:approach_positioning}.
-\begin{table}[!htbp]
+\begin{table}[H]
     \centering
-    \footnotesize
-    \setlength{\tabcolsep}{3pt}
-    \renewcommand{\arraystretch}{0.88}
-    \begin{tabularx}{\textwidth}{|>{\raggedright\arraybackslash}p{0.34\textwidth}|>{\raggedright\arraybackslash}p{0.31\textwidth}|>{\raggedright\arraybackslash}p{0.31\textwidth}|}
+    \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
+    \begin{tabularx}{\textwidth}{|X|X|X|}
         \hline
         Approach family & Strengths & Typical limitation \\ \hline
         Queue management platforms (Waitwhile, Qminder) & Customer-facing experience, virtual queues, appointment scheduling. & Require explicit check-in; do not observe physical queues or estimate wait time from the scene. \\ \hline
@@ -110,40 +97,18 @@ The proposed solution is positioned against the main existing approach families 
     \end{tabularx}
     \caption{Positioning of the proposed solution against existing approaches}
     \label{tab:approach_positioning}
+    \endgroup
 \end{table}
 
-The proposed solution fills the gap between these families by combining open-source vision-based detection with queue-theoretic analytics, a web monitoring dashboard, and automated alert routing, all in one modular pipeline that does not require proprietary hardware or explicit customer interaction.
+The proposed solution combines open-source vision-based detection with queue-theoretic analytics, a web monitoring dashboard, and automated alert routing in one modular pipeline without proprietary hardware or explicit customer interaction.
 
-\subsection{Proposed Solution}
-The system combines perception, analytics, and integration in one modular pipeline:
-\begin{enumerate}
-    \item person detection and multi-object tracking from camera feeds,
-    \item polygon-based queue-zone filtering,
-    \item estimation of $\lambda$, $\mu$, and expected wait time,
-    \item adaptive queue-state metrics that remain interpretable under varying load,
-    \item real-time web supervision through tiered live transport (WebRTC primary, MJPEG fallback),
-    \item automation through n8n webhooks and Telegram alerts.
-\end{enumerate}
+\subsection{Proposed Solution and Project Objectives}
+The proposed system integrates perception, analytics, and integration layers in a modular architecture designed to bridge the gap between raw visual observations and actionable operational metrics. Rather than treating these domains in isolation, the architecture maps directly from camera feeds to verifiable queue-state information and automated responses.
 
-This architecture converts visual observations into operational actions while keeping each layer independently testable. Detection and tracking modules can evolve without rewriting queue formulas, and the web and automation channels can evolve without changing the core metric contract.
-
-\subsection{Objectives of the Project}
-The project objectives are to:
-\begin{enumerate}
-    \item detect and track people in real time,
-    \item count people in configurable queue zones,
-    \item estimate arrival and service rates,
-    \item compute expected wait time,
-    \item estimate wait time adaptively for operational reliability,
-    \item expose metrics through web interfaces and automation workflows.
-\end{enumerate}
-
-To keep the implementation traceable, the objectives are mapped to delivery modules and observable outputs in Table~\ref{tab:objective_traceability}.
+To establish clear traceability between the technical solution and measurable project outcomes, the objectives are mapped to delivery modules and observable outputs in Table~\ref{tab:objective_traceability}.
 \begin{table}[H]
     \centering
-    \footnotesize
-    \setlength{\tabcolsep}{3pt}
-    \renewcommand{\arraystretch}{0.88}
+    \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
     \begin{tabularx}{\textwidth}{|l|X|l|X|}
         \hline
         Objective ID & Objective & Primary module & Observable output \\ \hline
@@ -156,22 +121,13 @@ To keep the implementation traceable, the objectives are mapped to delivery modu
     \end{tabularx}
     \caption{Objective-to-module traceability}
     \label{tab:objective_traceability}
+    \endgroup
 \end{table}
 
-\subsection{Project Scope and Boundaries}
-The implementation scope covers backend perception and analytics modules, API and runtime integration, web monitoring, and external workflow automation. The report focuses on this web-first operational architecture.
+\subsection{Project Scope, Boundaries, and Stakeholders}
+The implementation scope addresses three distinct but interdependent technical domains: backend perception and analytics modules, API and runtime integration, and web-based operational interfaces. The report presentation mirrors this structure to maintain alignment between architectural decisions and validation activities.
 
-All implementation details and validation narratives are presented through the backend, web, and automation tracks to keep the scope consistent.
-
-\subsection{Target Audience}
-The system is intended for three stakeholder groups with complementary goals:
-\begin{itemize}
-    \item \textbf{Administrators}: manage manager accounts and access governance.
-    \item \textbf{Managers}: configure operational settings, monitor live queue status, react to alerts, and use indicators for staffing and service-quality planning.
-    \item \textbf{End users}: benefit indirectly from reduced waiting times and smoother service flow.
-\end{itemize}
-
-This separation is important because each group consumes different levels of abstraction, from per-feed live events to aggregated performance trends.
+The system is designed for three stakeholder groups with complementary operational responsibilities. Administrators manage account governance and access controls. Managers configure operational settings, monitor live queue status, respond to alerts, and use performance indicators for staffing and service-quality decisions. End users benefit indirectly through reduced waiting times and improved service flow. This separation reflects both organizational hierarchy and the varying levels of technical abstraction required by each stakeholder group, from per-feed real-time events to aggregated performance trends.
 
 \section{Project Management Methodology}
 
@@ -181,41 +137,19 @@ An Agile approach was selected to deliver functional increments quickly while re
 Iterative delivery made it possible to validate contracts progressively: first perception outputs, then analytical reliability, then API/runtime integration, then web usability, and finally workflow automation and hardening.
 
 \subsection{SCRUM}
-Development followed sprint-based Scrum planning with iterative validation. For report readability and implementation traceability, the work is presented as four consolidated sprint chapters that are grouped into three logical modules.
+Development followed a sprint-based Scrum methodology with iterative validation cycles. Each sprint focused on a coherent architectural or functional segment, progressing from foundational perception and analytics components through web interface development and finally to automation and system hardening. For report readability and implementation traceability, the work is presented through three logical modules that correspond to the architectural layers and their validation perspectives, as illustrated in Figure~\ref{fig:scrum_methodology}.
 
-The Scrum methodology used to organize the project is illustrated in Figure~\ref{fig:scrum_methodology}.
-\begin{figure}[H]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.9\textwidth]{\detokenize{SCRUM Methodology.jpg}}
     \caption{Scrum process used to organize the project.}
     \label{fig:scrum_methodology}
 \end{figure}
 
-\subsubsection{Module A: Backend Core (Sprints 1--2)}
-This module established the vision, analytics, and backend service backbone:
-\begin{itemize}
-    \item Sprint 1: detection, tracking, zone filtering, and queue metrics estimation,
-    \item Sprint 2: camera connectivity, backend API exposure, and live transport.
-\end{itemize}
-
-\subsubsection{Module B: Web Experience (Sprint 3)}
-This module focused on the web supervision experience:
-\begin{itemize}
-    \item Sprint 3: web design system, frontend scaffolding, live backend integration, and dashboard monitoring.
-\end{itemize}
-
-\subsubsection{Module C: Automation and Finalization (Sprint 4)}
-This module covered automation, evaluation, and project closure:
-\begin{itemize}
-    \item Sprint 4: n8n automation, Telegram alerting, evaluation, optimization, and project consolidation.
-\end{itemize}
-
-The Scrum module mapping used in this report is summarized in Table~\ref{tab:scrum_module_mapping}.
-\begin{table}[!htbp]
+The modular organization is summarized in Table~\ref{tab:scrum_module_mapping}, which maps each module to its constituent sprints, primary focus areas, and validation perspectives.
+\begin{table}[H]
     \centering
-    \footnotesize
-    \setlength{\tabcolsep}{3pt}
-    \renewcommand{\arraystretch}{0.88}
+    \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
     \begin{tabularx}{\textwidth}{|l|l|X|X|}
         \hline
         Module & Sprints & Main focus & Validation perspective \\ \hline
@@ -225,31 +159,28 @@ The Scrum module mapping used in this report is summarized in Table~\ref{tab:scr
     \end{tabularx}
     \caption{Scrum module mapping used in this report}
     \label{tab:scrum_module_mapping}
+    \endgroup
 \end{table}
 
-\subsection{Sprint Planning}
-The project followed a sprint-based Scrum structure to keep the work incremental and traceable from requirements to implementation. Each sprint focused on one coherent part of the system, and the overall plan was adjusted as the internship progressed, as detailed in Table~\ref{tab:sprint_planning}.
-\begin{table}[!htbp]
+\subsection{Sprint Planning and Execution}
+The project was structured into four iterative sprints, each with defined objectives, deliverables, and validation checkpoints. The sprint plan is summarized in Table~\ref{tab:sprint_planning}, which details the timeline, focus areas, and traceability to user story implementations for each sprint.
+\begin{table}[H]
     \centering
-    \footnotesize
-    \setlength{\tabcolsep}{3pt}
-    \renewcommand{\arraystretch}{1.08}
-    \begin{tabularx}{\textwidth}{|l|>{\raggedright\arraybackslash}X|c|c|c|}
+    \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
+    \begin{tabularx}{\textwidth}{|l|X|l|l|l|}
         \hline
         Sprint & Objectives & Start Date & End Date & User Story IDs \\ \hline
-        Sprint 1 & \shortstack[l]{\textbullet\ Perception and queue analytics\\\textbullet\ Detection, tracking, and zone filtering\\\textbullet\ Wait-time estimation and stability handling} & 16/02/2026 & 14/03/2026 & US1.1--US1.9 \\ \hline
-        Sprint 2 & \shortstack[l]{\textbullet\ Camera connectivity and discovery\\\textbullet\ Backend API exposure\\\textbullet\ Live transport and feed management} & 15/03/2026 & 11/04/2026 & US2.1--US2.4 \\ \hline
-        Sprint 3 & \shortstack[l]{\textbullet\ Web design system and frontend scaffolding\\\textbullet\ Live backend integration\\\textbullet\ Dashboard monitoring and role-based navigation} & 12/04/2026 & 09/05/2026 & US3.1--US3.9 \\ \hline
-        Sprint 4 & \shortstack[l]{\textbullet\ n8n automation and Telegram alerting\\\textbullet\ Testing and verification\\\textbullet\ Runtime tuning and fault tolerance} & 10/05/2026 & 06/06/2026 & US4.1--US4.7 \\ \hline
+        Sprint 1 & Perception and queue analytics, detection, tracking, and zone filtering, wait-time estimation and stability handling & 16/02/2026 & 14/03/2026 & US1.1--US1.9 \\ \hline
+        Sprint 2 & Camera connectivity and discovery, backend API exposure, live transport and feed management & 15/03/2026 & 11/04/2026 & US2.1--US2.4 \\ \hline
+        Sprint 3 & Web design system and frontend scaffolding, live backend integration, dashboard monitoring and role-based navigation & 12/04/2026 & 09/05/2026 & US3.1--US3.9 \\ \hline
+        Sprint 4 & n8n automation and Telegram alerting, testing and verification, runtime tuning and fault tolerance & 10/05/2026 & 06/06/2026 & US4.1--US4.7 \\ \hline
     \end{tabularx}
     \caption{Sprint planning used in the report}
     \label{tab:sprint_planning}
+    \endgroup
 \end{table}
 
 The detailed user stories for each sprint are presented in the backlog tables in Chapters 3 to 6.
 
-\clearpage
-
 \section{Conclusion}
-This chapter set the project context, formalized the addressed operational problem, and justified the selected delivery strategy. Chapter 2 builds on this baseline by defining the requirements, architecture constraints, and analysis artifacts used to guide implementation decisions.
-
+This chapter set the project context and justified the selected delivery strategy. Chapter 2 builds on this baseline by defining the requirements, architecture constraints, and analysis artifacts used to guide implementation decisions.

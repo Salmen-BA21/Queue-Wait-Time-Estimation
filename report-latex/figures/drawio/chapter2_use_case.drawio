@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="global-use-case" name="Global Use Case">
-        <mxGraphModel dx="473" dy="515" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="585" dy="773" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -17,7 +17,7 @@
                     <mxGeometry x="250" y="90" width="940" height="830" as="geometry"/>
                 </mxCell>
                 <mxCell id="uc_manage" value="Manage accounts" style="ellipse;whiteSpace=wrap;html=1;" parent="system" vertex="1">
-                    <mxGeometry x="120" y="90" width="190" height="80" as="geometry"/>
+                    <mxGeometry x="137.5" y="90" width="190" height="80" as="geometry"/>
                 </mxCell>
                 <mxCell id="uc_feeds" value="Configure feeds" style="ellipse;whiteSpace=wrap;html=1;" parent="system" vertex="1">
                     <mxGeometry x="120" y="215" width="235" height="80" as="geometry"/>
@@ -37,14 +37,17 @@
                 <mxCell id="uc_monitor" value="Monitor queue" style="ellipse;whiteSpace=wrap;html=1;" parent="system" vertex="1">
                     <mxGeometry x="120" y="465" width="225" height="80" as="geometry"/>
                 </mxCell>
-                <mxCell id="uc_alerts" value="Receive alerts" style="ellipse;whiteSpace=wrap;html=1;" parent="system" vertex="1">
-                    <mxGeometry x="120" y="590" width="225" height="80" as="geometry"/>
+                <mxCell id="uc_alerts" value="React to alerts" style="ellipse;whiteSpace=wrap;html=1;" parent="system" vertex="1">
+                    <mxGeometry x="110" y="590" width="225" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="uc_dispatch" value="Notify on-site operator&lt;br&gt;via Telegram" style="ellipse;whiteSpace:wrap;html=1;" parent="system" vertex="1">
+                    <mxGeometry x="520" y="575" width="240" height="95" as="geometry"/>
                 </mxCell>
                 <mxCell id="uc_trends" value="Review trends" style="ellipse;whiteSpace=wrap;html=1;" parent="system" vertex="1">
                     <mxGeometry x="120" y="715" width="235" height="80" as="geometry"/>
                 </mxCell>
                 <mxCell id="uc_auth" value="Authenticate" style="ellipse;whiteSpace=wrap;html=1;" parent="system" vertex="1">
-                    <mxGeometry x="560" y="355" width="180" height="80" as="geometry"/>
+                    <mxGeometry x="520" y="330" width="180" height="80" as="geometry"/>
                 </mxCell>
                 <mxCell id="i_auth_1" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="dashed=1;endArrow=open;endFill=0;html=1;rounded=0;" parent="system" source="uc_manage" target="uc_auth" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
@@ -58,13 +61,16 @@
                 <mxCell id="i_auth_4" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="dashed=1;endArrow=open;endFill=0;html=1;rounded=0;" parent="system" source="uc_monitor" target="uc_auth" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="uc_confirm" value="Confirm action" style="ellipse;whiteSpace=wrap;html=1;" parent="system" vertex="1">
-                    <mxGeometry x="660" y="590" width="220" height="80" as="geometry"/>
-                </mxCell>
-                <mxCell id="i_alert_confirm" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="dashed=1;endArrow=open;endFill=0;html=1;rounded=0;" parent="system" source="uc_alerts" target="uc_confirm" edge="1">
+                <mxCell id="i_auth_5" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="dashed=1;endArrow=open;endFill=0;html=1;rounded=0;" parent="system" source="uc_alerts" target="uc_auth" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="2" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="html=1;verticalAlign=bottom;labelBackgroundColor=none;endArrow=open;endFill=0;dashed=1;" edge="1" parent="system" source="uc_discover_cameras" target="uc_test_camera">
+                <mxCell id="i_auth_7" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="dashed=1;endArrow=open;endFill=0;html=1;rounded=0;" parent="system" source="uc_trends" target="uc_auth" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="i_alert_dispatch" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="dashed=1;endArrow=open;endFill=0;html=1;rounded=0;" parent="system" source="uc_alerts" target="uc_dispatch" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="2" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="html=1;verticalAlign=bottom;labelBackgroundColor=none;endArrow=open;endFill=0;dashed=1;" parent="system" source="uc_discover_cameras" target="uc_test_camera" edge="1">
                     <mxGeometry width="160" relative="1" as="geometry">
                         <mxPoint x="450" y="260" as="sourcePoint"/>
                         <mxPoint x="610" y="260" as="targetPoint"/>
@@ -89,9 +95,21 @@
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
                 <mxCell id="operator" value="Operator (On-site)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;fillColor=#f5f5f5;strokeColor=#666666;" parent="1" vertex="1">
-                    <mxGeometry x="1220" y="565" width="70" height="130" as="geometry"/>
+                    <mxGeometry x="1450" y="650" width="70" height="130" as="geometry"/>
                 </mxCell>
-                <mxCell id="a8" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=none;endFill=0;" parent="1" source="operator" target="uc_confirm" edge="1">
+                <mxCell id="telegram_bot_api" value="&amp;lt;&amp;lt;external system&amp;gt;&amp;gt;&lt;br&gt;Telegram Bot/API" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=center;verticalAlign=middle;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="1210" y="605" width="155" height="75" as="geometry"/>
+                </mxCell>
+                <mxCell id="send_alert" value="" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=none;endFill=0;" parent="1" source="uc_dispatch" target="telegram_bot_api" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="telegram_alert_group" value="" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=none;endFill=0;" parent="1" source="telegram_bot_api" target="operator" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="note_mvp" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;MVP: The system automatically sends queue alert notifications to the on-site operator through a shared Telegram group using Telegram Bot/API. The operator confirms completion manually in the Telegram group. This confirmation is not automatically captured by the application.&lt;/font&gt;" style="text;html=1;strokeColor=#666666;fillColor=#fffacd;align=center;verticalAlign=middle;rounded=1;fontSize=11;whiteSpace=wrap;" parent="1" vertex="1">
+                    <mxGeometry x="920" y="970" width="630" height="75" as="geometry"/>
+                </mxCell>
+                <mxCell id="note_connection" style="dashed=1;endArrow=open;endFill=0;html=1;rounded=0;" parent="1" source="note_mvp" target="telegram_alert_group" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
             </root>

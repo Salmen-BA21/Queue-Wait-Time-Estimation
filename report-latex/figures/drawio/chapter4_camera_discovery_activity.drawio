@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="chapter4-camera-discovery-activity" name="Page-1">
-        <mxGraphModel dx="1091" dy="1024" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="729" dy="475" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -14,27 +14,27 @@
                     <mxGeometry x="310" y="130" width="205" height="55" as="geometry"/>
                 </mxCell>
                 <mxCell id="act_probe" value="Search cameras" style="rounded=1;arcSize=50;fillColor=#ffe6cc;strokeColor=#d79b00;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
-                    <mxGeometry x="290" y="220" width="245" height="70" as="geometry"/>
+                    <mxGeometry x="302.5" y="240" width="220" height="50" as="geometry"/>
                 </mxCell>
                 <mxCell id="dec_devices" value="Cameras found?" style="rhombus;fillColor=#fff2cc;strokeColor=#d6b656;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
                     <mxGeometry x="352" y="330" width="120" height="95" as="geometry"/>
                 </mxCell>
-                <mxCell id="5" style="edgeStyle=none;html=1;" edge="1" parent="1" source="act_no_devices" target="6">
+                <mxCell id="11" style="edgeStyle=none;html=1;" edge="1" parent="1" source="act_no_devices" target="8">
                     <mxGeometry relative="1" as="geometry">
-                        <mxPoint x="172.5" y="510" as="targetPoint"/>
+                        <mxPoint x="667.5" y="580" as="targetPoint"/>
                     </mxGeometry>
                 </mxCell>
                 <mxCell id="act_no_devices" value="No cameras" style="rounded=1;arcSize=50;fillColor=#f8cecc;strokeColor=#b85450;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
-                    <mxGeometry x="85" y="350" width="175" height="60" as="geometry"/>
+                    <mxGeometry x="588.5" y="347.5" width="175" height="60" as="geometry"/>
                 </mxCell>
                 <mxCell id="act_select" value="Select camera" style="rounded=1;arcSize=50;fillColor=#f5f5f5;strokeColor=#666666;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
-                    <mxGeometry x="310" y="465" width="205" height="55" as="geometry"/>
+                    <mxGeometry x="315" y="480" width="190" height="40" as="geometry"/>
                 </mxCell>
                 <mxCell id="act_credentials" value="Connect camera" style="rounded=1;arcSize=50;fillColor=#ffe6cc;strokeColor=#d79b00;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
-                    <mxGeometry x="290" y="560" width="245" height="70" as="geometry"/>
+                    <mxGeometry x="305" y="590" width="210" height="40" as="geometry"/>
                 </mxCell>
                 <mxCell id="act_media" value="Probe stream" style="rounded=1;arcSize=50;fillColor=#ffe6cc;strokeColor=#d79b00;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
-                    <mxGeometry x="290" y="670" width="245" height="70" as="geometry"/>
+                    <mxGeometry x="300" y="690" width="220" height="50" as="geometry"/>
                 </mxCell>
                 <mxCell id="act_streams" value="Get stream URL" style="rounded=1;arcSize=50;fillColor=#ffe6cc;strokeColor=#d79b00;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
                     <mxGeometry x="310" y="780" width="205" height="65" as="geometry"/>
@@ -42,35 +42,40 @@
                 <mxCell id="dec_streams" value="Stream works?" style="rhombus;fillColor=#fff2cc;strokeColor=#d6b656;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
                     <mxGeometry x="352" y="885" width="120" height="95" as="geometry"/>
                 </mxCell>
-                <mxCell id="7" style="edgeStyle=none;html=1;" edge="1" parent="1" source="act_no_streams" target="6">
-                    <mxGeometry relative="1" as="geometry"/>
+                <mxCell id="12" style="edgeStyle=none;html=1;" edge="1" parent="1" source="act_no_streams" target="8">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="580" y="700" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="580" y="625"/>
+                        </Array>
+                    </mxGeometry>
                 </mxCell>
                 <mxCell id="act_no_streams" value="No stream" style="rounded=1;arcSize=50;fillColor=#f8cecc;strokeColor=#b85450;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
-                    <mxGeometry x="80" y="897.5" width="175" height="70" as="geometry"/>
+                    <mxGeometry x="520" y="845" width="120" height="50" as="geometry"/>
                 </mxCell>
                 <mxCell id="act_test" value="Test connection" style="rounded=1;arcSize=50;fillColor=#d5e8d4;strokeColor=#82b366;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
-                    <mxGeometry x="290" y="1020" width="245" height="70" as="geometry"/>
+                    <mxGeometry x="322" y="1020" width="180" height="40" as="geometry"/>
                 </mxCell>
                 <mxCell id="dec_test" value="Test passed?" style="rhombus;fillColor=#fff2cc;strokeColor=#d6b656;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
-                    <mxGeometry x="600" y="1008" width="110" height="95" as="geometry"/>
+                    <mxGeometry x="621.25" y="992.5" width="110" height="95" as="geometry"/>
                 </mxCell>
                 <mxCell id="act_register" value="Save settings" style="rounded=1;arcSize=50;fillColor=#d5e8d4;strokeColor=#82b366;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
-                    <mxGeometry x="550" y="890" width="210" height="70" as="geometry"/>
+                    <mxGeometry x="596.25" y="912.5" width="157.5" height="40" as="geometry"/>
                 </mxCell>
                 <mxCell id="act_snapshot" value="Capture snapshot" style="rounded=1;arcSize=50;fillColor=#d5e8d4;strokeColor=#82b366;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
-                    <mxGeometry x="550" y="760" width="210" height="60" as="geometry"/>
+                    <mxGeometry x="609.5" y="790" width="133" height="35" as="geometry"/>
                 </mxCell>
-                <mxCell id="10" style="edgeStyle=none;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="act_fail_test" target="8">
+                <mxCell id="10" style="edgeStyle=none;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" parent="1" source="act_fail_test" target="8" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <Array as="points">
-                            <mxPoint x="810" y="1185"/>
+                            <mxPoint x="810" y="1165"/>
                             <mxPoint x="810" y="890"/>
                             <mxPoint x="810" y="625"/>
                         </Array>
                     </mxGeometry>
                 </mxCell>
                 <mxCell id="act_fail_test" value="Connection failed" style="rounded=1;arcSize=50;fillColor=#f8cecc;strokeColor=#b85450;html=1;whiteSpace=wrap;align=center;verticalAlign=middle;" parent="1" vertex="1">
-                    <mxGeometry x="550" y="1150" width="210" height="70" as="geometry"/>
+                    <mxGeometry x="582.5" y="1140" width="187.5" height="50" as="geometry"/>
                 </mxCell>
                 <mxCell id="edge_start" style="html=1;endArrow=block;rounded=0;" parent="1" source="start" target="act_request" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
@@ -81,10 +86,10 @@
                 <mxCell id="edge_probe_devices" style="html=1;endArrow=block;rounded=0;" parent="1" source="act_probe" target="dec_devices" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="edge_devices_no" value="No" style="html=1;endArrow=block;rounded=0;" parent="1" source="dec_devices" target="act_no_devices" edge="1">
+                <mxCell id="edge_devices_no" value="No" style="html=1;endArrow=block;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" parent="1" source="dec_devices" target="act_no_devices" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <Array as="points">
-                            <mxPoint x="260" y="378"/>
+                            <mxPoint x="560" y="378"/>
                         </Array>
                     </mxGeometry>
                 </mxCell>
@@ -103,10 +108,10 @@
                 <mxCell id="edge_streams_decision" style="html=1;endArrow=block;rounded=0;" parent="1" source="act_streams" target="dec_streams" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="edge_streams_no" value="No" style="html=1;endArrow=block;rounded=0;" parent="1" source="dec_streams" target="act_no_streams" edge="1">
+                <mxCell id="edge_streams_no" value="No" style="html=1;endArrow=block;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" parent="1" source="dec_streams" target="act_no_streams" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <Array as="points">
-                            <mxPoint x="260" y="932"/>
+                            <mxPoint x="580" y="933"/>
                         </Array>
                     </mxGeometry>
                 </mxCell>
@@ -131,11 +136,8 @@
                         <Array as="points"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="6" value="" style="ellipse;html=1;shape=endState;fillColor=strokeColor;" vertex="1" parent="1">
-                    <mxGeometry x="157.5" y="650" width="30" height="30" as="geometry"/>
-                </mxCell>
-                <mxCell id="8" value="" style="ellipse;html=1;shape=endState;fillColor=strokeColor;" vertex="1" parent="1">
-                    <mxGeometry x="640" y="610" width="30" height="30" as="geometry"/>
+                <mxCell id="8" value="" style="ellipse;html=1;shape=endState;fillColor=strokeColor;" parent="1" vertex="1">
+                    <mxGeometry x="661" y="610" width="30" height="30" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>

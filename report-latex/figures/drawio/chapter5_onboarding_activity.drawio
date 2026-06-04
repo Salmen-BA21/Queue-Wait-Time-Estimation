@@ -1,0 +1,137 @@
+<mxfile host="65bd71144e">
+    <diagram id="chapter5-onboarding-activity" name="Page-1">
+        <mxGraphModel dx="167" dy="221" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="Sprint 3: Manager Onboarding Workflow" style="text;html=1;align=center;verticalAlign=top;fontSize=16;fontStyle=1;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="350" y="10" width="300" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="initial" value="" style="ellipse;html=1;shape=ellipse;perimeter=ellipsePerimeter;whiteSpace=wrap;filled=1;fillColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="475" y="60" width="50" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="action1" value="Open Setup Wizard" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;strokeColor=#2196F3;fillColor=#BBDEFB;fontStyle=1;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="425" y="130" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_init_action1" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#000000;endArrow=block;endSize=8;" parent="1" source="initial" target="action1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="decision1" value="Source Type?" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#FF9800;fillColor=#FFE0B2;fontStyle=1;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="430" y="230" width="140" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_action1_decision1" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#000000;endArrow=block;endSize=8;" parent="1" source="action1" target="decision1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="action2a" value="Enter ONVIF IP &amp;#10;Credentials" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;strokeColor=#2196F3;fillColor=#BBDEFB;fontStyle=1;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="250" y="370" width="130" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_decision1_action2a" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#000000;endArrow=block;endSize=8;" parent="1" source="decision1" target="action2a" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="action2b" value="Upload Video File" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;strokeColor=#2196F3;fillColor=#BBDEFB;fontStyle=1;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="620" y="370" width="130" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_decision1_action2b" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#000000;endArrow=block;endSize=8;" parent="1" source="decision1" target="action2b" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="merge1" value="" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#4CAF50;fillColor=#C8E6C9;fontSize=1;" parent="1" vertex="1">
+                    <mxGeometry x="470" y="480" width="60" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_action2a_merge1" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#000000;endArrow=block;endSize=8;" parent="1" source="action2a" target="merge1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_action2b_merge1" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#000000;endArrow=block;endSize=8;" parent="1" source="action2b" target="merge1" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="decision_test_check" value="Is&#xa;ONVIF?" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#FF9800;fillColor=#FFE0B2;fontStyle=1;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="440" y="570" width="120" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_merge1_decision_test_check" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#000000;endArrow=block;endSize=8;" parent="1" source="merge1" target="decision_test_check" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="action3" value="Test Source Connection" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;strokeColor=#2196F3;fillColor=#BBDEFB;fontStyle=1;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="230" y="690" width="140" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_decision_test_check_action3" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#000000;endArrow=block;endSize=8;" parent="1" source="decision_test_check" target="action3" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="label_yes_onvif" value="Yes" style="text;html=1;align=center;fontSize=10;fontStyle=1;fontColor=#FF9800;" parent="1" vertex="1">
+                    <mxGeometry x="360" y="575" width="30" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="decision2" value="Test&#xa;OK?" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#FF9800;fillColor=#FFE0B2;fontStyle=1;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="240" y="775" width="120" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_action3_decision2" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#000000;endArrow=block;endSize=8;" parent="1" source="action3" target="decision2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="retry" value="Retry Configuration" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;strokeColor=#F44336;fillColor=#FFCDD2;fontStyle=1;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="870" width="120" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_decision2_retry" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#F44336;endArrow=block;endSize=8;" parent="1" source="decision2" target="retry" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="label_no" value="No" style="text;html=1;align=center;fontSize=10;fontStyle=1;fontColor=#F44336;" parent="1" vertex="1">
+                    <mxGeometry x="230" y="770" width="30" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_retry_action3" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#F44336;endArrow=block;endSize=8;dashed=1;" parent="1" source="retry" target="action3" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="98" y="715"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="merge2" value="" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#4CAF50;fillColor=#C8E6C9;fontSize=1;" parent="1" vertex="1">
+                    <mxGeometry x="547" y="770" width="50" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_decision_test_check_upload_skip" style="html=1;strokeColor=#4CAF50;endArrow=block;endSize=8;exitX=1;exitY=0.5;edgeStyle=orthogonalEdgeStyle;rounded=0;curved=0;" parent="1" source="decision_test_check" target="merge2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="label_no_onvif" value="No&amp;nbsp;" style="text;html=1;align=center;fontSize=10;fontStyle=1;fontColor=#4CAF50;" parent="1" vertex="1">
+                    <mxGeometry x="590" y="670" width="70" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_decision2_merge2" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#4CAF50;endArrow=block;endSize=8;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" parent="1" source="decision2" target="merge2" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="label_yes" value="Yes" style="text;html=1;align=center;fontSize=10;fontStyle=1;fontColor=#4CAF50;" parent="1" vertex="1">
+                    <mxGeometry x="380" y="775" width="30" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_merge2_action4" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#000000;endArrow=block;endSize=8;" parent="1" source="merge2" target="action5" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="572" y="879.0000000000002" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="action5" value="Draw Detection Zone" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;strokeColor=#2196F3;fillColor=#BBDEFB;fontStyle=1;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="497" y="876" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="action6" value="Select Model Size" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;strokeColor=#2196F3;fillColor=#BBDEFB;fontStyle=1;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="497" y="991" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_action5_action6" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#000000;endArrow=block;endSize=8;" parent="1" source="action5" target="action6" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="action7" value="Review Staged Feed Config" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;strokeColor=#2196F3;fillColor=#BBDEFB;fontStyle=1;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="497" y="1095" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_action6_action7" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#000000;endArrow=block;endSize=8;" parent="1" source="action6" target="action7" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="action8" value="Confirm Launch Feed" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;strokeColor=#4CAF50;fillColor=#C8E6C9;fontStyle=1;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="497" y="1194" width="150" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_action7_action8" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#000000;endArrow=block;endSize=8;" parent="1" source="action7" target="action8" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_action8_final" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#000000;endArrow=block;endSize=8;" parent="1" source="action8" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="571.9999999999999" y="1291" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="2" value="" style="ellipse;html=1;shape=endState;fillColor=strokeColor;" vertex="1" parent="1">
+                    <mxGeometry x="557" y="1290" width="30" height="30" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

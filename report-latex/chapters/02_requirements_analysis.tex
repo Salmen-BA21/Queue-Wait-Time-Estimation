@@ -1,12 +1,12 @@
 \chapter{Requirements Specification and Analysis}
 \chaptertoc
 
-
+\clearpage
 
 \section{Introduction}
 This chapter turns the project objective into the requirements that guided the implementation. It identifies the actors, lists the functions and quality constraints they need, and shows how those requirements are spread across the implementation plan.
 
-The requirements are tied to the queue-monitoring pipeline used throughout the project: video ingestion, person detection and tracking, queue-metric estimation, dashboard delivery, authentication, and alert automation. This connection matters because the later chapters follow the same path from requirement to implementation, including the access layer used for manager onboarding and administrator governance.
+The requirements are tied to the queue-monitoring pipeline used throughout the project: video ingestion, person detection and tracking, queue-metric estimation, dashboard delivery, authentication, and alert automation.
 
 \section{Requirements Specification}
 
@@ -17,50 +17,16 @@ The actors are:
 \begin{itemize}
     \item \textbf{Administrator}: manages manager accounts (create, update, delete) and controls access governance.
     \item \textbf{Manager}: configures sources and thresholds, monitors live queues, reacts to alerts, and reviews performance indicators.
-    \item \textbf{On-site Operator (external actor)}: receives operational instructions from the manager and applies field actions (for example opening a new queue line or redirecting customer flow), then confirms completion.
+    \item \textbf{On-site Operator (external actor)}: receives queue alert notifications in a shared Telegram group and applies field actions, such as opening a new queue line or redirecting customer flow. In the MVP, the operator confirms completion manually in Telegram, and this confirmation is not automatically captured by the application.
 \end{itemize}
 
-This split makes the functional scope easier to explain and validate: access-control and monitoring actions remain in-system, while physical queue intervention is explicitly modeled as an external operational action.
-
-\subsection{Authentication and Access Governance}
-The platform includes a lightweight identity layer that restricts dashboard access to authenticated users, enabling managers to register, sign in, refresh sessions, and log out while allowing administrators to manage manager accounts and review access-related actions. Although the detailed backend and frontend implementation is deferred to the sprint chapters, these requirements are captured here because access boundaries form part of the core system behavior, as shown in Table~\ref{tab:auth_access_requirements}.
-\begin{table}[!htbp]
-    \centering
-    \footnotesize
-    \setlength{\tabcolsep}{3pt}
-    \renewcommand{\arraystretch}{0.88}
-    \begin{tabularx}{\textwidth}{|l|X|X|X|}
-        \hline
-        ID & Requirement & Priority & Verification \\ \hline
-        AR-01 & Allow a manager to register, sign in, refresh, and log out through secure cookies. & High & Validate register, login, refresh, logout, and session checks. \\ \hline
-        AR-02 & Allow the administrator to create, update, deactivate, and reset manager accounts. & High & Validate account-governance endpoints and audit events. \\ \hline
-        AR-03 & Enforce password policy, lockout after repeated failures, and role-based protection on operational endpoints. & High & Validate failed-login counters, lockout behavior, and unauthorized access. \\ \hline
-        AR-04 & Record authentication and account-governance actions for later traceability. & Medium & Validate audit-log entries during register and login flows. \\ \hline
-    \end{tabularx}
-    \caption{Authentication and access-control requirements}
-    \label{tab:auth_access_requirements}
-\end{table}
+This split makes the functional scope easier to explain and validate: access-control, monitoring, and alert notification actions remain in-system, while physical queue intervention and manual completion confirmation are explicitly modeled as external operational actions.
 
 \subsection{Functional Requirements}
-At a high level, the system captures a feed, counts people, estimates queue behavior, updates the dashboard, and sends alerts when needed. From that workflow, the system must provide the following capabilities:
-\begin{itemize}
-    \item real-time person detection and tracking,
-    \item configurable queue zone definition,
-    \item estimation of arrival rate ($\lambda$), service rate ($\mu$), and wait time ($W$),
-    \item adaptive wait-time estimation with robust fallback behavior,
-    \item real-time web dashboard updates and alerts,
-    \item IP camera integration through complementary ONVIF discovery and RTSP streaming,
-    \item automated webhook and Telegram notifications,
-    \item secure manager sign-up, sign-in, and role-based access control,
-    \item historical data logging and analytics.
-\end{itemize}
-
-These requirements define the minimum end-to-end behavior expected from the platform and are formalized in the traceability matrix shown in Table~\ref{tab:functional_requirement_matrix}.
-\begin{table}[!htbp]
+At a high level, the system captures a feed, counts people, estimates queue behavior, updates the dashboard, and sends alerts when needed. These requirements define the minimum end-to-end behavior expected from the platform and are formalized in the traceability matrix shown in Table~\ref{tab:functional_requirement_matrix}.
+\begin{table}[H]
     \centering
-    \footnotesize
-    \setlength{\tabcolsep}{3pt}
-    \renewcommand{\arraystretch}{0.88}
+    \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
     \begin{tabularx}{\textwidth}{|l|X|l|X|}
         \hline
         ID & Requirement & Priority & Verification \\ \hline
@@ -72,30 +38,22 @@ These requirements define the minimum end-to-end behavior expected from the plat
         FR-06 & Expose feed control and live updates through API and websocket channels. & High & Validate endpoint and runtime behavior in API tests. \\ \hline
         FR-07 & Dispatch alert payloads to automation workflows. & Medium & Validate webhook dispatch and n8n branching. \\ \hline
         FR-08 & Persist operational metrics and metadata for analysis and auditing. & Medium & Validate persistence behavior in runtime and database checks. \\ \hline
-        FR-09 & Support manager registration, sign-in, refresh, and logout through secure cookies. & High & Validate register, login, refresh, logout, and session checks. \\ \hline
-        FR-10 & Protect administrative and operational APIs with role-based access control and audit logging. & High & Validate unauthorized access paths and audit events. \\ \hline
+        FR-09 & Allow manager registration, sign-in, refresh, and logout through secure cookies. & High & Validate register, login, refresh, logout, and session checks. \\ \hline
+        FR-10 & Allow administrator to create, update, deactivate, and reset manager accounts. & High & Validate account-governance endpoints and audit events. \\ \hline
+        FR-11 & Enforce password policy, lockout after repeated failures, and role-based protection on operational endpoints. & High & Validate failed-login counters, lockout behavior, and unauthorized access. \\ \hline
+        FR-12 & Record authentication and account-governance actions for traceability. & Medium & Validate audit-log entries during register and login flows. \\ \hline
+        FR-13 & Protect administrative and operational APIs with role-based access control. & High & Validate unauthorized access paths and audit events. \\ \hline
     \end{tabularx}
     \caption{Functional requirement traceability matrix}
     \label{tab:functional_requirement_matrix}
+    \endgroup
 \end{table}
 
 \subsection{Non-functional Requirements}
-In addition to functional behavior, the platform must satisfy quality constraints that keep it usable in a live monitoring environment. Because the project combines computer vision, analytics, a web dashboard, and automation workflows, performance and reliability matter as much as correctness. For this project, the main quality constraints are:
-\begin{itemize}
-    \item \textbf{Performance}: maintain real-time behavior and low alert latency.
-    \item \textbf{Scalability}: support multiple feeds and independent feed lifecycle control.
-    \item \textbf{Reliability}: tolerate transient source failures and integration interruptions.
-    \item \textbf{Usability}: provide clear web workflows for monitoring and configuration.
-    \item \textbf{Security}: protect integration channels and service endpoints.
-    \item \textbf{Maintainability}: keep modular code organization and testable interfaces.
-\end{itemize}
-
-These quality attributes are treated as engineering contracts rather than only design intentions, and the corresponding non-functional requirement quality matrix is summarized in Table~\ref{tab:nonfunctional_quality_matrix}.
-\begin{table}[!htbp]
+In addition to functional behavior, the platform must satisfy quality constraints that keep it usable in a live monitoring environment. Because the project combines computer vision, analytics, a web dashboard, and automation workflows, performance and reliability matter as much as correctness. These quality attributes are treated as engineering contracts rather than only design intentions, and the corresponding non-functional requirement quality matrix is summarized in Table~\ref{tab:nonfunctional_quality_matrix}.
+\begin{table}[H]
     \centering
-    \footnotesize
-    \setlength{\tabcolsep}{3pt}
-    \renewcommand{\arraystretch}{0.88}
+    \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
     \begin{tabularx}{\textwidth}{|l|X|X|X|}
         \hline
         ID & Quality & Target indicator & Validation \\ \hline
@@ -108,21 +66,15 @@ These quality attributes are treated as engineering contracts rather than only d
     \end{tabularx}
     \caption{Non-functional requirement quality matrix}
     \label{tab:nonfunctional_quality_matrix}
+    \endgroup
 \end{table}
 
-\section{Product Backlog}
-The product backlog was prioritized according to business value and technical dependency. To keep the implementation easy to follow, the items were grouped into three domains that mirror the system architecture: backend processing, web supervision, and automation.
-\begin{itemize}
-    \item \textbf{Backend domain}: perception pipeline, queue analytics, API and stream interfaces.
-    \item \textbf{Web domain}: dashboard UX, live monitoring integration, zone editing workflows.
-    \item \textbf{Automation domain}: n8n workflow integration, alert routing, webhook reliability.
-\end{itemize}
-
-The first sprints focused on backend foundations, because the dashboard and automation layers depend on a stable metric contract. This order reduced integration risk and made later validation clearer.
+\section{Product Backlog and Sprint Organization}
+The product backlog was prioritized according to business value and technical dependency and organized into four implementation sprints. To manage complexity and validate incremental progress, the work was structured around the system's data flow pipeline: from perception and analytics foundations, through web-based monitoring, to automation and evaluation. The first sprints focused on backend foundations because the dashboard and automation layers depend on a stable metric contract. Each subsequent sprint added layers of functionality while maintaining testability and integration with earlier work.
 
 \section{Global Use Case Diagram}
 The global use case diagram gives a high-level view of how the administrator and manager interact with the platform during configuration, monitoring, and alert handling, as shown in Figure~\ref{fig:global_use_case}.
-\begin{figure}[H]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{\detokenize{chapter2_use_case.pdf}}
     \caption{Global use case diagram of the queue wait-time estimation system.}
@@ -140,23 +92,20 @@ At the system level, the use cases can be grouped into four interactions: config
         UC-03 & Define or update queue zone geometry. & Manager \\ \hline
         UC-04 & Monitor live queue metrics and feed status. & Manager \\ \hline
         UC-05 & Receive and interpret warning or critical alerts. & Manager \\ \hline
-        UC-06 & Dispatch operator after an alert. & Manager \\ \hline
-        UC-07 & Confirm queue action completion. & On-site Operator (external) \\ \hline
-        UC-08 & Review trends and performance indicators. & Manager \\ \hline
+        UC-06 & Automatically notify the on-site operator via Telegram when an alert is detected. & System automatic behavior \\ \hline
+        UC-07 & Review trends and performance indicators. & Manager \\ \hline
     \end{tabularx}
     \caption{Primary global use cases}
     \label{tab:global_use_cases}
 \end{table}
 
-\section{Sprint Scope Overview}
-We organized the project into four consolidated sprints so that the pipeline could be delivered step by step and checked at each stage. The sprint chapters that follow describe those implementation phases in detail, from perception and queue analytics to frontend integration and automation.
-
 \section{Project Environment}
 
 \subsection{Hardware and Software Environment}
-The hardware environment used during development is shown in Table~\ref{tab:hardware_environment}, while the software and runtime layers are summarized in Table~\ref{tab:execution_environment_profile}.
-\begin{table}[!htbp]
+The hardware environment used during development is shown in Table~\ref{tab:hardware_environment}.
+\begin{table}[H]
     \centering
+    \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\small
     \begin{tabularx}{0.8\textwidth}{|l|X|}
         \hline
         Component & Type \\ \hline
@@ -164,32 +113,17 @@ The hardware environment used during development is shown in Table~\ref{tab:hard
         Memory (RAM) & 16 GB \\ \hline
         Graphics card & NVIDIA GeForce RTX 4060 \\ \hline
         Storage & 512 GB SSD \\ \hline
-    \end{tabularx}
-    \caption{Hardware environment}
-    \label{tab:hardware_environment}
-\end{table}
-The execution environment profile is detailed in Table~\ref{tab:execution_environment_profile}.
-\begin{table}[!htbp]
-    \centering
-    \begin{tabularx}{\textwidth}{|l|X|X|}
-        \hline
-        Environment layer & Main tooling & Purpose \\ \hline
-        Backend runtime & Python ecosystem with vision and scientific libraries \cite{python_docs,numpy_docs,pandas_docs,scipy_docs,opencv_docs} & Perception, queue analytics, and integration dispatch. \\ \hline
-        Frontend runtime & Node/Bun-based TypeScript toolchain with Vite \cite{nodejs_docs,bun_docs,typescript_docs,vite_docs} & Dashboard rendering, interaction workflows, and live-state synchronization. \\ \hline
-        Automation runtime & Self-hosted n8n with webhook endpoints \cite{n8n_docs} & Alert routing, cooldown logic, and external notifications. \\ \hline
-        Persistence/runtime support & SQLite database store (metrics, metadata, alerts) \cite{sqlite_docs} & Historical analysis and system state continuity. \\ \hline
-    \end{tabularx}
-    \caption{Execution environment profile}
-    \label{tab:execution_environment_profile}
-\end{table}
+        \end{tabularx}
+        \caption{Hardware environment}
+        \label{tab:hardware_environment}
+        \endgroup
+    \end{table}
 
 \subsection{Development Tools}
 The project also relied on a small set of development tools for editing, versioning, diagramming, container support, and report generation. Keeping them separate from the technology stack makes it easier to distinguish what was used to build the project from what the project actually runs on, as listed in Table~\ref{tab:development_tools}.
-\begin{table}[!htbp]
+\begin{table}[H]
     \centering
-    \footnotesize
-    \setlength{\tabcolsep}{3pt}
-    \renewcommand{\arraystretch}{0.88}
+    \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
     \begin{tabularx}{\textwidth}{|l|X|X|}
         \hline
         Tool & Role in the project & Typical use \\ \hline
@@ -200,28 +134,28 @@ The project also relied on a small set of development tools for editing, version
     \end{tabularx}
     \caption{Development tools used in the project}
     \label{tab:development_tools}
+    \endgroup
 \end{table}
 
 \subsection{Technologies Used}
 The technology stack follows the main stages of the system, as summarized in Table~\ref{tab:technologies_used}.
-\begin{table}[!htbp]
+\begin{table}[H]
     \centering
-    \footnotesize
-    \setlength{\tabcolsep}{3pt}
-    \renewcommand{\arraystretch}{0.88}
+    \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
     \begin{tabularx}{\textwidth}{|l|X|X|}
         \hline
         Layer & Main technologies & Role in the project \\ \hline
         Vision pipeline & YOLO26, ByteTrack, and OpenCV \cite{ultralytics_docs,bytetrack2022,opencv_docs} & Detects people, tracks them across frames, and prepares the visual input for queue analysis. \\ \hline
         Queue analytics & NumPy, Pandas, SciPy, and M/M/1 modeling \cite{numpy_docs,pandas_docs,scipy_docs,gross_queueing} & Computes arrival rate, service rate, and wait time. \\ \hline
         Backend API & FastAPI and Pydantic v2 \cite{fastapi_docs,pydantic_docs} & Exposes typed endpoints, validates payloads, and coordinates the backend services. \\ \hline
-        Live transport & WebRTC, MediaMTX WHEP gateway, and MJPEG fallback \cite{webrtc_w3c,mediamtx_docs} & Delivers low-latency video streaming while keeping a simpler HTTP fallback available. \\ \hline
+        Live transport & WebRTC for IP cameras, MediaMTX WHEP gateway, and MJPEG playback for local MP4 videos \cite{webrtc_w3c,mediamtx_docs} & Delivers low-latency video streaming for camera feeds while keeping a simpler HTTP playback path for uploaded videos. \\ \hline
         Frontend & React, TypeScript, Vite, and Tailwind CSS \cite{react_docs,typescript_docs,vite_docs,tailwind_docs} & Implements the dashboard, user interactions, and responsive presentation layer. \\ \hline
         Automation & n8n workflows and Telegram notifications \cite{n8n_docs,telegram_bot_api} & Routes alerts and sends operational messages to users. \\ \hline
         Persistence & SQLite \cite{sqlite_docs} & Stores metrics, metadata, and alert history for later analysis. \\ \hline
     \end{tabularx}
     \caption{Technologies used in the project}
     \label{tab:technologies_used}
+    \endgroup
 \end{table}
 
 This selection keeps the implementation modular from perception through automation.
@@ -230,7 +164,7 @@ This selection keeps the implementation modular from perception through automati
 
 \subsection{Overall Architecture}
 The architecture is described as four stages that match the flow of data through the system, from video acquisition to alert delivery, as illustrated in Figure~\ref{fig:overall_architecture}.
-\begin{figure}[H]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{\detokenize{chapter2_architecture.pdf}}
     \caption{Overall system architecture from video acquisition to alert delivery.}
@@ -260,4 +194,6 @@ That separation keeps API changes localized to the integration layer and lets th
 
 \section{Conclusion}
 This chapter establishes the functional baseline, the quality constraints, and the architecture choices that guide the rest of the report. The next chapters turn these requirements into perception, connectivity, automation, and evaluation work.
+
+
 
