@@ -4,14 +4,14 @@
 \clearpage
 
 \section{Introduction}
-This chapter turns the project objective into the requirements that guided the implementation. It identifies the actors, lists the functions and quality constraints they need, and shows how those requirements are spread across the implementation plan.
+After defining the project context, the next step was to translate the idea into requirements that could guide the work. This chapter identifies the actors, lists the expected functions and quality constraints, and shows how those requirements are distributed across the implementation plan.
 
-The requirements are tied to the queue-monitoring pipeline used throughout the project: video ingestion, person detection and tracking, queue-metric estimation, dashboard delivery, authentication, and alert automation.
+The requirements follow the same queue-monitoring path used throughout the project: video ingestion, person detection and tracking, queue-metric estimation, dashboard delivery, authentication, and alert automation.
 
 \section{Requirements Specification}
 
 \subsection{Identification of Actors}
-The platform involves two in-system actors and one external operational actor. This separation clarifies which actions are executed inside the software and which actions happen on site.
+The platform involves two actors inside the application and one operational actor outside it. This distinction matters because the software can detect, estimate, and notify, but the physical response to congestion still happens on site.
 
 The actors are:
 \begin{itemize}
@@ -20,10 +20,10 @@ The actors are:
     \item \textbf{On-site Operator (external actor)}: receives queue alert notifications in a shared Telegram group and applies field actions, such as opening a new queue line or redirecting customer flow. In the MVP, the operator confirms completion manually in Telegram, and this confirmation is not automatically captured by the application.
 \end{itemize}
 
-This split makes the functional scope easier to explain and validate: access-control, monitoring, and alert notification actions remain in-system, while physical queue intervention and manual completion confirmation are explicitly modeled as external operational actions.
+This split keeps the functional scope clear: access control, monitoring, and alert notification remain inside the system, while physical queue intervention and manual completion confirmation are treated as external operational actions.
 
 \subsection{Functional Requirements}
-At a high level, the system captures a feed, counts people, estimates queue behavior, updates the dashboard, and sends alerts when needed. These requirements define the minimum end-to-end behavior expected from the platform and are formalized in the traceability matrix shown in Table~\ref{tab:functional_requirement_matrix}.
+At a high level, the system captures a feed, counts people inside a queue zone, estimates queue behavior, updates the dashboard, and sends alerts when the configured conditions are reached. These requirements define the minimum end-to-end behavior expected from the platform and are formalized in Table~\ref{tab:functional_requirement_matrix}.
 \begin{table}[H]
     \centering
     \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
@@ -35,7 +35,7 @@ At a high level, the system captures a feed, counts people, estimates queue beha
         FR-03 & Restrict counting to configurable polygon queue zones. & High & Validate polygon inclusion in the zone-management layer. \\ \hline
         FR-04 & Compute $\lambda$, $\mu$, and expected wait time from event windows. & High & Validate queue formulas and stability handling in analytics. \\ \hline
         FR-05 & Compute wait time with adaptive logic that switches between precise and conservative estimates. & High & Validate formula branches and fallback behavior. \\ \hline
-        FR-06 & Expose feed control and live updates through API and websocket channels. & High & Validate endpoint and runtime behavior in API tests. \\ \hline
+        FR-06 & Expose feed control and live updates through API and WebSocket channels. & High & Validate endpoint and runtime behavior in API tests. \\ \hline
         FR-07 & Dispatch alert payloads to automation workflows. & Medium & Validate webhook dispatch and n8n branching. \\ \hline
         FR-08 & Persist operational metrics and metadata for analysis and auditing. & Medium & Validate persistence behavior in runtime and database checks. \\ \hline
         FR-09 & Allow manager registration, sign-in, refresh, and logout through secure cookies. & High & Validate register, login, refresh, logout, and session checks. \\ \hline
@@ -50,7 +50,7 @@ At a high level, the system captures a feed, counts people, estimates queue beha
 \end{table}
 
 \subsection{Non-functional Requirements}
-In addition to functional behavior, the platform must satisfy quality constraints that keep it usable in a live monitoring environment. Because the project combines computer vision, analytics, a web dashboard, and automation workflows, performance and reliability matter as much as correctness. These quality attributes are treated as engineering contracts rather than only design intentions, and the corresponding non-functional requirement quality matrix is summarized in Table~\ref{tab:nonfunctional_quality_matrix}.
+In addition to functional behavior, the platform must satisfy quality constraints that keep it usable in a live monitoring environment. A correct wait-time formula is not enough if the video feed freezes, the dashboard stops updating, or alerts are lost. For this reason, performance, reliability, usability, security, and maintainability are treated as project requirements and summarized in Table~\ref{tab:nonfunctional_quality_matrix}.
 \begin{table}[H]
     \centering
     \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
@@ -62,7 +62,7 @@ In addition to functional behavior, the platform must satisfy quality constraint
         NFR-03 & Reliability & Recover gracefully from camera drops and webhook failures. & Reconnect paths and retry/fallback test scenarios. \\ \hline
         NFR-04 & Usability & Keep setup and monitoring clear for non-developer users. & Dashboard integration tests and workflow walkthroughs. \\ \hline
         NFR-05 & Security & Restrict integration access through secrets and credentials. & Webhook secret validation and credential checks. \\ \hline
-        NFR-06 & Maintainability & Keep the architecture modular and testable. & Code review and test-suite coverage by module. \\ \hline
+        NFR-06 & Maintainability & Keep the architecture modular and testable. & Design review and test-suite coverage by module. \\ \hline
     \end{tabularx}
     \caption{Non-functional requirement quality matrix}
     \label{tab:nonfunctional_quality_matrix}
@@ -70,13 +70,13 @@ In addition to functional behavior, the platform must satisfy quality constraint
 \end{table}
 
 \section{Product Backlog and Sprint Organization}
-The product backlog was prioritized according to business value and technical dependency and organized into four implementation sprints. To manage complexity and validate incremental progress, the work was structured around the system's data flow pipeline: from perception and analytics foundations, through web-based monitoring, to automation and evaluation. The first sprints focused on backend foundations because the dashboard and automation layers depend on a stable metric contract. Each subsequent sprint added layers of functionality while maintaining testability and integration with earlier work.
+The product backlog was prioritized according to business value and technical dependency, then organized into four sprints. The first sprint focused on perception and queue analytics because the dashboard and alerts depend on stable metrics. The second sprint added source management and live services. The third sprint turned those services into a usable web dashboard. The final sprint connected alerts to n8n and Telegram, then evaluated the complete system.
 
 \section{Global Use Case Diagram}
-The global use case diagram gives a high-level view of how the administrator and manager interact with the platform during configuration, monitoring, and alert handling, as shown in Figure~\ref{fig:global_use_case}.
+The global use case diagram gives a high-level view of how the administrator and manager interact with the platform during configuration, monitoring, and alert handling. It is shown in Figure~\ref{fig:global_use_case}.
 \begin{figure}[!htbp]
     \centering
-    \includegraphics[width=0.95\textwidth]{\detokenize{chapter2_use_case.pdf}}
+    \includegraphics[width=1.1\textwidth]{\detokenize{chapter2_use_case.pdf}}
     \caption{Global use case diagram of the queue wait-time estimation system.}
     \label{fig:global_use_case}
 \end{figure}
@@ -120,7 +120,7 @@ The hardware environment used during development is shown in Table~\ref{tab:hard
     \end{table}
 
 \subsection{Development Tools}
-The project also relied on a small set of development tools for editing, versioning, diagramming, container support, and report generation. Keeping them separate from the technology stack makes it easier to distinguish what was used to build the project from what the project actually runs on, as listed in Table~\ref{tab:development_tools}.
+The project also relied on a small set of tools for editing, versioning, diagramming, container support, and report generation. Keeping these tools separate from the technology stack makes it easier to distinguish the working environment from the components used by the final system, as listed in Table~\ref{tab:development_tools}.
 \begin{table}[H]
     \centering
     \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
@@ -158,12 +158,12 @@ The technology stack follows the main stages of the system, as summarized in Tab
     \endgroup
 \end{table}
 
-This selection keeps the implementation modular from perception through automation.
+This selection supports the complete path from perception through automation while keeping each stage understandable on its own.
 
 \section{Software Architecture}
 
 \subsection{Overall Architecture}
-The architecture is described as four stages that match the flow of data through the system, from video acquisition to alert delivery, as illustrated in Figure~\ref{fig:overall_architecture}.
+The architecture is described as four stages that match the flow of data through the system, from video acquisition to alert delivery. Figure~\ref{fig:overall_architecture} illustrates this flow.
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{\detokenize{chapter2_architecture.pdf}}
@@ -175,25 +175,25 @@ The architecture is described as four stages that match the flow of data through
     \item \textbf{Video acquisition}: camera sources and video streams (RTSP, ONVIF, and local files) feed into the video acquisition component, which handles frame capture and stream management \cite{rtsp_rfc2326,onvif_specs}.
     \item \textbf{Perception}: the perception engine runs detection and tracking on each captured frame and exposes tracked identities through a defined interface to the queue analyzer.
     \item \textbf{Analysis}: the queue analyzer receives tracked events and computes queue metrics ($\lambda$, $\mu$, $W$) using adaptive wait-time estimation logic.
-    \item \textbf{Output and integration}: the backend API acts as the hub that receives queue metrics and distributes them across three outputs — the live dashboard via a real-time feed, the persistence layer (SQLite) for historical records, and the alert orchestrator (n8n) which routes alert payloads to the Telegram notification channel.
+    \item \textbf{Output and integration}: the backend API acts as the hub that receives queue metrics and distributes them across three outputs: the live dashboard via a real-time feed, the persistence layer (SQLite) for historical records, and the alert orchestrator (n8n) which routes alert payloads to the Telegram notification channel.
 \end{enumerate}
 
-This separation keeps the four stages independently testable. Queue formulas in the analyzer depend only on perception events; the backend API depends only on the metric contract; and the dashboard, persistence, and alert orchestration are each driven by the API without depending on each other.
+This separation keeps the four stages easier to validate. Queue formulas depend on perception events, the API depends on the metric contract, and the dashboard, persistence, and alert orchestration consume the same project-level outputs without being tightly coupled to one another.
 
 \subsection{Backend Architecture}
-The backend exposes REST and websocket interfaces for feed lifecycle control and live metrics. It includes modules for detection orchestration, tracking, queue analysis, threshold evaluation, webhook delivery, and camera-source management.
+The backend exposes REST and WebSocket interfaces for feed lifecycle control and live metrics. It coordinates the main project responsibilities: source management, queue analysis, threshold evaluation, alert delivery, and live dashboard updates.
 
 Feed-level orchestration lets each camera be started, stopped, or refreshed independently. If one feed fails, the others keep running, and the dashboard still receives a predictable event stream.
 
-We treat persistence and integration as core responsibilities rather than add-ons: a durable backend state store preserves operational context, while webhook delivery turns queue events into external notifications.
+Persistence and integration are treated as core responsibilities rather than add-ons. Stored state preserves operational context, while webhook delivery turns queue events into external notifications.
 
 \subsection{Frontend Architecture}
-The frontend is built as a component-based interface with typed API integration, feed-oriented dashboard composition, and websocket-driven synchronization. Data access is isolated in hooks and client utilities, while pages and reusable components focus on presentation and interaction.
+The frontend is built as a component-based interface with feed-oriented dashboard composition and WebSocket-driven synchronization. Its role is to make setup, monitoring, and analytics usable for managers without exposing the complexity of the underlying services.
 
-That separation keeps API changes localized to the integration layer and lets the visual components stay stable even when the backend contract changes. It also makes the dashboard easier to extend when new feed controls or indicators are added.
+This separation makes the dashboard easier to extend when new feed controls or indicators are added, while preserving a stable user experience for monitoring and setup.
 
 \section{Conclusion}
-This chapter establishes the functional baseline, the quality constraints, and the architecture choices that guide the rest of the report. The next chapters turn these requirements into perception, connectivity, automation, and evaluation work.
+This chapter established the functional baseline, the quality constraints, and the architecture choices that guide the rest of the report. The next chapters show how these requirements were implemented through perception, connectivity, dashboard monitoring, automation, and evaluation work.
 
 
 

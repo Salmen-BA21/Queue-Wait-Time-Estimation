@@ -3,7 +3,7 @@
 \clearpage
 
 \section{Summary}
-This end-of-studies project produced a complete queue wait-time estimation platform that brings together computer vision, queue analytics, web supervision, and automation workflows.
+This end-of-studies project produced a queue wait-time estimation platform that connects computer vision, queue analytics, web supervision, and alert automation. The project started from a practical problem: managers need more than a visual impression of a queue. They need indicators that show how the queue is evolving and when action is required.
 
 In practical terms, the system now includes:
 \begin{itemize}
@@ -16,25 +16,25 @@ In practical terms, the system now includes:
     \item n8n and Telegram integration for operational alert routing.
 \end{itemize}
 
-The resulting architecture shows that a full monitoring-to-action loop can be built from modular components without losing maintainability or testability.
+Taken together, these elements form a monitoring-to-action loop: the system observes a queue, estimates its state, displays it to the manager, and sends alerts when the situation requires attention.
 
-Across the four sprint chapters, the work progresses from perception and queue analytics to backend services, then to the web dashboard, and finally to automation and validation.
+Across the four sprint chapters, the work progressed from perception and queue analytics to live services, then to the web dashboard, and finally to automation and validation.
 
 \section{Objective Review}
 The initial objectives were achieved at the project scope level:
 \begin{enumerate}
-    \item \textbf{Real-time detection and tracking:} achieved through dedicated detector and tracker modules.
+    \item \textbf{Real-time detection and tracking:} achieved through YOLO-based detection and ByteTrack identity continuity.
     \item \textbf{Queue-zone counting:} achieved with polygon-zone management and in-zone identity filtering.
     \item \textbf{Queue metric estimation:} achieved for arrival rate, service rate, and wait time.
     \item \textbf{Adaptive wait-time estimation:} achieved through automatic formula switching based on queue load.
-    \item \textbf{Web monitoring:} achieved through a multi-feed dashboard with live updates.
+    \item \textbf{Web monitoring:} achieved through a multi-feed dashboard with live updates, setup workflows, and fallback behavior.
     \item \textbf{Automation integration:} achieved through webhook transport, n8n routing, and Telegram notifications.
 \end{enumerate}
 
-The main remaining gap is not architectural completeness, but the depth of long-horizon evaluation under broader operational scenarios.
+The main remaining gap is not architectural completeness, but the depth of long-duration evaluation under broader operational scenarios.
 
 \section{Future Work}
-Possible extensions include:
+Several extensions would make the platform stronger before wider deployment:
 \begin{itemize}
     \item multi-zone and multi-server queue modeling for parallel cashier configurations,
     \item richer alert strategies with cooldown tuning, escalation policies, and acknowledgment loops,

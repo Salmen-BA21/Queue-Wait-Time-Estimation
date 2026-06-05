@@ -1,14 +1,14 @@
 \chapter*{General Introduction}
 \addcontentsline{toc}{chapter}{General Introduction}
 
-Service organizations are under constant pressure to reduce waiting time and improve service quality. Supermarkets, banks, and service centers all face the same problem: queues change quickly, are difficult to monitor by hand, and react strongly to demand fluctuations.
+In many service environments, waiting time is one of the first signs that the organization is under pressure. Supermarkets, banks, and service centers may have enough staff during normal periods, but a sudden increase in demand can quickly create queues that are difficult to evaluate by observation alone.
 
-In practice, customers often join a queue without knowing how long they will wait, while managers and operational staff rarely have reliable real-time indicators for adjusting resources quickly. Manual observation is subjective, and simple counting tools are not enough to estimate waiting time in a meaningful way.
+In practice, customers usually join a queue without knowing how long they will wait. Managers and operational staff also have limited real-time information for deciding when to open another service point, redirect customers, or escalate the situation. Manual observation remains subjective, and simple counting tools do not explain how fast the queue is moving or whether the waiting time is becoming unstable.
 
-This end-of-studies project addresses that gap through the design and development of a real-time queue monitoring system based on computer vision and queueing theory. The proposed system detects and tracks people in video streams, analyzes occupancy inside configurable queue zones, estimates arrival and service rates, computes waiting time, and exposes metrics that can be used operationally.
+This end-of-studies project addresses that gap through a real-time queue monitoring system based on computer vision and queueing theory. The system detects and tracks people in video streams, restricts the analysis to configurable queue zones, estimates arrival and service rates, computes waiting time, and presents the resulting indicators in a form that can support operational decisions.
 
 It combines classical queueing theory with computer-vision detection and tracking techniques 
 \cite{gross_queueing,ultralytics_docs} to provide actionable waiting-time estimates.
 
-This report is organized as follows. Chapter 1 presents the project context, host organization, problem statement, and objectives. Chapter 2 defines the requirements analysis and the main architecture choices. Chapters 3 to 6 follow the implementation sprint by sprint, from perception and queue analytics to frontend integration and operational automation. The general conclusion closes the report and presents future work directions.
+The report is organized as follows. Chapter 1 presents the project context, the host organization, the problem statement, and the objectives. Chapter 2 defines the requirements and the main architecture choices. Chapters 3 to 6 describe the work sprint by sprint, from perception and queue analytics to the web dashboard and alert automation. The general conclusion closes the report and presents future work directions.
 

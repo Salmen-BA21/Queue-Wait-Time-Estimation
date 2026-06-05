@@ -3,15 +3,15 @@
 
 \clearpage
 \section{Introduction}
-Sprint 1 built the full path from raw video to actionable queue indicators. It started by detecting people, tracking them across frames, and filtering observations to the queue zone. Once that perception baseline was reliable, the sprint moved to queue interpretation: estimating how fast people arrive, how quickly service handles them, and how long a new arrival should expect to wait.
+The first sprint answered the most basic question of the project: can a video feed be transformed into queue indicators that are stable enough for later use? The work therefore started with people detection, frame-to-frame tracking, and zone filtering before moving to arrival rate, service rate, and wait-time estimation.
 
-Perception and analytics were delivered together so that the later sprints could reuse a stable metric pipeline instead of rebuilding it from raw counts.
+Delivering perception and analytics together was important because the later dashboard and alerting work needed more than raw counts. They needed a consistent metric output that already represented the queue zone, the tracked identities, and the estimated flow of people.
 
 \section{Sprint Objectives and Backlog}
-This sprint was focused on delivering two complementary layers: a reliable perception baseline for tracking people across frames within designated queue zones, and a queue analytics layer that converts tracked observations into operational metrics. The specific objectives are captured in the sprint backlog, which separates manager-facing outcomes from technical implementation concerns.
+Sprint 1 had two linked objectives. The first was to obtain a reliable perception baseline by detecting people, preserving identity across frames, and ignoring movement outside the queue zone. The second was to convert those observations into operational metrics that a manager could interpret later in the dashboard. The sprint backlog separates these manager-facing outcomes from the technical tasks needed to support them.
 
 \section{Sprint Backlog}
-The Sprint 1 backlog separates manager-facing user stories from technical implementation tasks. User stories represent stakeholder needs and value; technical tasks are internal infrastructure concerns. This structure ensures that traceability focuses on business outcomes while documenting all delivery work.
+The Sprint 1 backlog separates manager-facing user stories from technical tasks. User stories represent stakeholder needs, while technical tasks describe the internal work required to make those needs measurable.
 The user stories in Sprint 1 represent manager needs for reliable perception and analytics, as shown in Table~\ref{tab:sprint1_user_stories}.
 
 \begin{table}[H]
@@ -52,11 +52,11 @@ Supporting technical tasks address internal implementation requirements that ena
 \section{Design}
 
 \subsection{Perception and Analytics Flow}
-The Sprint 1 workflow from frame ingestion to queue metrics output occurs at two levels: the overall perception pipeline and the detailed queue analytics transformation. The design must address several runtime conditions and operational scenarios that arise during real-world queue monitoring.
+The Sprint 1 workflow can be read at two levels: the overall path from frame ingestion to metric output, and the detailed transformation from tracked identities to queue rates. This distinction helped keep the visual processing concerns separate from the waiting-time calculation.
 
 At the perception level, the system handles three key scenarios: when a person enters the queue zone, they are treated as a possible arrival; when the same person appears in consecutive frames, the system maintains stable identification to avoid double-counting; and when people appear outside the zone, they are filtered out to keep measurements focused on the queue area.
 
-At the queue-operation level, the system must respond gracefully to three distinct conditions. In a normal queue, arrivals remain below service capacity, allowing the M/M/1 formula to provide precise rate-based estimates. When arrivals approach service capacity, the system seamlessly switches to a conservative occupancy-based estimate. When no service events are available, the output remains bounded and safe for downstream processing. This adaptive logic ensures that a single metric responds correctly to real-world conditions without requiring separate state signals.
+At the queue-operation level, the system handles three practical situations. When arrivals remain below service capacity, the M/M/1 formula provides a rate-based estimate. When arrivals approach or exceed service capacity, the estimate switches to a conservative occupancy-based value. When no service events are available, the output remains bounded instead of producing unstable values. This adaptive behavior keeps a single wait-time indicator usable across changing queue conditions.
 
 At the high level, Figure~\ref{fig:sprint1_activity} shows the end-to-end flow from a video source (local file or live camera stream) through detection, tracking, zone filtering, and finally to queue analysis that computes arrival rate, service rate, and expected wait time.
 \begin{figure}[!htbp]
@@ -77,9 +77,9 @@ At the detailed level, Figure~\ref{fig:sprint1_analytics_activity} focuses on th
 \section{Implementation}
 
 \subsection{Perception Pipeline}
-The perception pipeline integrates three core components: detection, tracking, and zone filtering. The detection layer identifies people in each frame using YOLO and is tuned to balance speed and accuracy, ensuring the system remains responsive without losing critical observations. The detection output is then fed to the tracking layer, which preserves person identity across consecutive frames using ByteTrack. This identity continuity is essential for reliable arrival and departure counting, as it prevents double-counting from single-frame detections alone. Finally, zone-aware filtering restricts all measurements to a polygon-defined queue area, eliminating unrelated movement elsewhere in the scene and ensuring the metric reflects only the relevant part of the frame.
+The perception pipeline combines detection, tracking, and zone filtering. YOLO identifies people in each frame, while ByteTrack preserves identity across consecutive frames. This identity continuity is necessary for arrival and departure counting, because a person should not be counted again simply because they appear in the next frame. Zone-aware filtering then restricts the measurement to the polygon-defined queue area, so unrelated movement elsewhere in the scene does not affect the queue metric.
 
-The pipeline integration is orchestrated in the runtime layer, which supports handling diverse input sources (local files, webcams, and live camera streams), adjusting frame-processing frequency to maintain system responsiveness, rendering overlays to display detections, tracker identities, queue zones, and computed metrics, and operating without visual output when needed for headless integration with downstream systems.
+The same processing path supports local files, webcams, and live camera streams. It can adjust frame-processing frequency, display overlays for detections, tracker identities, queue zones, and computed metrics, or run without visual output when the results are needed by later system components.
 
 \subsection{Queue Event Windows and Rate Estimation}
 The queue-analysis step uses short time windows to count arrivals and departures. Let $N_a$ and $N_d$ be the number of events observed in windows $T_a$ and $T_d$:
@@ -98,7 +98,7 @@ W = \begin{cases}
 \]
 where $L$ is the current number of people in the zone. We use the M/M/1 sojourn-time expression because the project models each monitored lane as a single service channel with one effective queue, which matches the cashier-style setting studied in the report. Other models were less appropriate here: M/M/c would assume multiple parallel servers, which is not the default lane setup, and Little's Law is useful for validation but does not directly produce a forward wait-time estimate from the instantaneous rates alone.
 
-The adaptive formula ensures the output always remains safe and interpretable: when arrivals are below service capacity, the formula is precise; when arrivals exceed capacity, it gracefully degrades to a conservative estimate based on current queue size. When no service events are observed, the implementation returns zero.
+The adaptive formula keeps the output interpretable. Under normal load, the estimate comes from the rate-based expression. Under overload, it falls back to a conservative value based on the current queue size. When no service events are observed, the result is bounded instead of allowing division by zero or an unrealistic wait-time value.
 
 \subsection{Runtime Metric Contract}
 The final metric output includes:
@@ -109,10 +109,9 @@ The final metric output includes:
 These values are then reused by logs, overlays, webhook payloads, and dashboard events \cite{opencv_docs,gross_queueing}.
 
 \section{Conclusion}
-Sprint 1 delivered the complete path from raw video to operational queue indicators, establishing a trustworthy metric layer for downstream systems. The integration of detection, tracking, and zone filtering produced a reliable perception baseline, while the queue analytics layer converted tracked observations into arrival rates, service rates, and adaptive wait-time estimates.
+Sprint 1 delivered the first complete path from raw video to queue indicators. Detection, tracking, and zone filtering produced a usable perception baseline, while the queue analytics step converted tracked observations into arrival rates, service rates, and adaptive wait-time estimates.
 
-The key technical achievement was the adaptive wait-time formula, which remains interpretable and safe across all operating conditions: it provides precise estimates when arrivals are below service capacity, gracefully degrades to occupancy-based estimates when the queue grows, and returns bounded values when service events are unavailable. This design ensures that downstream layers—the dashboard, persistence, and automation—can operate on structured and stable signals rather than raw detection counts.
+The main result of the sprint was not only that people could be counted, but that the count was translated into a reusable queue signal. The adaptive wait-time logic made this signal more robust: it used the rate-based model when the queue was stable, moved to an occupancy-based estimate when the queue became overloaded, and stayed bounded when service events were missing.
 
-By connecting perception to interpretation in a single delivery, the sprint reduced false continuity problems through tracking and zone logic, while the queue model provided the necessary foundation for later integration with web monitoring and automated alerting workflows. The metric contract established in this sprint is designed to be reused consistently throughout the system's remaining layers.
-
+By connecting perception to interpretation in one sprint, the project avoided building the dashboard on top of raw visual counts. The metric output established here became the foundation for web monitoring, persistence, and automated alerting in the following sprints.
 
