@@ -105,21 +105,21 @@ The proposed solution combines open-source vision-based detection with queue-the
 \subsection{Proposed Solution and Project Objectives}
 The proposed system links perception, analytics, monitoring, and automation in a modular architecture. Instead of stopping at raw visual observations, it maps camera feeds to queue-state information, then makes that information available through dashboard views and alert workflows.
 
-To establish clear traceability between the technical solution and measurable project outcomes, the objectives are mapped to delivery modules and observable outputs in Table~\ref{tab:objective_traceability}.
+To establish clear traceability between the technical solution and measurable project outcomes, the objectives and their observable outputs are listed in Table~\ref{tab:objective_traceability}.
 \begin{table}[H]
     \centering
     \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
-    \begin{tabularx}{\textwidth}{|l|X|l|X|}
+    \begin{tabularx}{\textwidth}{|l|X|X|}
         \hline
-        Objective ID & Objective & Primary module & Observable output \\ \hline
-        OBJ-01 & Real-time detection and tracking & Module A & Stable in-frame detections with persistent tracker IDs. \\ \hline
-        OBJ-02 & Queue-zone counting & Module A & Per-frame in-zone people count and zone-aware overlays. \\ \hline
-        OBJ-03 & Queue metric estimation ($\lambda,\mu,W$) & Module A & Continuous metric payloads from queue analysis pipeline. \\ \hline
-        OBJ-04 & Adaptive wait-time estimation & Module A & Compute wait time with adaptive logic that responds to queue load. \\ \hline
-        OBJ-05 & Web monitoring & Module B & Live dashboard with feed controls, KPIs, and stream views. \\ \hline
-        OBJ-06 & Automation integration & Module C & Webhook-based alert routing through n8n and Telegram. \\ \hline
+        Objective ID & Objective & Observable output \\ \hline
+        OBJ-01 & Real-time detection and tracking & Stable in-frame detections with persistent tracker IDs. \\ \hline
+        OBJ-02 & Queue-zone counting & Per-frame in-zone people count and zone-aware overlays. \\ \hline
+        OBJ-03 & Queue metric estimation ($\lambda,\mu,W$) & Continuous metric payloads from queue analysis pipeline. \\ \hline
+        OBJ-04 & Adaptive wait-time estimation & Compute wait time with adaptive logic that responds to queue load. \\ \hline
+        OBJ-05 & Web monitoring & Live dashboard with feed controls, KPIs, and stream views. \\ \hline
+        OBJ-06 & Automation integration & Webhook-based alert routing through n8n and Telegram. \\ \hline
     \end{tabularx}
-    \caption{Objective-to-module traceability}
+    \caption{Objectives and observable outputs}
     \label{tab:objective_traceability}
     \endgroup
 \end{table}
@@ -146,41 +146,7 @@ Development followed a sprint-based Scrum methodology with validation at the end
     \label{fig:scrum_methodology}
 \end{figure}
 
-The modular organization is summarized in Table~\ref{tab:scrum_module_mapping}, which maps each module to its constituent sprints, primary focus areas, and validation perspectives.
-\begin{table}[H]
-    \centering
-    \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
-    \begin{tabularx}{\textwidth}{|l|l|X|X|}
-        \hline
-        Module & Sprints & Main focus & Validation perspective \\ \hline
-        Module A: Backend Core & 1 to 2 & Perception pipeline, queue analytics, camera connectivity, API services, live transport & Perception correctness, metric contracts, and API reliability. \\ \hline
-        Module B: Web Experience & 3 & Frontend design system, dashboard scaffolding, live integration, monitoring workflows & Usability, live-rendering stability, and role-based navigation. \\ \hline
-        Module C: Automation and Finalization & 4 & n8n alerting, Telegram notifications, evaluation, optimization, and fault tolerance & End-to-end operability and delivery readiness. \\ \hline
-    \end{tabularx}
-    \caption{Scrum module mapping used in this report}
-    \label{tab:scrum_module_mapping}
-    \endgroup
-\end{table}
 
-\subsection{Sprint Planning and Execution}
-The project was structured into four sprints, each with defined objectives, deliverables, and validation checkpoints. The sprint plan is summarized in Table~\ref{tab:sprint_planning}, which details the timeline, focus areas, and traceability to user story implementations.
-\begin{table}[H]
-    \centering
-    \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
-    \begin{tabularx}{\textwidth}{|l|X|l|l|l|}
-        \hline
-        Sprint & Objectives & Start Date & End Date & User Story IDs \\ \hline
-        Sprint 1 & Perception and queue analytics, detection, tracking, and zone filtering, wait-time estimation and stability handling & 16/02/2026 & 14/03/2026 & US1.1--US1.9 \\ \hline
-        Sprint 2 & Camera connectivity and discovery, backend API exposure, live transport and feed management & 15/03/2026 & 11/04/2026 & US2.1--US2.4 \\ \hline
-        Sprint 3 & Web design system and frontend scaffolding, live backend integration, dashboard monitoring and role-based navigation & 12/04/2026 & 09/05/2026 & US3.1--US3.9 \\ \hline
-        Sprint 4 & n8n automation and Telegram alerting, testing and verification, runtime tuning and fault tolerance & 10/05/2026 & 06/06/2026 & US4.1--US4.7 \\ \hline
-    \end{tabularx}
-    \caption{Sprint planning used in the report}
-    \label{tab:sprint_planning}
-    \endgroup
-\end{table}
-
-The detailed user stories for each sprint are presented in the backlog tables in Chapters 3 to 6.
 
 \section{Conclusion}
 This chapter defined the project context and the delivery strategy. Chapter 2 builds on this baseline by presenting the requirements, architecture constraints, and analysis artifacts used to guide the implementation.

@@ -9,27 +9,28 @@ Sprint 2 moved the project from a local video-processing pipeline to a service t
 This sprint also prepared the ground for the web dashboard. Managers would later need to discover cameras, configure sources, start or stop feeds, and keep watching a stream even when the preferred transport was unavailable.
 
 \section{Sprint Objectives and Backlog}
-The sprint objectives focused on four manager needs: secure connection to IP cameras, automatic camera discovery, centralized feed management, and reliable live delivery. These needs are captured in Table~\ref{tab:sprint2_user_stories}.
+The sprint objectives focused on four manager needs: secure connection to IP cameras, automatic camera discovery, centralized feed management, and reliable live delivery. These needs are captured in Table~\ref{tab:sprint2_backlog}.
 
 \begin{table}[H]
     \centering
     \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
-    \begin{tabularx}{\textwidth}{|l|X|l|X|}
+    \begin{tabularx}{\textwidth}{|l|X|X|}
         \hline
-        User Story ID & User Story & Task ID & Task \\ \hline
-        US2.1 & As a manager, I want IP camera streams connected securely so that live sources can be reused reliably. & T2.1 & Add authentication, transport control, reconnection, and snapshots for RTSP feeds. \\ \hline
-        US2.2 & As a manager, I want cameras discovered automatically so that stream addresses do not need to be hardcoded. & T2.2 & Detect IP cameras and resolve their stream addresses. \\ \hline
-        US2.3 & As a manager, I want feed management exposed through the API so that camera lifecycle actions are centralized. & T2.3 & Expose feed control, metadata handling, and diagnostic operations. \\ \hline
-        US2.4 & As a manager, I want live delivery to stay available so that the dashboard can keep showing the active feed. & T2.4 & Support live delivery through real-time events and a layered video transport strategy. \\ \hline
+        UC ID & User Story & Implementation Work \\ \hline
+        UC-02 & As a manager, I want IP camera streams connected securely so that live sources can be reused reliably. & Add credential handling, RTSP transport control, reconnection behavior, and snapshot capture for camera feeds. \\ \hline
+        UC-02 & As a manager, I want cameras discovered automatically so that stream addresses do not need to be hardcoded. & Detect ONVIF cameras, resolve media services, and retrieve stream addresses. \\ \hline
+        UC-02 & As a manager, I want feed management exposed through the API so that camera lifecycle actions are centralized. & Expose feed control, metadata handling, diagnostics, persistence, and state recovery through typed backend endpoints. \\ \hline
+        UC-04 & As a manager, I want live delivery to stay available so that the dashboard can keep showing the active feed. & Support real-time events, WebRTC delivery for IP cameras, MJPEG delivery for local videos, and explicit fallback reporting. \\ \hline
     \end{tabularx}
-    \caption{Sprint 2 user stories}
-    \label{tab:sprint2_user_stories}
+    \caption{Sprint 2 backlog}
+    \label{tab:sprint2_backlog}
     \endgroup
 \end{table}
 
 \section{Design}
 
-\subsection{Backend Domain Model and Class Structure}
+Backend Domain Model and Class Structure
+
 The backend model was organized around the entities that appear in a real monitoring scenario: establishments, managers, feed configurations, video sessions, queue metrics, and alerts. Establishments group both managers and feeds, while managers operate only on the feeds assigned to their scope. This organization keeps access control and feed recovery consistent when the system restarts.
 
 The core entities and their relationships are illustrated in Figure~\ref{fig:sprint2_class_diagram}.
@@ -85,4 +86,3 @@ On startup, saved feed definitions are reloaded and unfinished sessions are rese
 Sprint 2 turned the perception prototype into a managed service layer for camera discovery, feed lifecycle control, live events, and video delivery. The work addressed three project-level challenges: connecting heterogeneous sources through ONVIF and RTSP, keeping access and feed state consistent, and providing fallback-aware live delivery for the dashboard.
 
 The sprint established the runtime foundation used by the web interface in Sprint 3. By the end of the sprint, the project could move from a configured source to live queue monitoring data without requiring the manager to handle camera addresses or transport details manually.
-

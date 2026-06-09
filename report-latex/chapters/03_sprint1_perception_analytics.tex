@@ -8,50 +8,30 @@ The first sprint answered the most basic question of the project: can a video fe
 Delivering perception and analytics together was important because the later dashboard and alerting work needed more than raw counts. They needed a consistent metric output that already represented the queue zone, the tracked identities, and the estimated flow of people.
 
 \section{Sprint Objectives and Backlog}
-Sprint 1 had two linked objectives. The first was to obtain a reliable perception baseline by detecting people, preserving identity across frames, and ignoring movement outside the queue zone. The second was to convert those observations into operational metrics that a manager could interpret later in the dashboard. The sprint backlog separates these manager-facing outcomes from the technical tasks needed to support them.
-
-\section{Sprint Backlog}
-The Sprint 1 backlog separates manager-facing user stories from technical tasks. User stories represent stakeholder needs, while technical tasks describe the internal work required to make those needs measurable.
-The user stories in Sprint 1 represent manager needs for reliable perception and analytics, as shown in Table~\ref{tab:sprint1_user_stories}.
+Sprint 1 had two linked objectives. The first was to obtain a reliable perception baseline by detecting people, preserving identity across frames, and ignoring movement outside the queue zone. The second was to convert those observations into operational metrics that a manager could interpret later in the dashboard. Table~\ref{tab:sprint1_backlog} summarizes the sprint backlog by use case and links each user-facing need to its implementation work.
 
 \begin{table}[H]
     \centering
     \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
-    \begin{tabularx}{\textwidth}{|l|X|l|X|}
+    \begin{tabularx}{\textwidth}{|l|X|X|}
         \hline
-        User Story ID & User Story & Task ID & Task \\ \hline
-        US1.1 & As a manager, I want to detect people in the video stream so that queue observations start from a reliable signal. & T1.1 & Configure the detector to identify people in live and recorded video. \\ \hline
-        US1.2 & As a manager, I want to keep the same person identifiable across frames so that counts remain consistent. & T1.2 & Integrate tracking to preserve identity across consecutive frames. \\ \hline
-        US1.3 & As a manager, I want to restrict counting to queue zones so that irrelevant movement does not affect the queue state. & T1.3 & Define queue zones as polygons and filter detections by zone. \\ \hline
-        US1.6 & As a manager, I want queue rates estimated from tracked people so that the dashboard can interpret flow intensity. & T1.6 & Group tracked events into short windows and compute arrival and service rates. \\ \hline
-        US1.7 & As a manager, I want wait time computed adaptively so that the result remains useful in real conditions. & T1.7 & Apply the M/M/1 formula when arrivals are below service capacity and fallback to occupancy-based estimation otherwise. \\ \hline
-        US1.9 & As a manager, I want a clear metric output so that the dashboard can reuse these values without reprocessing them. & T1.9 & Publish rate estimates, wait time, and people-in-zone occupancy. \\ \hline
+        UC ID & User Story & Implementation Work \\ \hline
+        UC-04 & As a manager, I want to detect people in the video stream so that queue observations start from a reliable signal. & Configure detection for live and recorded video, then connect frame capture, detection, tracking, zone filtering, and display into one continuous flow. \\ \hline
+        UC-04 & As a manager, I want to keep the same person identifiable across frames so that counts remain consistent. & Integrate tracking to preserve identity across consecutive frames and expose runtime settings that adapt the pipeline without code changes. \\ \hline
+        UC-03 & As a manager, I want to restrict counting to queue zones so that irrelevant movement does not affect the queue state. & Define queue zones as polygons and filter detections by zone. \\ \hline
+        UC-07 & As a manager, I want queue rates estimated from tracked people so that the dashboard can interpret flow intensity. & Group tracked events into short windows and compute arrival and service rates. \\ \hline
+        UC-07 & As a manager, I want wait time computed adaptively so that the result remains useful in real conditions. & Apply the M/M/1 formula when arrivals are below service capacity, switch to occupancy-based estimation otherwise, and guard against empty windows, low counts, and division by zero. \\ \hline
+        UC-04 & As a manager, I want a clear metric output so that the dashboard can reuse these values without reprocessing them. & Publish rate estimates, wait time, and people-in-zone occupancy as a reusable metric contract. \\ \hline
     \end{tabularx}
-    \caption{Sprint 1 user stories}
-    \label{tab:sprint1_user_stories}
-    \endgroup
-\end{table}
-
-Supporting technical tasks address internal implementation requirements that enable these user stories, as detailed in Table~\ref{tab:sprint1_technical_tasks}.
-
-\begin{table}[H]
-    \centering
-    \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
-    \begin{tabularx}{\textwidth}{|l|X|l|X|}
-        \hline
-        Task ID & Task & Subtask ID & Subtask \\ \hline
-        T1.4 & Connect capture, detection, tracking, zone filtering, and display into one continuous flow. & ST1.4.1 & Implement runtime orchestration that integrates all perception components. \\ \hline
-        T1.5 & Expose runtime settings so that the pipeline can be adapted without code changes. & ST1.5.1 & Provide configurable parameters for frame handling and visualization. \\ \hline
-        T1.8 & Add guards for empty windows, low counts, and bounded fallback output to protect calculations from division-by-zero and noise. & ST1.8.1 & Implement defensive bounds checking in the analytics layer. \\ \hline
-    \end{tabularx}
-    \caption{Sprint 1 technical tasks}
-    \label{tab:sprint1_technical_tasks}
+    \caption{Sprint 1 backlog}
+    \label{tab:sprint1_backlog}
     \endgroup
 \end{table}
 
 \section{Design}
 
-\subsection{Perception and Analytics Flow}
+Perception and Analytics Flow
+
 The Sprint 1 workflow can be read at two levels: the overall path from frame ingestion to metric output, and the detailed transformation from tracked identities to queue rates. This distinction helped keep the visual processing concerns separate from the waiting-time calculation.
 
 At the perception level, the system handles three key scenarios: when a person enters the queue zone, they are treated as a possible arrival; when the same person appears in consecutive frames, the system maintains stable identification to avoid double-counting; and when people appear outside the zone, they are filtered out to keep measurements focused on the queue area.
@@ -59,7 +39,7 @@ At the perception level, the system handles three key scenarios: when a person e
 At the queue-operation level, the system handles three practical situations. When arrivals remain below service capacity, the M/M/1 formula provides a rate-based estimate. When arrivals approach or exceed service capacity, the estimate switches to a conservative occupancy-based value. When no service events are available, the output remains bounded instead of producing unstable values. This adaptive behavior keeps a single wait-time indicator usable across changing queue conditions.
 
 At the high level, Figure~\ref{fig:sprint1_activity} shows the end-to-end flow from a video source (local file or live camera stream) through detection, tracking, zone filtering, and finally to queue analysis that computes arrival rate, service rate, and expected wait time.
-\begin{figure}[!htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.60\textwidth]{\detokenize{chapter3_activity.pdf}}
     \caption{Sprint 1 activity flow from frame ingestion to queue metrics output.}
@@ -67,7 +47,7 @@ At the high level, Figure~\ref{fig:sprint1_activity} shows the end-to-end flow f
 \end{figure}
 
 At the detailed level, Figure~\ref{fig:sprint1_analytics_activity} focuses on the queue analytics transformation that converts tracked people inside the zone into the metric payload consumed by the dashboard and later automation layers. The analytics step compares current tracked identifiers with the previous observation window to identify arrivals and departures. These events are stored in short windows, then converted into rates ($\lambda$ and $\mu$). Before applying the wait-time formula, the system checks whether enough events were observed, whether $\mu$ is positive, and whether arrivals remain below service capacity. If these guards are satisfied, it uses the M/M/1 expression; otherwise, it falls back to a bounded occupancy-based estimate.
-\begin{figure}[!htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.72\textwidth]{\detokenize{chapter3_activity_Analytics.pdf}}
     \caption{Sprint 1 analytics activity diagram for queue metric generation.}
@@ -114,4 +94,3 @@ Sprint 1 delivered the first complete path from raw video to queue indicators. D
 The main result of the sprint was not only that people could be counted, but that the count was translated into a reusable queue signal. The adaptive wait-time logic made this signal more robust: it used the rate-based model when the queue was stable, moved to an occupancy-based estimate when the queue became overloaded, and stayed bounded when service events were missing.
 
 By connecting perception to interpretation in one sprint, the project avoided building the dashboard on top of raw visual counts. The metric output established here became the foundation for web monitoring, persistence, and automated alerting in the following sprints.
-

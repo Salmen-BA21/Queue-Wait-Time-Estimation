@@ -9,45 +9,26 @@ Sprint 3 turned the backend capabilities from Sprint 2 into a manager-facing web
 The main objective was to make monitoring usable in one place. A manager should be able to sign in, prepare a feed, define the queue zone, launch monitoring, follow live indicators, and review analytics without switching between separate tools.
 
 \section{Sprint Objectives and Backlog}
-Sprint 3 combined interface design with live system integration. The design work defined the visual language, page structure, and reusable interaction patterns. The integration work connected those screens to authentication, feed management, WebSocket updates, video transport, and fallback polling. The sprint backlog organized these goals into manager-facing and administrator-facing user stories.
-
-\subsection{User Stories}
-Table~\ref{tab:sprint3_user_stories} lists the manager and admin requirements for Sprint 3.
+Sprint 3 combined interface design with live system integration. The design work defined the visual language, page structure, and reusable interaction patterns. The integration work connected those screens to authentication, feed management, WebSocket updates, video transport, and fallback polling. Table~\ref{tab:sprint3_backlog} lists the manager and administrator needs together with the implementation work that supported them.
 
 \begin{table}[H]
     \centering
     \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
-    \begin{tabularx}{\textwidth}{|l|X|l|X|}
+    \begin{tabularx}{\textwidth}{|l|X|X|}
         \hline
-        User Story ID & User Story & Task ID & Task \\ \hline
-        US3.1 & As a manager, I want a consistent visual style so that the dashboard feels like one coherent product. & T3.1 & Define colors, typography, spacing, and reusable component rules. \\ \hline
-        US3.2 & As a manager, I want the main page layouts prepared so that onboarding, monitoring, and analytics screens are available. & T3.2 & Prepare the landing page, dashboard, analytics, and settings layouts. \\ \hline
-        US3.3 & As an admin, I want to create and maintain manager accounts so that system access is centrally controlled. & T3.3 & Build the admin dashboard for manager account creation, editing, and deletion. \\ \hline
-        US3.4 & As a manager, I want the dashboard connected to backend responses so that the interface reflects live operational data. & T3.4 & Implement the API integration layer and typed request handling. \\ \hline
-        US3.5 & As a manager, I want to manage feeds from the interface so that feed lifecycle actions stay centralized. & T3.5 & Connect login state, protected routes, and feed control actions to the dashboard. \\ \hline
-        US3.6 & As a manager, I want live updates without refreshing so that changes are visible immediately. & T3.6 & Add websocket-driven live state updates and dashboard orchestration. \\ \hline
-        US3.7 & As a manager, I want a suitable video transport chosen automatically so that the feed remains usable when conditions change. & T3.7 & Add transport selection, fallback streaming, and reconnection logic. \\ \hline
-        US3.8 & As a manager, I want the dashboard to stay usable during interruptions so that monitoring does not stop during transient failures. & T3.8 & Add fallback polling and stale-data guards. \\ \hline
+        UC ID & User Story & Implementation Work \\ \hline
+        UC-04 & As a manager, I want a consistent visual style so that the dashboard feels like one coherent product. & Define colors, typography, spacing, reusable component rules, and shared page scaffolding. \\ \hline
+        UC-02 & As a manager, I want the main setup and monitoring layouts prepared so that onboarding, monitoring, and analytics screens are available. & Prepare the landing page, dashboard, analytics page, settings screens, and feed onboarding dialogs. \\ \hline
+        UC-01 & As an administrator, I want to create and maintain manager accounts so that system access is centrally controlled. & Build the administrator dashboard for manager account creation, editing, activation, deactivation, and password reset. \\ \hline
+        UC-04 & As a manager, I want the dashboard connected to backend responses so that the interface reflects live operational data. & Implement the typed API integration layer and request handling for feeds, metrics, health, statistics, and authentication. \\ \hline
+        UC-02 & As a manager, I want to manage feeds from the interface so that feed lifecycle actions stay centralized. & Connect login state, protected routes, feed setup, zone selection, model selection, and feed control actions to the dashboard. \\ \hline
+        UC-04 & As a manager, I want live updates without refreshing so that changes are visible immediately. & Add WebSocket-driven live state updates, dashboard orchestration, and scenario-based integration tests. \\ \hline
+        UC-04 & As a manager, I want a suitable video transport chosen automatically so that the feed remains usable when conditions change. & Add WebRTC negotiation, MJPEG fallback, transport selection, and reconnection logic. \\ \hline
+        UC-04 & As a manager, I want the dashboard to stay usable during interruptions so that monitoring does not stop during transient failures. & Add fallback polling, stale-data guards, and error-state handling for live monitoring workflows. \\ \hline
+        UC-07 & As a manager, I want historical analytics available so that queue trends and alerts can be reviewed. & Implement the analytics page, KPI summaries, charts, filters, and CSV export behavior. \\ \hline
     \end{tabularx}
-    \caption{Sprint 3 user stories}
-    \label{tab:sprint3_user_stories}
-    \endgroup
-\end{table}
-
-\subsection{Technical Tasks}
-Table~\ref{tab:sprint3_technical_tasks} lists the internal implementation work for integration and testing.
-
-\begin{table}[H]
-    \centering
-    \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
-    \begin{tabularx}{\textwidth}{|l|X|l|X|}
-        \hline
-        Task ID & Task & Subtask ID & Subtask \\ \hline
-        T3.10 & Set up the frontend project with shared components and page scaffolding so that the interface can grow without duplication. & ST3.10.1 & Create reusable UI component library and establish project structure. \\ \hline
-        T3.11 & Validate dashboard setup and onboarding flows with integration tests to ensure the integration behaves correctly end to end. & ST3.11.1 & Implement scenario-based tests for dashboard lifecycle and error paths. \\ \hline
-    \end{tabularx}
-    \caption{Sprint 3 technical tasks}
-    \label{tab:sprint3_technical_tasks}
+    \caption{Sprint 3 backlog}
+    \label{tab:sprint3_backlog}
     \endgroup
 \end{table}
 
@@ -56,7 +37,7 @@ Table~\ref{tab:sprint3_technical_tasks} lists the internal implementation work f
 \subsection{Visual Design and Interface Architecture}
 The interface follows a ``Terminal Minimal'' style suited to monitoring work. Dark surfaces reduce visual fatigue during long sessions, while semantic colors distinguish normal, warning, and critical states. Cards and panels are used to group feed summaries, KPI values, recent activity, and configuration steps without changing the manager's mental model from page to page.
 
-The application is organized around five main pages: landing, dashboard, analytics, settings, and authentication. Defining this navigation early helped separate design decisions from live-data behavior. Once the main screens were stable, integration work could focus on whether the dashboard reacted correctly to feed changes, alerts, and transport failures.
+The application is organized around four main pages:  dashboard, analytics, admin panel, and authentication. Defining this navigation early helped separate design decisions from live-data behavior. Once the main screens were stable, integration work could focus on whether the dashboard reacted correctly to feed changes, alerts, and transport failures.
 
 \subsection{Dashboard Data Flow and Integration Architecture}
 The dashboard data flow starts after authentication. The interface retrieves feed configuration and system health, then opens a persistent WebSocket connection for live updates. The backend sends an initial metrics snapshot, followed by feed lifecycle events, metric changes, alerts, and warnings. Feed actions such as launch, stop, or update are sent as REST commands, then reflected back through the live event stream.
@@ -68,7 +49,7 @@ Figure~\ref{fig:sprint3_dashboard_data_flow_sequence} illustrates this complete 
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.95\textwidth]{\detokenize{chapter5_dashboard_data_flow_sequence.pdf}}
-    \caption{Dashboard data flow sequence showing protected access (alt), metric broadcasts (loop), fallback polling (opt), and video transport negotiation (alt).}
+    \caption{Dashboard data flow sequence: authentication, live metrics, fallback polling, and video transport.}
     \label{fig:sprint3_dashboard_data_flow_sequence}
 \end{figure}
 
@@ -92,12 +73,12 @@ The dashboard communicates with the backend through a dedicated integration boun
 \subsection{Authentication and Role-Based Navigation}
 Sprint 3 integrated authentication and role-based access into the dashboard. Session changes clear cached dashboard data, protected routes redirect users according to role, administrators reach the manager administration interface, and managers reach the monitoring dashboard. The purpose is simple from the user's perspective: each role sees the screens that match its responsibilities.
 
-Three key screens support this flow: the manager sign-in screen, the manager account creation screen, and the administrator account-governance interface. These screens are shown in Figures~\ref{fig:sprint3_login_page}, \ref{fig:sprint3_signup_page}, and \ref{fig:sprint3_admin_dashboard}. Together, they keep authentication, account creation, and role-based routing within the same product experience.
+Three key screens support this flow: the manager/admin sign-in screen, the manager account creation screen, and the administrator account-governance interface. These screens are shown in Figures~\ref{fig:sprint3_login_page}, \ref{fig:sprint3_signup_page}, and \ref{fig:sprint3_admin_dashboard}. Together, they keep authentication, account creation, and role-based routing within the same product experience.
 
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.65\textwidth]{\detokenize{LoginPage.png}}
-    \caption{Manager sign-in screen for dashboard access.}
+    \caption{Manager/admin sign-in screen for dashboard access.}
     \label{fig:sprint3_login_page}
 \end{figure}
 
@@ -149,16 +130,16 @@ The dashboard integrates live feed controls, setup dialogs, onboarding, KPI visu
 
 The manager onboarding flow covers the full path from feed setup to feed confirmation. Figure~\ref{fig:onboarding_activity} shows the main phases: source selection, source configuration, connection testing, zone definition, model selection, and final review.
 
-\begin{figure}[!htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.7\textwidth]{\detokenize{chapter5_onboarding_activity.pdf}}
-    \caption{Manager onboarding activity diagram showing user actions and UI state transitions from feed setup initialization through feed launch confirmation. Decision nodes show ONVIF versus upload path selection and the test validation retry loop.}
+    \caption{Manager onboarding activity diagram: feed setup, zone definition, model selection, and launch confirmation.}
     \label{fig:onboarding_activity}
 \end{figure}
 
 The workflow execution involves several screens. First, the feed setup screen prepares an uploaded video or ONVIF source:
 
-\begin{figure}[!htbp]
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.9\textwidth]{\detokenize{FeedConfigUi.png}}
     \caption{Feed setup screen used to prepare an uploaded video or ONVIF camera source before zone tracing and model selection.}
@@ -166,7 +147,8 @@ The workflow execution involves several screens. First, the feed setup screen pr
 \end{figure}
 
 Then the zone is defined through the tracing interface:
-\begin{figure}[!htbp]
+
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.9\textwidth]{\detokenize{ZoneTraceUi.png}}
     \caption{Zone tracing screen used to define the queue polygon for the selected feed.}
@@ -174,7 +156,8 @@ Then the zone is defined through the tracing interface:
 \end{figure}
 
 Model selection precedes the final confirmation. The manager chooses the YOLO size here:
-\begin{figure}[!htbp]
+
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.9\textwidth]{\detokenize{ModelSelectUi.png}}
     \caption{Model selection screen used to choose the YOLO size before launching the feed.}
@@ -182,7 +165,8 @@ Model selection precedes the final confirmation. The manager chooses the YOLO si
 \end{figure}
 
 Finally, the staged feed or batch is confirmed before launch:
-\begin{figure}[!htbp]
+
+\begin{figure}[H]
     \centering
     \includegraphics[width=0.95\textwidth]{\detokenize{ReviewPanelUi.png}}
     \caption{Review and launch panel used to confirm staged feeds before batch creation or launch.}
@@ -214,4 +198,3 @@ These tests were useful because the dashboard is not correct just because it ren
 Sprint 3 delivered the manager-facing monitoring interface and connected it to the live system behavior prepared in Sprint 2. The dashboard now supports authentication, feed setup, ONVIF onboarding, zone selection, model choice, launch review, live metrics, video transport selection, analytics, and administration screens.
 
 The most important result was continuity of use. When live events arrive normally, the dashboard updates without refresh. When WebSocket events are interrupted, polling keeps the manager informed. When the preferred video transport is unavailable, fallback behavior keeps the feed area usable. These choices made the interface suitable for the alert automation and final validation work in Sprint 4.
-

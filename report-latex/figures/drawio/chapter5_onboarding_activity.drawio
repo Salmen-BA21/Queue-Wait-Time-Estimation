@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="chapter5-onboarding-activity" name="Page-1">
-        <mxGraphModel dx="167" dy="221" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="419" dy="424" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -43,7 +43,7 @@
                 <mxCell id="edge_action2b_merge1" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#000000;endArrow=block;endSize=8;" parent="1" source="action2b" target="merge1" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="decision_test_check" value="Is&#xa;ONVIF?" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#FF9800;fillColor=#FFE0B2;fontStyle=1;fontSize=11;" parent="1" vertex="1">
+                <mxCell id="decision_test_check" value="Is&#10;ONVIF?" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#FF9800;fillColor=#FFE0B2;fontStyle=1;fontSize=11;" parent="1" vertex="1">
                     <mxGeometry x="440" y="570" width="120" height="80" as="geometry"/>
                 </mxCell>
                 <mxCell id="edge_merge1_decision_test_check" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#000000;endArrow=block;endSize=8;" parent="1" source="merge1" target="decision_test_check" edge="1">
@@ -58,7 +58,7 @@
                 <mxCell id="label_yes_onvif" value="Yes" style="text;html=1;align=center;fontSize=10;fontStyle=1;fontColor=#FF9800;" parent="1" vertex="1">
                     <mxGeometry x="360" y="575" width="30" height="20" as="geometry"/>
                 </mxCell>
-                <mxCell id="decision2" value="Test&#xa;OK?" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#FF9800;fillColor=#FFE0B2;fontStyle=1;fontSize=11;" parent="1" vertex="1">
+                <mxCell id="decision2" value="Test&#10;OK?" style="rhombus;whiteSpace=wrap;html=1;strokeColor=#FF9800;fillColor=#FFE0B2;fontStyle=1;fontSize=11;" parent="1" vertex="1">
                     <mxGeometry x="240" y="775" width="120" height="80" as="geometry"/>
                 </mxCell>
                 <mxCell id="edge_action3_decision2" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#000000;endArrow=block;endSize=8;" parent="1" source="action3" target="decision2" edge="1">
@@ -128,8 +128,14 @@
                         <mxPoint x="571.9999999999999" y="1291" as="targetPoint"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="2" value="" style="ellipse;html=1;shape=endState;fillColor=strokeColor;" vertex="1" parent="1">
+                <mxCell id="2" value="" style="ellipse;html=1;shape=endState;fillColor=strokeColor;" parent="1" vertex="1">
                     <mxGeometry x="557" y="1290" width="30" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" value="MP4 video" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontStyle=1;fontSize=15;" vertex="1" parent="1">
+                    <mxGeometry x="600" y="240" width="100" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="4" value="IP Camera" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=15;fontStyle=1" vertex="1" parent="1">
+                    <mxGeometry x="300" y="240" width="100" height="30" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>

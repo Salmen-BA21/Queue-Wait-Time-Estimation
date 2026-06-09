@@ -33,13 +33,11 @@ The initial objectives were achieved at the project scope level:
 
 The main remaining gap is not architectural completeness, but the depth of long-duration evaluation under broader operational scenarios.
 
-\section{Future Work}
-Several extensions would make the platform stronger before wider deployment:
+\section{Future Improvements}
+Several extensions would strengthen the platform before wider deployment:
 \begin{itemize}
-    \item multi-zone and multi-server queue modeling for parallel cashier configurations,
-    \item richer alert strategies with cooldown tuning, escalation policies, and acknowledgment loops,
-    \item edge deployment optimization through ONNX/TensorRT profiling and resource-aware scheduling,
-    \item long-duration field evaluation with domain-specific KPI baselines,
-    \item stronger security controls for production webhook exposure and secrets management.
+    \item \textbf{Mobile application}: developing a companion mobile application allowing operators and managers to monitor queue activity, consult statistics, and receive alerts remotely in real time.
+    \item \textbf{In-platform messaging}: introducing a notification system enabling managers to communicate directly with operators, such as assigning available staff to queues based on live crowd conditions.
+    \item \textbf{Tracking accuracy improvement}: refining the person re-identification pipeline to reduce identity switches and tracking losses, particularly in dense or partially occluded queue scenarios.
 \end{itemize}
 

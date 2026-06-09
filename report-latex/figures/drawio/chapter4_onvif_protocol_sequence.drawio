@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="chapter4-onvif-protocol-sequence" name="Page-1">
-        <mxGraphModel dx="1122" dy="660" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+        <mxGraphModel dx="729" dy="509" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -46,7 +46,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="msg1b" value="1b. Broadcast" style="html=1;verticalAlign=bottom;startArrow=none;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" source="act_network" target="act_camera1" edge="1">
+                <mxCell id="msg1b" value="2. Broadcast to Camera 1" style="html=1;verticalAlign=bottom;startArrow=none;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" source="act_network" target="act_camera1" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="550" y="240" as="sourcePoint"/>
                         <mxPoint x="780" y="240" as="targetPoint"/>
@@ -55,7 +55,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="msg1c" value="1c. Broadcast" style="html=1;verticalAlign=bottom;startArrow=none;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" source="act_network" target="act_camera2" edge="1">
+                <mxCell id="msg1c" value="3. Broadcast to Camera 2" style="html=1;verticalAlign=bottom;startArrow=none;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" source="act_network" target="act_camera2" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="550" y="280" as="sourcePoint"/>
                         <mxPoint x="1010" y="280" as="targetPoint"/>
@@ -64,7 +64,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="msg2a" value="2a. ProbeMatch (name, IP, XAddrs)" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" source="act_camera1" target="act_app" edge="1">
+                <mxCell id="msg2a" value="4. ProbeMatch from Camera 1 (name, IP, XAddrs)" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" source="act_camera1" target="act_app" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="780" y="340" as="sourcePoint"/>
                         <mxPoint x="320" y="340" as="targetPoint"/>
@@ -73,7 +73,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="msg2b" value="2b. ProbeMatch (name, IP, XAddrs)" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" source="act_camera2" target="act_app" edge="1">
+                <mxCell id="msg2b" value="5. ProbeMatch from Camera 2 (name, IP, XAddrs)" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" source="act_camera2" target="act_app" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="1010" y="390" as="sourcePoint"/>
                         <mxPoint x="320" y="390" as="targetPoint"/>
@@ -94,7 +94,7 @@
                 <mxCell id="opt_auth1_label" value="[auth: Digest → Basic → None]" style="text;html=1;align=left;verticalAlign=top;spacingLeft=4;spacingTop=-4;fontStyle=1;labelBackgroundColor=default;fontSize=15;" parent="1" vertex="1">
                     <mxGeometry x="310" y="520" width="240" height="20" as="geometry"/>
                 </mxCell>
-                <mxCell id="msg3" value="3. SOAP GetProfiles" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" source="act_app" target="act_camera1" edge="1">
+                <mxCell id="msg3" value="6. SOAP GetProfiles" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" source="act_app" target="act_camera1" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="320" y="545" as="sourcePoint"/>
                         <mxPoint x="780" y="545" as="targetPoint"/>
@@ -103,7 +103,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="msg4" value="4. Profile Tokens" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" source="act_camera1" target="act_app" edge="1">
+                <mxCell id="msg4" value="7. Profile Tokens" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" source="act_camera1" target="act_app" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="780" y="600" as="sourcePoint"/>
                         <mxPoint x="320" y="600" as="targetPoint"/>
@@ -112,7 +112,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="msg5" value="5. SOAP GetStreamUri" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" source="act_app" target="act_camera1" edge="1">
+                <mxCell id="msg5" value="8. SOAP GetStreamUri" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" source="act_app" target="act_camera1" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="320" y="680" as="sourcePoint"/>
                         <mxPoint x="780" y="680" as="targetPoint"/>
@@ -121,7 +121,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="msg6" value="6. RTSP URL" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" source="act_camera1" target="act_app" edge="1">
+                <mxCell id="msg6" value="9. RTSP URL" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" source="act_camera1" target="act_app" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="780" y="750" as="sourcePoint"/>
                         <mxPoint x="320" y="750" as="targetPoint"/>
@@ -142,7 +142,7 @@
                 <mxCell id="opt_auth2_label" value="[auth: Digest → Basic → None]" style="text;html=1;align=left;verticalAlign=top;spacingLeft=4;spacingTop=-4;fontSize=15;" parent="1" vertex="1">
                     <mxGeometry x="330" y="850" width="240" height="20" as="geometry"/>
                 </mxCell>
-                <mxCell id="msg7" value="7. SOAP GetCapabilities" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" edge="1">
+                <mxCell id="msg7" value="10. SOAP GetCapabilities" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="325" y="890" as="sourcePoint"/>
                         <mxPoint x="1005" y="890" as="targetPoint"/>
@@ -157,7 +157,7 @@
                 <mxCell id="alt_extract_cond" value="[Media capability found]" style="text;html=1;align=left;verticalAlign=top;spacingLeft=4;spacingTop=-4;fontStyle=1;fontSize=15;" parent="1" vertex="1">
                     <mxGeometry x="330" y="940" width="200" height="20" as="geometry"/>
                 </mxCell>
-                <mxCell id="msg8a" value="8a. Extract Media XAddr from Capabilities" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" edge="1">
+                <mxCell id="msg8a" value="11. Extract Media XAddr from Capabilities" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="1005" y="1000" as="sourcePoint"/>
                         <mxPoint x="325.0000000000002" y="1000" as="targetPoint"/>
@@ -172,7 +172,7 @@
                 <mxCell id="alt_extract_else" value="[else → fallback GetServices]" style="text;html=1;align=left;verticalAlign=top;spacingLeft=4;spacingTop=-4;fontStyle=1;fontSize=15;" parent="1" vertex="1">
                     <mxGeometry x="330" y="1050" width="250" height="20" as="geometry"/>
                 </mxCell>
-                <mxCell id="msg8b_note" value="8b. SOAP GetServices (query media service)" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" edge="1">
+                <mxCell id="msg8b_note" value="12. SOAP GetServices (query media service)" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="1005" y="1100" as="sourcePoint"/>
                         <mxPoint x="325.0000000000002" y="1100" as="targetPoint"/>
@@ -183,7 +183,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="msg9" value="9. SOAP GetProfiles (on media endpoint)" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" edge="1">
+                <mxCell id="msg9" value="13. SOAP GetProfiles (on media endpoint)" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="325" y="1160" as="sourcePoint"/>
                         <mxPoint x="1005" y="1160" as="targetPoint"/>
@@ -193,7 +193,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="msg10" value="10. Profile Tokens" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" edge="1">
+                <mxCell id="msg10" value="14. Profile Tokens" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="1005" y="1200" as="sourcePoint"/>
                         <mxPoint x="325" y="1200" as="targetPoint"/>
@@ -203,7 +203,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="msg11" value="11. SOAP GetStreamUri" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" edge="1">
+                <mxCell id="msg11" value="15. SOAP GetStreamUri" style="html=1;verticalAlign=bottom;startArrow=oval;endArrow=block;startSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="325" y="1250" as="sourcePoint"/>
                         <mxPoint x="1005" y="1250" as="targetPoint"/>
@@ -214,7 +214,7 @@
                         <mxPoint as="offset"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="msg12" value="12. RTSP URL" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" edge="1">
+                <mxCell id="msg12" value="16. RTSP URL" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;fontSize=15;" parent="1" edge="1">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="1005" y="1290" as="sourcePoint"/>
                         <mxPoint x="325" y="1290" as="targetPoint"/>

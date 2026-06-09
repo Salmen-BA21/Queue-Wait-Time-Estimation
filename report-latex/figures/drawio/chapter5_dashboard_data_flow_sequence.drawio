@@ -85,7 +85,7 @@
                 <mxCell id="alt_auth_else" value="[else]" style="text;html=1;align=left;verticalAlign=top;spacingLeft=4;spacingTop=-4;" vertex="1" parent="1">
                     <mxGeometry x="260" y="350" width="60" height="20" as="geometry"/>
                 </mxCell>
-                <mxCell id="ret_auth_error" value="4b. Return 401 Unauthorized" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" edge="1" parent="1" source="act_backend" target="act_dashboard">
+                <mxCell id="ret_auth_error" value="4. Return 401 Unauthorized" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" edge="1" parent="1" source="act_backend" target="act_dashboard">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="705" y="360" as="sourcePoint"/>
                         <mxPoint x="290" y="360" as="targetPoint"/>
@@ -303,7 +303,7 @@
                 <mxCell id="alt_webrtc_else" value="[else - fallback to MJPEG]" style="text;html=1;align=left;verticalAlign=top;spacingLeft=4;spacingTop=-4;fontStyle=1;fontSize=13;labelBackgroundColor=default;" vertex="1" parent="1">
                     <mxGeometry x="260" y="1380" width="180" height="20" as="geometry"/>
                 </mxCell>
-                <mxCell id="msg_mjpeg_fallback" value="23b. Use MJPEG stream endpoint" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" edge="1" parent="1" source="act_backend" target="act_dashboard">
+                <mxCell id="msg_mjpeg_fallback" value="23. Use MJPEG stream endpoint" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;edgeStyle=elbowEdgeStyle;elbow=vertical;curved=0;rounded=0;" edge="1" parent="1" source="act_backend" target="act_dashboard">
                     <mxGeometry relative="1" as="geometry">
                         <mxPoint x="710" y="1090" as="sourcePoint"/>
                         <mxPoint x="290" y="1090" as="targetPoint"/>
