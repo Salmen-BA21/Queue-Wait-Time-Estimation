@@ -128,12 +128,20 @@ function FeedTransportSurface({
   const [mjpegFrameLoaded, setMjpegFrameLoaded] = useState(false);
   const previousStatusRef = useRef(feed.status);
   const lastForcedReconnectAtRef = useRef(0);
+  const WORKER_LOADING_TIMEOUT_MS = 60_000;
+  const [workerLoadingTimedOut, setWorkerLoadingTimedOut] = useState(false);
+  const workerLoadingTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     setPlaybackFailed(false);
     setMjpegFrameLoaded(false);
     previousStatusRef.current = feed.status;
     lastForcedReconnectAtRef.current = 0;
+    if (workerLoadingTimerRef.current !== null) {
+      window.clearTimeout(workerLoadingTimerRef.current);
+      workerLoadingTimerRef.current = null;
+    }
+    setWorkerLoadingTimedOut(false);
   }, [feed.feed_id, feed.preview_path, feed.status]);
 
   const transportActive = uiStatus !== "offline" && !isStopping;
@@ -150,9 +158,33 @@ function FeedTransportSurface({
   );
   const shouldShowWorkerLoading = transportActive
     && (feed.status === "initializing" || (feed.status === "running" && !hasWorkerMetrics));
+
+  useEffect(() => {
+    if (shouldShowWorkerLoading) {
+      if (workerLoadingTimerRef.current === null) {
+        workerLoadingTimerRef.current = window.setTimeout(() => {
+          setWorkerLoadingTimedOut(true);
+        }, WORKER_LOADING_TIMEOUT_MS);
+      }
+    } else {
+      if (workerLoadingTimerRef.current !== null) {
+        window.clearTimeout(workerLoadingTimerRef.current);
+        workerLoadingTimerRef.current = null;
+      }
+      setWorkerLoadingTimedOut(false);
+    }
+    return () => {
+      if (workerLoadingTimerRef.current !== null) {
+        window.clearTimeout(workerLoadingTimerRef.current);
+        workerLoadingTimerRef.current = null;
+      }
+    };
+  }, [shouldShowWorkerLoading]);
+
   const shouldAttemptWebRtc = transportActive
     && feed.status === "running"
-    && canUseWebRtc;
+    && canUseWebRtc
+    && (hasWorkerMetrics || workerLoadingTimedOut);
   const {
     videoRef: webRtcVideoRef,
     streamReady: webRtcReady,
@@ -168,7 +200,8 @@ function FeedTransportSurface({
     || Boolean(webRtcConnectionError);
   const shouldUseMjpegStream = transportActive
     && feed.status === "running"
-    && shouldUseMjpegFallback;
+    && shouldUseMjpegFallback
+    && (hasWorkerMetrics || workerLoadingTimedOut);
   const streamUrl = shouldUseMjpegStream
     ? `${getFeedMjpegStreamUrl(feed.feed_id)}?attempt=${streamAttempt}`
     : null;
