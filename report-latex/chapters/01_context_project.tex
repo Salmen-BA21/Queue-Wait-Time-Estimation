@@ -81,26 +81,6 @@ RetailNext \cite{retailnext2026} and Xovis \cite{xovis2026} represent the sensor
 \subsubsection{Vision-Based Monitoring Frameworks}
 Open-source tools built on YOLO detection and tracking, such as those provided by Ultralytics \cite{ultralytics_docs} and Roboflow \cite{roboflow_queue}, offer the computer-vision building blocks needed for queue monitoring: person detection, tracking, and zone-based counting. These frameworks are flexible and can be adapted to specific use cases. However, they typically stop at detection and counting. They do not include queue-theoretic estimation of wait time, stability classification, or integration with notification workflows. The gap between raw detection output and actionable operational metrics is left to the developer.
 
-\subsubsection{Positioning of the Proposed Solution}
-The proposed solution is positioned against the main existing approach families in Table~\ref{tab:approach_positioning}.
-\begin{table}[H]
-    \centering
-    \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
-    \begin{tabularx}{\textwidth}{|X|X|X|}
-        \hline
-        Approach family & Strengths & Typical limitation \\ \hline
-        Queue management platforms (Waitwhile, Qminder) & Customer-facing experience, virtual queues, appointment scheduling. & Require explicit check-in; do not observe physical queues or estimate wait time from the scene. \\ \hline
-        Sensor-based analytics (RetailNext, Xovis) & High-accuracy occupancy and flow data from dedicated 3D sensors. & Proprietary hardware; limited custom automation; enterprise-scale pricing. \\ \hline
-        Vision-based detection frameworks (Ultralytics, Roboflow) & Flexible open-source detection and tracking building blocks. & Stop at counting; no queue-theoretic estimation, stability classification, or alert integration. \\ \hline
-        Manual or occupancy-only monitoring & Easy to deploy and interpret. & Weak predictive value and high subjectivity. \\ \hline
-        Proposed integrated pipeline & Links perception, queue analytics, stability handling, web monitoring, and automation in one modular architecture. & Requires careful integration and validation across multiple technical domains. \\ \hline
-    \end{tabularx}
-    \caption{Positioning of the proposed solution against existing approaches}
-    \label{tab:approach_positioning}
-    \endgroup
-\end{table}
-
-The proposed solution combines open-source vision-based detection with queue-theoretic analytics, a web monitoring dashboard, and automated alert routing in one modular pipeline without proprietary hardware or explicit customer interaction.
 
 \subsection{Proposed Solution and Project Objectives}
 The proposed system links perception, analytics, monitoring, and automation in a modular architecture. Instead of stopping at raw visual observations, it maps camera feeds to queue-state information, then makes that information available through dashboard views and alert workflows.

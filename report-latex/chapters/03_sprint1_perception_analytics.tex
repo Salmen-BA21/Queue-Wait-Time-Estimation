@@ -91,6 +91,3 @@ These values are then reused by logs, overlays, webhook payloads, and dashboard 
 \section{Conclusion}
 Sprint 1 delivered the first complete path from raw video to queue indicators. Detection, tracking, and zone filtering produced a usable perception baseline, while the queue analytics step converted tracked observations into arrival rates, service rates, and adaptive wait-time estimates.
 
-The main result of the sprint was not only that people could be counted, but that the count was translated into a reusable queue signal. The adaptive wait-time logic made this signal more robust: it used the rate-based model when the queue was stable, moved to an occupancy-based estimate when the queue became overloaded, and stayed bounded when service events were missing.
-
-By connecting perception to interpretation in one sprint, the project avoided building the dashboard on top of raw visual counts. The metric output established here became the foundation for web monitoring, persistence, and automated alerting in the following sprints.

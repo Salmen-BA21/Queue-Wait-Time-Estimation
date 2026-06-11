@@ -17,7 +17,7 @@ The actors are:
 \begin{itemize}
     \item \textbf{Administrator}: manages manager accounts (create, update, delete) and controls access governance.
     \item \textbf{Manager}: configures sources and thresholds, monitors live queues, reacts to alerts, and reviews performance indicators.
-    \item \textbf{On-site Operator (external actor)}: receives queue alert notifications in a shared Telegram group and applies field actions, such as opening a new queue line or redirecting customer flow. In the MVP, the operator confirms completion manually in Telegram, and this confirmation is not automatically captured by the application.
+    \item \textbf{On-site Operator (external actor)}: receives queue alert notifications in a shared Telegram group and applies field actions, such as opening a new queue line or redirecting customer flow.
 \end{itemize}
 
 This split keeps the functional scope clear: access control, monitoring, and alert notification remain inside the system, while physical queue intervention and manual completion confirmation are treated as external operational actions.
