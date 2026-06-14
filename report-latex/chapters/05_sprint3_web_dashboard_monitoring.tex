@@ -8,7 +8,7 @@ Sprint 3 turned the backend capabilities from Sprint 2 into a manager-facing web
 
 The main objective was to make monitoring usable in one place. A manager should be able to sign in, prepare a feed, define the queue zone, launch monitoring, follow live indicators, and review analytics without switching between separate tools.
 
-\section{Sprint Objectives and Backlog}
+\section{Sprint Backlog}
 Sprint 3 combined interface design with live system integration. The design work defined the visual language, page structure, and reusable interaction patterns. The integration work connected those screens to authentication, feed management, WebSocket updates, video transport, and fallback polling. Table~\ref{tab:sprint3_backlog} lists the manager and administrator needs together with the implementation work that supported them.
 
 \begin{table}[H]
@@ -17,15 +17,13 @@ Sprint 3 combined interface design with live system integration. The design work
     \begin{tabularx}{\textwidth}{|l|X|X|}
         \hline
         UC ID & User Story & Implementation Work \\ \hline
-        UC-04 & As a manager, I want a consistent visual style so that the dashboard feels like one coherent product. & Define colors, typography, spacing, reusable component rules, and shared page scaffolding. \\ \hline
-        UC-02 & As a manager, I want the main setup and monitoring layouts prepared so that onboarding, monitoring, and analytics screens are available. & Prepare the landing page, dashboard, analytics page, settings screens, and feed onboarding dialogs. \\ \hline
-        UC-01 & As an administrator, I want to create and maintain manager accounts so that system access is centrally controlled. & Build the administrator dashboard for manager account creation, editing, activation, deactivation, and password reset. \\ \hline
-        UC-04 & As a manager, I want the dashboard connected to backend responses so that the interface reflects live operational data. & Implement the typed API integration layer and request handling for feeds, metrics, health, statistics, and authentication. \\ \hline
-        UC-02 & As a manager, I want to manage feeds from the interface so that feed lifecycle actions stay centralized. & Connect login state, protected routes, feed setup, zone selection, model selection, and feed control actions to the dashboard. \\ \hline
-        UC-04 & As a manager, I want live updates without refreshing so that changes are visible immediately. & Add WebSocket-driven live state updates, dashboard orchestration, and scenario-based integration tests. \\ \hline
-        UC-04 & As a manager, I want a suitable video transport chosen automatically so that the feed remains usable when conditions change. & Add WebRTC negotiation, MJPEG fallback, transport selection, and reconnection logic. \\ \hline
-        UC-04 & As a manager, I want the dashboard to stay usable during interruptions so that monitoring does not stop during transient failures. & Add fallback polling, stale-data guards, and error-state handling for live monitoring workflows. \\ \hline
-        UC-07 & As a manager, I want historical analytics available so that queue trends and alerts can be reviewed. & Implement the analytics page, KPI summaries, charts, filters, and CSV export behavior. \\ \hline
+        UC-3.1 & As a manager, I want a coherent dashboard interface so that setup, monitoring, and analytics can be used from one place. & Define colors, typography, spacing, reusable component rules, and shared page scaffolding. \\ \hline
+        UC-3.2 & As an administrator, I want to create and maintain manager accounts so that system access is centrally controlled. & Build the administrator dashboard for manager account creation, editing, activation, deactivation, and password reset. \\ \hline
+        UC-3.3 & As a manager, I want protected sign-in and role-based navigation so that each user sees only the screens matching their responsibility. & Connect login state, protected routes, feed setup, zone selection, model selection, and feed control actions to the dashboard. \\ \hline
+        UC-3.4 & As a manager, I want live dashboard updates without refreshing so that changes are visible immediately. & Add WebSocket-driven live state updates, dashboard orchestration, and scenario-based integration tests. \\ \hline
+        UC-3.5 & As a manager, I want live dashboard updates and fallback polling so that the interface remains informative during temporary interruptions. & Add fallback polling, stale-data guards, and error-state handling for live monitoring workflows. \\ \hline
+        UC-3.6 & As a manager, I want a suitable video transport chosen automatically so that the feed remains usable when conditions change. & Add WebRTC negotiation, MJPEG fallback, transport selection, and reconnection logic. \\ \hline
+        UC-3.7 & As a manager, I want historical analytics and exportable indicators so that repeated congestion patterns can be reviewed and shared. & Implement the analytics page, KPI summaries, charts, filters, and CSV export behavior. \\ \hline
     \end{tabularx}
     \caption{Sprint 3 backlog}
     \label{tab:sprint3_backlog}

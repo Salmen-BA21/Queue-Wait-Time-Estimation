@@ -8,7 +8,7 @@ Sprint 2 moved the project from a local video-processing pipeline to a service t
 
 This sprint also prepared the ground for the web dashboard. Managers would later need to discover cameras, configure sources, start or stop feeds, and keep watching a stream even when the preferred transport was unavailable.
 
-\section{Sprint Objectives and Backlog}
+\section{Sprint Backlog}
 The sprint objectives focused on four manager needs: secure connection to IP cameras, automatic camera discovery, centralized feed management, and reliable live delivery. These needs are captured in Table~\ref{tab:sprint2_backlog}.
 
 \begin{table}[H]
@@ -17,10 +17,11 @@ The sprint objectives focused on four manager needs: secure connection to IP cam
     \begin{tabularx}{\textwidth}{|l|X|X|}
         \hline
         UC ID & User Story & Implementation Work \\ \hline
-        UC-02 & As a manager, I want IP camera streams connected securely so that live sources can be reused reliably. & Add credential handling, RTSP transport control, reconnection behavior, and snapshot capture for camera feeds. \\ \hline
-        UC-02 & As a manager, I want cameras discovered automatically so that stream addresses do not need to be hardcoded. & Detect ONVIF cameras, resolve media services, and retrieve stream addresses. \\ \hline
-        UC-02 & As a manager, I want feed management exposed through the API so that camera lifecycle actions are centralized. & Expose feed control, metadata handling, diagnostics, persistence, and state recovery through typed backend endpoints. \\ \hline
-        UC-04 & As a manager, I want live delivery to stay available so that the dashboard can keep showing the active feed. & Support real-time events, WebRTC delivery for IP cameras, MJPEG delivery for local videos, and explicit fallback reporting. \\ \hline
+        UC-2.1 & As a manager, I want IP camera streams connected securely so that live sources can be reused reliably. & Add credential handling, RTSP transport control, reconnection behavior, and snapshot capture for camera feeds. \\ \hline
+        UC-2.2 & As a manager, I want cameras discovered automatically so that stream addresses do not need to be hardcoded. & Detect ONVIF cameras, resolve media services, and retrieve stream addresses. \\ \hline
+        UC-2.3 & As a manager, I want feed management exposed through the API so that camera lifecycle actions are centralized. & Expose feed control, metadata handling, diagnostics, persistence, and state recovery through typed backend endpoints. \\ \hline
+        UC-2.4 & As a manager, I want live metrics and feed status delivered through real-time channels so that monitoring reflects the current situation. & Support real-time events and WebRTC delivery for IP cameras and MJPEG delivery for local videos. \\ \hline
+        UC-2.5 & As a manager, I want fallback video delivery when the preferred transport is unavailable so that monitoring remains usable. & Support MJPEG delivery as a fallback when WebRTC is unavailable, and report the active transport explicitly so that the dashboard can reflect the current delivery mode. \\ \hline
     \end{tabularx}
     \caption{Sprint 2 backlog}
     \label{tab:sprint2_backlog}

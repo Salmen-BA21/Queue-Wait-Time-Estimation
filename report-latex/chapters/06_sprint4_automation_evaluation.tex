@@ -8,7 +8,7 @@ Sprint 4 completed the monitoring loop by connecting queue alerts to an external
 
 The sprint therefore combined two types of work: alert automation through n8n and Telegram, and final evaluation of perception, live monitoring, transport fallback, and notification delivery.
 
-\section{Sprint Objectives and Backlog}
+\section{Sprint Backlog}
 Sprint 4 focused on alert automation and system-wide verification. Alert automation required a validated payload, secure workflow access, cooldown handling, and Telegram delivery. Verification required testing the integrated system, checking streaming stability, tuning runtime responsiveness, and improving recovery from temporary failures. Table~\ref{tab:sprint4_backlog} lists the user stories and implementation work that drove this sprint.
 
 \begin{table}[H]
@@ -17,12 +17,11 @@ Sprint 4 focused on alert automation and system-wide verification. Alert automat
     \begin{tabularx}{\textwidth}{|l|X|X|}
         \hline
         UC ID & User Story & Implementation Work \\ \hline
-        UC-05 & As a manager, I want alert payloads dispatched to n8n so that operational staff can be notified automatically. & Define the webhook payload schema, validate it before dispatch, and protect delivery with shared-secret authorization. \\ \hline
-        UC-06 & As a manager, I want alerts routed through Telegram so that the on-site operator receives notifications on a familiar channel. & Create and configure the Telegram bot, store its credential in n8n, and configure the workflow branches. \\ \hline
-        UC-05 & As a manager, I want repeated alerts controlled so that operators are notified without being overwhelmed. & Add retry logic, timeout handling, cooldown checks, and delivery logging for webhook notifications. \\ \hline
-        UC-05 & As a manager, I want alert routing validated under realistic scenarios so that notification behavior is trustworthy. & Prepare PowerShell validation scripts for single-alert, multi-feed, and execution polling scenarios. \\ \hline
-        UC-04 & As a manager, I want the complete monitoring chain verified so that dashboard and streaming failures do not make the platform unusable. & Run backend and frontend integration checks for lifecycle actions, streaming, API contracts, and fallback behavior. \\ \hline
-        UC-04 & As a manager, I want monitoring to stay responsive during runtime execution. & Apply configurable image size, frame stride, async dispatch, playback pacing, worker supervision, frame handoff continuity, and WebSocket reconnection improvements. \\ \hline
+        UC-4.1 & As a manager, I want alert payloads dispatched to n8n so that operational staff can be notified automatically. & Define the webhook payload schema, validate it before dispatch, and protect delivery with shared-secret authorization. \\ \hline
+        UC-4.2 & As a manager, I want Telegram notifications routed to the on-site operator so that field action can be triggered through a familiar channel. & Create and configure the Telegram bot, store its credential in n8n, and configure the workflow branches. \\ \hline
+        UC-4.3 & As a manager, I want webhook retries, cooldown handling, and delivery logging so that notification failures are visible and repeated alerts are controlled. & Add retry logic, timeout handling, cooldown checks, and delivery logging for webhook notifications. \\ \hline
+        UC-4.4 & As a developer, I want alert routing validated under realistic scenarios so that notification behavior is trustworthy before deployment. & Prepare PowerShell validation scripts for single-alert, multi-feed, and execution polling scenarios. \\ \hline
+        UC-4.5 & As a developer, I want the complete monitoring chain tested and runtime behavior tuned so that the platform is reliable under realistic conditions. & Run backend and frontend integration checks for lifecycle actions, streaming, API contracts, and fallback behavior; apply configurable image size, frame stride, async dispatch, playback pacing, worker supervision, frame handoff continuity, and WebSocket reconnection improvements. \\ \hline
     \end{tabularx}
     \caption{Sprint 4 backlog}
     \label{tab:sprint4_backlog}
