@@ -17,9 +17,9 @@ The sprint objectives focused on four manager needs: secure connection to IP cam
     \begin{tabularx}{\textwidth}{|l|X|X|}
         \hline
         UC ID & User Story & Implementation Work \\ \hline
-        UC-2.1 & As a manager, I want IP camera streams connected securely so that live sources can be reused reliably. & Add credential handling, RTSP transport control, reconnection behavior, and snapshot capture for camera feeds. \\ \hline
+        UC-2.1 & As a developer, I want to implement secure IP camera stream connections with credential handling, RTSP transport control, and reconnection behavior so that live sources are reliable and reusable. & Add credential handling, RTSP transport control, reconnection behavior, and snapshot capture for camera feeds. \\ \hline
         UC-2.2 & As a manager, I want cameras discovered automatically so that stream addresses do not need to be hardcoded. & Detect ONVIF cameras, resolve media services, and retrieve stream addresses. \\ \hline
-        UC-2.3 & As a manager, I want feed management exposed through the API so that camera lifecycle actions are centralized. & Expose feed control, metadata handling, diagnostics, persistence, and state recovery through typed backend endpoints. \\ \hline
+        UC-2.3 & As a developer, I want to design and implement the feed management API with lifecycle actions, metadata handling, persistence, and state recovery so that feed operations are consistent and reliable. & Expose feed control, metadata handling, diagnostics, persistence, and state recovery through typed backend endpoints. \\ \hline
         UC-2.4 & As a manager, I want live metrics and feed status delivered through real-time channels so that monitoring reflects the current situation. & Support real-time events and WebRTC delivery for IP cameras and MJPEG delivery for local videos. \\ \hline
         UC-2.5 & As a manager, I want fallback video delivery when the preferred transport is unavailable so that monitoring remains usable. & Support MJPEG delivery as a fallback when WebRTC is unavailable, and report the active transport explicitly so that the dashboard can reflect the current delivery mode. \\ \hline
     \end{tabularx}

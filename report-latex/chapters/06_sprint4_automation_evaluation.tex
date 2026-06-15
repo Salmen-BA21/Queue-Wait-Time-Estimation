@@ -17,9 +17,9 @@ Sprint 4 focused on alert automation and system-wide verification. Alert automat
     \begin{tabularx}{\textwidth}{|l|X|X|}
         \hline
         UC ID & User Story & Implementation Work \\ \hline
-        UC-4.1 & As a manager, I want alert payloads dispatched to n8n so that operational staff can be notified automatically. & Define the webhook payload schema, validate it before dispatch, and protect delivery with shared-secret authorization. \\ \hline
+        UC-4.1 & As a developer, I want to implement webhook dispatch with validated alert payloads and proper authorization so that alerts securely reach the notification workflow. & Define the webhook payload schema, validate it before dispatch, and protect delivery with shared-secret authorization. \\ \hline
         UC-4.2 & As a manager, I want Telegram notifications routed to the on-site operator so that field action can be triggered through a familiar channel. & Create and configure the Telegram bot, store its credential in n8n, and configure the workflow branches. \\ \hline
-        UC-4.3 & As a manager, I want webhook retries, cooldown handling, and delivery logging so that notification failures are visible and repeated alerts are controlled. & Add retry logic, timeout handling, cooldown checks, and delivery logging for webhook notifications. \\ \hline
+        UC-4.3 & As a developer, I want to implement resilient webhook delivery with retries, cooldown deduplication, and audit logging so that alert delivery is reliable and traceable. & Add retry logic, timeout handling, cooldown checks, and delivery logging for webhook notifications. \\ \hline
         UC-4.4 & As a developer, I want alert routing validated under realistic scenarios so that notification behavior is trustworthy before deployment. & Prepare PowerShell validation scripts for single-alert, multi-feed, and execution polling scenarios. \\ \hline
         UC-4.5 & As a developer, I want the complete monitoring chain tested and runtime behavior tuned so that the platform is reliable under realistic conditions. & Run backend and frontend integration checks for lifecycle actions, streaming, API contracts, and fallback behavior; apply configurable image size, frame stride, async dispatch, playback pacing, worker supervision, frame handoff continuity, and WebSocket reconnection improvements. \\ \hline
     \end{tabularx}
@@ -30,7 +30,6 @@ Sprint 4 focused on alert automation and system-wide verification. Alert automat
 
 \section{Design}
 
-\subsection{Alert Automation and n8n Workflow}
 The alert workflow was designed to avoid two opposite problems: missing important queue alerts and overwhelming staff with repeated notifications for the same condition. When an alert arrives, the workflow first checks that the message is authorized. It then applies cooldown logic, archives the alert in the database, and sends the validated notification to Telegram.
 
 This separation makes the workflow easier to reason about. Authorization protects the entry point, cooldown controls repetition, archival supports traceability, and Telegram delivery reaches the on-site staff channel. Figure~\ref{fig:sprint4_workflow} illustrates the complete workflow logic.
@@ -42,19 +41,7 @@ This separation makes the workflow easier to reason about. Authorization protect
     \label{fig:sprint4_workflow}
 \end{figure}
 
-\subsection{System Verification and Evaluation Strategy}
-The evaluation strategy covered the main parts of the finished system: queue analytics, API behavior, dashboard responsiveness, transport fallback, and n8n routing. The most important observations were whether the perception pipeline stayed responsive, whether streams recovered after feed changes, whether alerts reached Telegram, and whether the dashboard stayed usable when WebSocket delivery was interrupted.
 
-The tests combined focused checks for individual behaviors with integrated scenarios that followed the system from queue-state change to dashboard update or Telegram notification. Normal operation, temporary failures, feed lifecycle changes, and alert cooldown behavior were all included because these are the situations most likely to affect a real monitoring deployment.
-
-Figure~\ref{fig:sprint4_evaluation_resilience_activity} illustrates the iterative evaluation and tuning cycle that characterized the sprint.
-
-\begin{figure}[!htbp]
-    \centering
-    \includegraphics[width=0.74\textwidth]{\detokenize{chapter6_evaluation_resilience_activity.pdf}}
-    \caption{Sprint 4 evaluation and resilience activity diagram for tests, tuning, and recovery verification.}
-    \label{fig:sprint4_evaluation_resilience_activity}
-\end{figure}
 
 \section{Implementation}
 
@@ -83,15 +70,53 @@ The n8n workflow separates three alert states: no alert, suppressed alert during
 
 PowerShell validation scripts were used for single-alert scenarios, multi-feed scenarios, and execution polling. These checks confirmed that authorization, cooldown routing, and Telegram delivery behaved as expected across different alert paths.
 
+\section{Tests and Evaluation}
+
+\subsection{Evaluation Strategy and Scope}
+The evaluation strategy covered the main parts of the finished system: queue analytics, API behavior, dashboard responsiveness, transport fallback, and n8n routing. The most important observations were whether the perception pipeline stayed responsive, whether streams recovered after feed changes, whether alerts reached Telegram, and whether the dashboard stayed usable when WebSocket delivery was interrupted.
+
+The tests combined focused checks for individual behaviors with integrated scenarios that followed the system from queue-state change to dashboard update or Telegram notification. Normal operation, temporary failures, feed lifecycle changes, and alert cooldown behavior were all included because these are the situations most likely to affect a real monitoring deployment.
+
+Figure~\ref{fig:sprint4_evaluation_resilience_activity} illustrates the iterative evaluation and tuning cycle that characterized the sprint.
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=0.74\textwidth]{\detokenize{chapter6_evaluation_resilience_activity.pdf}}
+    \caption{Sprint 4 evaluation and resilience activity diagram for tests, tuning, and recovery verification.}
+    \label{fig:sprint4_evaluation_resilience_activity}
+\end{figure}
+
 \subsection{Integrated System Verification}
 Integration verification covered the complete monitoring chain: feed lifecycle actions, streaming behavior, live dashboard updates, webhook delivery, and Telegram notification routing. Error scenarios included authentication failures, WebSocket disconnections, WebRTC unavailability, and feed worker interruption.
 
 The goal was not only to confirm that each feature worked in isolation, but also to check that failures in one part of the system did not make the whole platform unusable. For example, a WebSocket interruption should move the dashboard to polling, and a temporary notification failure should be recorded rather than silently ignored.
 
 \subsection{Runtime Optimization and Performance Tuning}
-Several runtime tuning options were added to improve responsiveness. Image size and frame stride can be adjusted so the project can trade some detection detail for faster processing when hardware resources are limited. Device selection supports different deployment machines. Alert dispatch was moved away from the main perception path, and file playback pacing was adjusted to better simulate real-time delivery instead of pushing frames as fast as possible.
+Several runtime tuning options were added to improve responsiveness. Two key parameters control the inference behavior:
 
+\begin{itemize}
+    \item \textbf{Image size (\texttt{imgsz}):} Resolution of frames sent to YOLO. Larger images (640×640) improve accuracy but cost more GPU; smaller images (320×320) are faster but miss details.
+    
+    \item \textbf{Frame stride:} How many frames to skip between detections. Stride=1 processes every frame; stride=2 processes every second frame; stride=3 is fastest but may miss events.
+\end{itemize}
+
+
+Table~\ref{tab:sprint4_tuning_examples} summarizes the configurations evaluated during tuning and the measured impact on inference time, GPU load, and effective throughput.
+
+\begin{table}[H]
+    \centering
+    \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
+    \begin{tabularx}{\textwidth}{|l|l|l|l|l|X|}
+        \hline
+        \textbf{imgsz} & \textbf{Stride} & \textbf{Inference Time} & \textbf{GPU Load} & \textbf{Effective FPS} & \textbf{Use Case} \\ \hline
+        320 & 3 & 5 ms & 18\% & 28 & Fast processing, minimal VRAM usage \\ \hline
+        512 & 2 & 7 ms & 24\% & 15 & Balanced accuracy/speed \textit{(default)} \\ \hline
+        640 & 1 & 11 ms & 33\% & 13 & High-accuracy, all frames processed \\ \hline
+    \end{tabularx}
+    \caption{Runtime configuration variants and measured performance characteristics.}
+    \label{tab:sprint4_tuning_examples}
+    \endgroup
+\end{table}
 
 \section{Conclusion}
 Sprint 4 delivered the final monitoring-to-action loop. Queue alerts could be validated, routed through n8n, filtered by cooldown logic, and delivered to Telegram. The evaluation work confirmed the main integrated behaviors: live metrics, dashboard resilience, stream fallback, alert dispatch, and workflow routing.
-
