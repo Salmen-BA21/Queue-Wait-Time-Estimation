@@ -50,7 +50,7 @@ At a high level, the system captures a feed, counts people inside a queue zone, 
 \end{table}
 
 \subsection{Non-functional Requirements}
-In addition to functional behavior, the platform must satisfy quality constraints that keep it usable in a live monitoring environment. A correct wait-time formula is not enough if the video feed freezes, the dashboard stops updating, or alerts are lost. For this reason, performance, reliability, usability, security, and maintainability are treated as project requirements and summarized in Table~\ref{tab:nonfunctional_quality_matrix}.
+In addition to functional behavior, the platform must satisfy quality constraints that keep it usable in a live monitoring environment. A correct wait-time formula is not enough if the video feed freezes, the dashboard stops updating, or alerts are lost. For this reason, performance, reliability, and security are treated as project requirements and summarized in Table~\ref{tab:nonfunctional_quality_matrix}.
 \begin{table}[H]
     \centering
     \begingroup\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{0.95}\footnotesize
@@ -58,11 +58,8 @@ In addition to functional behavior, the platform must satisfy quality constraint
         \hline
         ID & Quality & Target indicator & Validation \\ \hline
         NFR-01 & Performance & Keep the loop near real time and limit alert delay. & Runtime observation under representative feed scenarios. \\ \hline
-        NFR-02 & Scalability & Support independent control for multiple feed contexts. & Feed registry behavior and state-transition checks. \\ \hline
-        NFR-03 & Reliability & Recover gracefully from camera drops and webhook failures. & Reconnect paths and retry/fallback test scenarios. \\ \hline
-        NFR-04 & Usability & Keep setup and monitoring clear for non-developer users. & Dashboard integration tests and workflow walkthroughs. \\ \hline
-        NFR-05 & Security & Restrict integration access through secrets and credentials. & Webhook secret validation and credential checks. \\ \hline
-        NFR-06 & Maintainability & Keep the architecture modular and testable. & Design review and test-suite coverage by module. \\ \hline
+        NFR-02 & Reliability & Recover gracefully from camera drops and webhook failures. & Reconnect paths and retry/fallback test scenarios. \\ \hline
+        NFR-03 & Security & Restrict integration access through secrets and credentials. & Webhook secret validation and credential checks. \\ \hline
     \end{tabularx}
     \caption{Non-functional requirement quality matrix}
     \label{tab:nonfunctional_quality_matrix}
