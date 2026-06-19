@@ -220,23 +220,6 @@ The technology stack follows the main stages of the system, from video perceptio
 This selection supports the complete path from perception through automation while keeping each stage understandable on its own.
 \section{Software Architecture}
 
-\subsection{Overall Architecture}
-The architecture is organized into four stages that match the flow of data through the system, from input acquisition to output delivery. Figure~\ref{fig:overall_architecture} illustrates this flow.
-\begin{figure}[!htbp]
-    \centering
-    \includegraphics[width=0.95\textwidth]{\detokenize{chapter2_architecture.pdf}}
-    \caption{Overall system architecture from video acquisition to alert delivery.}
-    \label{fig:overall_architecture}
-\end{figure}
-
-\begin{enumerate}
-    \item \textbf{Input acquisition}: multiple sources feed into the acquisition component, which handles connection management and stream ingestion.
-    \item \textbf{Processing}: the processing engine applies algorithms to extract structured observations from raw input data and exposes them through a defined interface.
-    \item \textbf{Analysis}: the analysis module receives structured observations and computes quantitative metrics using domain-specific models and evaluation logic.
-    \item \textbf{Output and integration}: the backend acts as the distribution hub that routes computed metrics across three outputs: the live interface via real-time channels, the persistence layer for historical records, and the orchestrator which forwards events to external notification services.
-\end{enumerate}
-
-This separation keeps the four stages easier to validate. Analysis formulas depend on processing outputs, the backend depends on the metric contract, and the interface, persistence, and orchestration consume the same outputs without being tightly coupled to one another.
 
 \subsection{Backend Architecture}
 The backend adopts a three-tier layered architecture combined with a Backend-for-Frontend (BFF) pattern. The layered architecture organizes the system vertically into separate tiers based on responsibility, while the BFF pattern tailors the backend API specifically to the requirements of the frontend client, rather than serving as a generic intermediary.
