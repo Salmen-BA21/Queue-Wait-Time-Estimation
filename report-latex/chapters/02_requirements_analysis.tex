@@ -104,7 +104,7 @@ Table~\ref{tab:product_backlog} presents the product backlog used to organize th
     PB-13 & E3: Web dashboard and access control & As a manager, I want live dashboard updates and fallback polling so that the interface remains informative during temporary interruptions. & S \\ \hline
     PB-14 & E3: Web dashboard and access control & As a manager, I want historical analytics and exportable indicators so that repeated congestion patterns can be reviewed. & C \\ \hline
     PB-15 & E4: Alert automation and evaluation & As a manager, I want alert payloads dispatched to n8n so that operational staff can be notified automatically. & M \\ \hline
-    PB-16 & E4: Alert automation and evaluation & As a manager, I want Telegram notifications routed to the on-site operator so that field action can be triggered through a familiar channel. & M \\ \hline
+    PB-16 & E4: Alert automation and evaluation & As a manager, I want Telegram notifications routed to both myself and the on-site operator through a shared group so that we can coordinate field actions through a familiar channel. & M \\ \hline
     PB-17 & E4: Alert automation and evaluation & Add webhook retries, cooldown handling, and delivery logging so that notification failures are visible and repeated alerts are controlled. & S \\ \hline
     PB-18 & E4: Alert automation and evaluation & Run integrated tests and apply runtime tuning so that the finished system is more reliable under realistic conditions. & S \\ \hline
     PB-19 & E5: Future improvement & As a manager, I want multi-zone and multi-server queue modeling so that parallel cashier configurations can be represented more precisely. & W \\ \hline
@@ -149,7 +149,7 @@ At the system level, the use cases can be grouped into four interactions: config
         UC-03 & Define or update queue zone geometry. & Manager \\ \hline
         UC-04 & Monitor live queue metrics and feed status. & Manager \\ \hline
         UC-05 & Receive and interpret warning or critical alerts. & Manager \\ \hline
-        UC-06 & Automatically notify the on-site operator via Telegram when an alert is detected. & System automatic behavior \\ \hline
+        UC-06 & Automatically notify both the manager and on-site operator via shared Telegram group when an alert is detected. & System automatic behavior \\ \hline
         UC-07 & Review trends and performance indicators. & Manager \\ \hline
     \end{tabularx}
     \caption{Primary global use cases}
